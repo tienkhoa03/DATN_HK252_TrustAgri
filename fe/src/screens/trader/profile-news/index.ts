@@ -1,0 +1,1 @@
+export { TraderProfileNewsScreen } from './TraderProfileNewsScreen';

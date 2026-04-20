@@ -1,0 +1,18 @@
+:root {
+  --color-primary-zaloBlue: #0068FF;
+  --color-primary-agriGreen: #3EBB6C;
+  --color-functional-alertRed: #F50000;
+  --color-functional-warningYellow: #FFCC00;
+  --color-functional-neutralGray: #F7F7F8;
+  --color-semantic-success: #3EBB6C;
+  --color-semantic-error: #F50000;
+  --color-semantic-warning: #FFCC00;
+  --color-semantic-info: #0068FF;
+  --color-text-primary: #000000;
+  --color-text-secondary: #666666;
+  --color-text-disabled: #CCCCCC;
+  --color-text-inverse: #FFFFFF;
+  --color-background-primary: #FFFFFF;
+  --color-background-secondary: #F7F7F8;
+  --color-background-tertiary: #F0F0F0;
+}

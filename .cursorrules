@@ -1,0 +1,18 @@
+# --- TỔ CHỨC WORKSPACE VÀ NGUỒN CHÂN LÝ ---
+1. CẤU TRÚC DỰ ÁN:
+   - `/fe`: Chỉ chứa mã nguồn Frontend. Lệnh terminal (npm/yarn) phải chạy trong thư mục này.
+   - `/be`: Chỉ chứa mã nguồn Backend. Lệnh terminal (go/java/node) phải chạy trong thư mục này.
+   - `/specs`: LÀ NGUỒN CHÂN LÝ DUY NHẤT (Single Source of Truth). Cấm tự ý thay đổi nội dung trong thư mục này.
+
+2. QUY TẮC ĐẶT BIỆT CHO ĐẶC TẢ (KIRO SPECS):
+   - Khi làm việc với Frontend: Bắt buộc đọc `/specs/frontend-ui-specification/design.md` và tuân thủ các bước trong `tasks.md`.
+   - Khi làm việc với Backend: Bắt buộc đọc `/specs/backend-api-specification/design.md` và tuân thủ các bước trong `tasks.md`.
+   - Tuyệt đối KHÔNG tự ý sáng tạo API endpoint, payload JSON, hoặc biến trạng thái UI ngoài các file `design.md`.
+
+3. QUY TẮC THỰC THI NHIỆM VỤ (TASK EXECUTION):
+   - Chỉ code đúng Bước (Task) được yêu cầu. Không nhảy bước.
+   - Không được gộp chung logic của FE và BE vào cùng một file hoặc một lần commit trừ khi được yêu cầu tích hợp.
+   - Nếu phát hiện API FE cần gọi không khớp với thiết kế BE, phải dừng lại cảnh báo, không tự ý sửa code để "chạy ép".
+
+4. MÔI TRƯỜNG & TERMINAL:
+   - Tự động `cd /fe` hoặc `cd /be` trước khi chạy bất kỳ lệnh cài đặt package nào.

@@ -1,0 +1,172 @@
+version: '3.9'
+
+services:
+  # ─── DATABASES ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: trustagri-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-trustagri}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-trustagri_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-trustagri}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-trustagri}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: trustagri-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  influxdb:
+    image: influxdb:2.7-alpine
+    container_name: trustagri-influxdb
+    restart: unless-stopped
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: trustagri
+      DOCKER_INFLUXDB_INIT_PASSWORD: trustagri_secret
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG:-trustagri}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET:-sensor_data}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_TOKEN:-trustagri-influx-token}
+    ports:
+      - '8086:8086'
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    healthcheck:
+      test: ['CMD', 'influx', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── MICROSERVICES ──────────────────────────────────────────────────────────
+  auth-service:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    container_name: trustagri-auth
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: 3001
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+    ports:
+      - '3001:3001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: apps/notification-service/Dockerfile
+    container_name: trustagri-notification
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: 3002
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+    ports:
+      - '3002:3002'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  farm-service:
+    build:
+      context: .
+      dockerfile: apps/farm-service/Dockerfile
+    container_name: trustagri-farm
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: 3003
+      POSTGRES_HOST: postgres
+    ports:
+      - '3003:3003'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  contract-service:
+    build:
+      context: .
+      dockerfile: apps/contract-service/Dockerfile
+    container_name: trustagri-contract
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: 3004
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+    ports:
+      - '3004:3004'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  monitoring-service:
+    build:
+      context: .
+      dockerfile: apps/monitoring-service/Dockerfile
+    container_name: trustagri-monitoring
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: 3005
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      INFLUXDB_URL: http://influxdb:8086
+    ports:
+      - '3005:3005'
+    depends_on:
+      influxdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # ─── API GATEWAY ────────────────────────────────────────────────────────────
+  api-gateway:
+    image: nginx:1.25-alpine
+    container_name: trustagri-gateway
+    restart: unless-stopped
+    ports:
+      - '3006:80'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - auth-service
+      - notification-service
+      - farm-service
+      - contract-service
+      - monitoring-service
+
+volumes:
+  postgres_data:
+  redis_data:
+  influxdb_data:

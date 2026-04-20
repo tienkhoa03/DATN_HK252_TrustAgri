@@ -1,0 +1,28 @@
+{
+  "primary": {
+    "zaloBlue": "#0068FF",
+    "agriGreen": "#3EBB6C"
+  },
+  "functional": {
+    "alertRed": "#F50000",
+    "warningYellow": "#FFCC00",
+    "neutralGray": "#F7F7F8"
+  },
+  "semantic": {
+    "success": "#3EBB6C",
+    "error": "#F50000",
+    "warning": "#FFCC00",
+    "info": "#0068FF"
+  },
+  "text": {
+    "primary": "#000000",
+    "secondary": "#666666",
+    "disabled": "#CCCCCC",
+    "inverse": "#FFFFFF"
+  },
+  "background": {
+    "primary": "#FFFFFF",
+    "secondary": "#F7F7F8",
+    "tertiary": "#F0F0F0"
+  }
+}

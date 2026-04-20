@@ -1,0 +1,76 @@
+# =========================
+# TrustAgri Monorepo Ignore
+# =========================
+
+# Dependencies
+**/node_modules/
+
+# Build outputs
+**/dist/
+fe/www/
+be/**/*.d.ts
+be/**/*.js.map
+
+# Turbo / coverage
+**/.turbo/
+**/coverage/
+
+# Logs
+logs/
+**/logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime
+pids/
+**/pids/
+*.pid
+*.pid.lock
+*.seed
+
+# Environment and secrets
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Caches
+**/.npm/
+**/.cache/
+**/.eslintcache
+**/.tsbuildinfo
+**/.node_repl_history
+**/.yarn-integrity
+
+# Playwright artifacts
+**/playwright-report/
+**/test-results/
+fe/playwright/.cache/
+
+# Build reports
+stats.html
+bundle-report.html
+fe/.performance/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editors / IDEs
+.idea/
+
+# VS Code local state
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/tasks.json
+!.vscode/launch.json
+
+# Local tooling folders
+fe/.kiro
+
+# Keep visual baseline screenshots committed
+!fe/src/tests/visual/__screenshots__/
