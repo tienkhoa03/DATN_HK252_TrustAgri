@@ -9,8 +9,7 @@
  *   POST   /api/v1/orders/:id/reject   (trader)
  *   POST   /api/v1/orders/:id/cancel   (buyer)
  *
- * Server lọc theo JWT: buyer chỉ thấy đơn của mình; trader chỉ thấy đơn của sản phẩm mình.
- * Không cần (và không có) query buyerId/traderId — token quyết định.
+ * Server lọc theo JWT; thêm query tùy chọn `buyerId=me|uuid`, `includeSummary`, `from`, `to` (Phase 19).
  */
 
 import apiClient from '@/api/client';
@@ -37,14 +36,27 @@ export interface ListResponse<T> {
   total: number;
 }
 
+/** GET /orders|/contracts khi `includeSummary=true` (common.dto.ts) */
+export interface BuyerTransactionSummaryDto {
+  totalSpent: number;
+  completedCount: number;
+}
+
+export type ListOrdersResponse = ListResponse<OrderDto> & {
+  summary?: BuyerTransactionSummaryDto;
+};
+
 export interface ListOrdersParams {
   status?: OrderDto['status'] | 'all';
   /** Lọc theo role người gọi (query backend OrderQueryDto) */
   role?: 'buyer' | 'trader';
+  /** `me` = người mua trong JWT (role buyer) */
+  buyerId?: string;
   from?: string;
   to?: string;
   page?: number;
   limit?: number;
+  includeSummary?: boolean;
 }
 
 export interface CreateOrderDto {
@@ -116,24 +128,68 @@ export function toOrderViMessage(err: unknown, context: OrderCtx = 'list'): stri
   return fallback[context];
 }
 
+function normalizeOrder(raw: unknown): OrderDto {
+  const r = raw as Record<string, unknown>;
+  return {
+    id: String(r.id ?? ''),
+    buyerId: String(r.buyerId ?? r.buyer_id ?? ''),
+    traderId: String(r.traderId ?? r.trader_id ?? ''),
+    productId: String(r.productId ?? r.product_id ?? ''),
+    quantity: Number(r.quantity ?? 0),
+    unit: String(r.unit ?? ''),
+    totalPrice: Number(r.totalPrice ?? r.total_price ?? 0),
+    deposit:
+      r.deposit != null && r.deposit !== ''
+        ? Number(r.deposit)
+        : undefined,
+    status: r.status as OrderDto['status'],
+    createdAt: String(r.createdAt ?? r.created_at ?? ''),
+    updatedAt: String(r.updatedAt ?? r.updated_at ?? ''),
+  };
+}
+
+function normalizeSummary(raw: unknown): BuyerTransactionSummaryDto | undefined {
+  if (raw == null || typeof raw !== 'object') return undefined;
+  const s = raw as Record<string, unknown>;
+  return {
+    totalSpent: Number(s.totalSpent ?? s.total_spent ?? 0),
+    completedCount: Number(s.completedCount ?? s.completed_count ?? 0),
+  };
+}
+
+function normalizeListOrdersResponse(raw: unknown): ListOrdersResponse {
+  const d = raw as Record<string, unknown>;
+  const itemsRaw = d.items;
+  const items = Array.isArray(itemsRaw) ? itemsRaw.map(normalizeOrder) : [];
+  return {
+    items,
+    page: Number(d.page ?? 1),
+    limit: Number(d.limit ?? 20),
+    total: Number(d.total ?? 0),
+    ...(d.summary != null ? { summary: normalizeSummary(d.summary) } : {}),
+  };
+}
+
 // ── API ──────────────────────────────────────────────────────────────────────
 
-export async function listOrders(params?: ListOrdersParams): Promise<ListResponse<OrderDto>> {
+export async function listOrders(params?: ListOrdersParams): Promise<ListOrdersResponse> {
   const q: Record<string, unknown> = {};
   if (params?.status && params.status !== 'all') q.status = params.status;
   if (params?.role) q.role = params.role;
+  if (params?.buyerId) q.buyerId = params.buyerId;
   if (params?.from) q.from = params.from;
   if (params?.to) q.to = params.to;
   if (params?.page) q.page = params.page;
   if (params?.limit) q.limit = params.limit;
+  if (params?.includeSummary === true) q.includeSummary = true;
 
-  const { data } = await apiClient.get<ListResponse<OrderDto>>('/orders', { params: q });
-  return data;
+  const { data } = await apiClient.get<unknown>('/orders', { params: q });
+  return normalizeListOrdersResponse(data);
 }
 
 export async function getOrder(id: string): Promise<OrderDto> {
-  const { data } = await apiClient.get<OrderDto>(`/orders/${id}`);
-  return data;
+  const { data } = await apiClient.get<unknown>(`/orders/${id}`);
+  return normalizeOrder(data);
 }
 
 export async function createOrder(body: CreateOrderDto): Promise<OrderDto> {

@@ -1,21 +1,38 @@
 import {
-  Entity,
-  PrimaryGeneratedColumn,
+  Check,
   Column,
   CreateDateColumn,
   DeleteDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
 } from 'typeorm';
+import { BuyingRequestEntity } from '../../buying-requests/entities/buying-request.entity';
 
 export type ProposalStatus = 'pending' | 'accepted' | 'rejected';
 
 @Entity('proposals')
+@Check('"price" > 0')
+@Check('"quantity" > 0')
+@Check(`"status" IN ('pending', 'accepted', 'rejected')`)
 export class ProposalEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index('idx_proposals_buying_request_id')
   @Column({ name: 'buying_request_id' })
   buyingRequestId: string;
 
+  @ManyToOne(() => BuyingRequestEntity, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'buying_request_id' })
+  buyingRequest: BuyingRequestEntity;
+
+  /**
+   * Cross-service FK → users.user_id (auth-service).
+   */
+  @Index('idx_proposals_trader_id')
   @Column({ name: 'trader_id' })
   traderId: string;
 
@@ -31,6 +48,7 @@ export class ProposalEntity {
   @Column({ type: 'text', nullable: true })
   note: string | null;
 
+  @Index('idx_proposals_status')
   @Column({ type: 'varchar', length: 20, default: 'pending' })
   status: ProposalStatus;
 

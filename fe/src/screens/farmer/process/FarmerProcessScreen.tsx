@@ -14,7 +14,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Page, Text, Modal, useSnackbar } from 'zmp-ui';
+import { Page, Text, Modal } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
@@ -35,6 +35,7 @@ import {
   generateClientRecordId,
 } from '@/services/careLogOfflineQueue';
 import { ApiError } from '@/api/errors';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 
 // ── Action type helpers ───────────────────────────────────────────────────────
 
@@ -125,7 +126,7 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
   onTaskToggle,
   onBack,
 }) => {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
 
   // ── Tab state ────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<'tasks' | 'diary' | 'standards'>('tasks');

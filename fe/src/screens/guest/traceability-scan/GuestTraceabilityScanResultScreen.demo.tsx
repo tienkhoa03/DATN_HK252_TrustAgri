@@ -80,7 +80,7 @@ export const GuestTraceabilityScanResultScreenDemo: React.FC<GuestTraceabilitySc
       {/* Guest Traceability Scan Result Screen */}
       <div style={contentWrapperStyles}>
         <GuestTraceabilityScanResultScreen
-          productId="PROD-001"
+          qrCode="TRUST-DEMO-001"
           onLogin={handleLogin}
         />
       </div>

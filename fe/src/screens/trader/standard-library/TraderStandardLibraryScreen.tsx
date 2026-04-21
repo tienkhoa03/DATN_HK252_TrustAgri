@@ -19,13 +19,14 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Page, Text, useSnackbar } from 'zmp-ui';
+import { Page, Text } from 'zmp-ui';
 import { useAtomValue } from 'jotai';
 import { currentRoleAtom } from '@/state/authAtoms';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { useStandards } from '@/hooks/useStandards';
 import type { StandardDto, StandardStepDto, CreateStandardDto, UpdateStandardDto } from '@/hooks/useStandards';
 
@@ -113,7 +114,7 @@ export const TraderStandardLibraryScreen: React.FC = () => {
     removeStandard,
   } = useStandards();
 
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
 
   // ── Snackbar on error ──────────────────────────────────────────────────────
 

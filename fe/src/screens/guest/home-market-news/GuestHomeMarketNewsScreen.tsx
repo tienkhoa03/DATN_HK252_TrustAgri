@@ -13,17 +13,23 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Page, Box, Text, useSnackbar } from 'zmp-ui';
+import { Page, Text } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { Chart } from '../../../design-system/components/Chart';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import {
   listProducts,
   cropEmoji,
   toMarketplaceViMessage,
 } from '../../../services/marketplaceService';
+import {
+  listForecasts,
+  listNews,
+  toNewsForecastViMessage,
+} from '../../../services/newsForecastService';
 
 export interface GuestHomeMarketNewsScreenProps {
   onLogin?: () => void;
@@ -53,6 +59,107 @@ interface PriceData {
   data: { day: string; price: number }[];
 }
 
+function mapCategoryToSliderType(
+  category: string,
+): 'price-forecast' | 'weather-alert' | 'farming-technique' {
+  if (category === 'weather_alert') return 'weather-alert';
+  if (category === 'farming_technique') return 'farming-technique';
+  return 'price-forecast';
+}
+
+function formatNewsDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  } catch {
+    return iso;
+  }
+}
+
+const FALLBACK_PRICE_DATA: Record<string, PriceData> = {
+  pomelo: {
+    product: 'Bưởi Da Xanh',
+    trend: 'up',
+    change: 15,
+    data: [
+      { day: 'T2', price: 38 },
+      { day: 'T3', price: 40 },
+      { day: 'T4', price: 42 },
+      { day: 'T5', price: 41 },
+      { day: 'T6', price: 43 },
+      { day: 'T7', price: 45 },
+      { day: 'CN', price: 47 },
+    ],
+  },
+  mango: {
+    product: 'Xoài Cát Chu',
+    trend: 'stable',
+    change: 2,
+    data: [
+      { day: 'T2', price: 34 },
+      { day: 'T3', price: 35 },
+      { day: 'T4', price: 34 },
+      { day: 'T5', price: 35 },
+      { day: 'T6', price: 35 },
+      { day: 'T7', price: 36 },
+      { day: 'CN', price: 35 },
+    ],
+  },
+  durian: {
+    product: 'Sầu riêng Monthong',
+    trend: 'down',
+    change: -8,
+    data: [
+      { day: 'T2', price: 130 },
+      { day: 'T3', price: 128 },
+      { day: 'T4', price: 125 },
+      { day: 'T5', price: 122 },
+      { day: 'T6', price: 120 },
+      { day: 'T7', price: 118 },
+      { day: 'CN', price: 120 },
+    ],
+  },
+};
+
+function parseForecastToPriceData(
+  cropKey: string,
+  fallback: PriceData,
+  forecastData: unknown,
+): PriceData {
+  if (!forecastData || typeof forecastData !== 'object') return fallback;
+  const fd = forecastData as Record<string, unknown>;
+  const trendRaw = fd.trend;
+  const trend: 'up' | 'down' | 'stable' =
+    trendRaw === 'up' || trendRaw === 'down' || trendRaw === 'stable' ? trendRaw : fallback.trend;
+  const changePercent =
+    typeof fd.changePercent === 'number' ? fd.changePercent : fallback.change;
+  const series = fd.series;
+  const productLabel = typeof fd.productLabel === 'string' ? fd.productLabel : fallback.product;
+  let data = fallback.data;
+  if (Array.isArray(series)) {
+    const mapped = series
+      .map((row) => {
+        if (!row || typeof row !== 'object') return null;
+        const r = row as Record<string, unknown>;
+        const day = typeof r.day === 'string' ? r.day : '';
+        const price = typeof r.price === 'number' ? r.price : NaN;
+        if (!day || Number.isNaN(price)) return null;
+        return { day, price };
+      })
+      .filter((x): x is { day: string; price: number } => x !== null);
+    if (mapped.length > 0) data = mapped;
+  }
+  return {
+    product: productLabel,
+    trend,
+    change: changePercent,
+    data,
+  };
+}
+
 /**
  * Guest Home & Market News Screen Component
  * Requirements: FR-G02, FR-G03, US-G02, 23.1-23.4
@@ -61,12 +168,15 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
   onLogin,
   onProductPress,
 }) => {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
   const [selectedProduct, setSelectedProduct] = useState<string>('pomelo');
   const [featuredProducts, setFeaturedProducts] = useState<FeaturedProductUi[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
+  const [newsAndForecastLoading, setNewsAndForecastLoading] = useState(true);
+  const [priceData, setPriceData] = useState<Record<string, PriceData>>(FALLBACK_PRICE_DATA);
 
   // Load featured products (public — không cần auth) on mount
   useEffect(() => {
@@ -101,77 +211,57 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Mock news data - Tin tức nổi bật
-  const newsItems: NewsItem[] = [
-    {
-      id: '1',
-      title: 'Dự báo giá Bưởi Da Xanh tăng 15% tuần tới do nhu cầu cao',
-      type: 'price-forecast',
-      image: '📊',
-      date: '15/12/2025',
-    },
-    {
-      id: '2',
-      title: 'Cảnh báo: Thời tiết nắng nóng kéo dài ảnh hưởng vụ Xoài',
-      type: 'weather-alert',
-      image: '⚠️',
-      date: '14/12/2025',
-    },
-    {
-      id: '3',
-      title: 'Kỹ thuật canh tác: Cách chăm sóc Sầu riêng giai đoạn ra hoa',
-      type: 'farming-technique',
-      image: '🌱',
-      date: '13/12/2025',
-    },
-  ];
+  // Tin công khai + dự báo giá (GET public — không bắt buộc Bearer), song song với marketplace
+  useEffect(() => {
+    let cancelled = false;
+    setNewsAndForecastLoading(true);
+    Promise.all([
+      listNews({ page: 1, limit: 12 }),
+      listForecasts({ page: 1, limit: 20, region: 'mekong_delta', type: 'price' }),
+    ])
+      .then(([newsRes, fcRes]) => {
+        if (cancelled) return;
+        const slider: NewsItem[] = newsRes.items.map((a) => ({
+          id: a.id,
+          title: a.title,
+          type: mapCategoryToSliderType(a.category),
+          image: a.imageUrl && a.imageUrl.startsWith('http') ? '📰' : a.imageUrl || '📰',
+          date: formatNewsDate(a.publishedAt),
+        }));
+        setNewsItems(slider);
 
-  // Mock price data - Biểu đồ giá cả 7 ngày
-  const priceData: Record<string, PriceData> = {
-    pomelo: {
-      product: 'Bưởi Da Xanh',
-      trend: 'up',
-      change: 15,
-      data: [
-        { day: 'T2', price: 38 },
-        { day: 'T3', price: 40 },
-        { day: 'T4', price: 42 },
-        { day: 'T5', price: 41 },
-        { day: 'T6', price: 43 },
-        { day: 'T7', price: 45 },
-        { day: 'CN', price: 47 },
-      ],
-    },
-    mango: {
-      product: 'Xoài Cát Chu',
-      trend: 'stable',
-      change: 2,
-      data: [
-        { day: 'T2', price: 34 },
-        { day: 'T3', price: 35 },
-        { day: 'T4', price: 34 },
-        { day: 'T5', price: 35 },
-        { day: 'T6', price: 35 },
-        { day: 'T7', price: 36 },
-        { day: 'CN', price: 35 },
-      ],
-    },
-    durian: {
-      product: 'Sầu riêng Monthong',
-      trend: 'down',
-      change: -8,
-      data: [
-        { day: 'T2', price: 130 },
-        { day: 'T3', price: 128 },
-        { day: 'T4', price: 125 },
-        { day: 'T5', price: 122 },
-        { day: 'T6', price: 120 },
-        { day: 'T7', price: 118 },
-        { day: 'CN', price: 120 },
-      ],
-    },
-  };
+        const nextPrice: Record<string, PriceData> = { ...FALLBACK_PRICE_DATA };
+        for (const f of fcRes.items) {
+          const key = f.cropType;
+          if (key === 'pomelo' || key === 'mango' || key === 'durian') {
+            nextPrice[key] = parseForecastToPriceData(key, FALLBACK_PRICE_DATA[key], f.forecastData);
+          }
+        }
+        setPriceData(nextPrice);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          openSnackbar({
+            type: 'error',
+            text: toNewsForecastViMessage(err, 'newsList'),
+            duration: 4000,
+            icon: true,
+          });
+          setNewsItems([]);
+          setPriceData(FALLBACK_PRICE_DATA);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setNewsAndForecastLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [openSnackbar]);
 
+  useEffect(() => {
+    setCurrentNewsIndex(0);
+  }, [newsItems.length]);
 
   // Styles
   const headerStyles: React.CSSProperties = {
@@ -399,7 +489,9 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
     paddingBottom: spacing.xl,
   };
 
-  const currentPriceData = priceData[selectedProduct];
+  const currentPriceData = priceData[selectedProduct] ?? FALLBACK_PRICE_DATA[selectedProduct];
+  const sliderNews =
+    newsItems.length > 0 ? newsItems[Math.min(currentNewsIndex, newsItems.length - 1)] : null;
 
   return (
     <Page className="guest-home-market-news-screen">
@@ -441,68 +533,85 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
           </div>
         </div>
 
-        {/* News Section - Tin tức nổi bật */}
+        {/* News Section - Tin tức nổi bật (GET /news) */}
         <div style={newsSectionStyles}>
           <div style={sectionTitleStyles}>📰 Tin tức nổi bật</div>
 
-          <div style={newsSliderStyles}>
+          {newsAndForecastLoading ? (
             <div
-              style={newsCardStyles(newsItems[currentNewsIndex].type)}
-              onClick={() => console.log('View news:', newsItems[currentNewsIndex])}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'scale(1.02)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'scale(1)';
+              style={{
+                padding: spacing.lg,
+                backgroundColor: colors.background.secondary,
+                borderRadius: '12px',
+                minHeight: '140px',
               }}
             >
-              <div style={{ fontSize: '32px', marginBottom: spacing.sm }}>
-                {newsItems[currentNewsIndex].image}
+              <div style={{ height: '14px', width: '60%', backgroundColor: colors.background.tertiary, borderRadius: '6px', marginBottom: spacing.md }} />
+              <div style={{ height: '12px', width: '90%', backgroundColor: colors.background.tertiary, borderRadius: '6px', marginBottom: spacing.sm }} />
+              <div style={{ height: '12px', width: '40%', backgroundColor: colors.background.tertiary, borderRadius: '6px' }} />
+            </div>
+          ) : sliderNews ? (
+            <div style={newsSliderStyles}>
+              <div
+                style={newsCardStyles(sliderNews.type)}
+                onClick={() => console.log('View news:', sliderNews.id)}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'scale(1.02)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                <div style={{ fontSize: '32px', marginBottom: spacing.sm }}>{sliderNews.image}</div>
+                <Text.Title
+                  size="small"
+                  style={{
+                    margin: 0,
+                    color:
+                      sliderNews.type === 'weather-alert' ? colors.text.primary : colors.text.inverse,
+                    fontWeight: fontWeight.semibold,
+                  }}
+                >
+                  {sliderNews.title}
+                </Text.Title>
+                <Text
+                  size="xSmall"
+                  style={{
+                    color:
+                      sliderNews.type === 'weather-alert' ? colors.text.secondary : colors.text.inverse,
+                    marginTop: spacing.xs,
+                    opacity: 0.9,
+                  }}
+                >
+                  {sliderNews.date}
+                </Text>
               </div>
-              <Text.Title
-                size="small"
-                style={{
-                  margin: 0,
-                  color:
-                    newsItems[currentNewsIndex].type === 'weather-alert'
-                      ? colors.text.primary
-                      : colors.text.inverse,
-                  fontWeight: fontWeight.semibold,
-                }}
-              >
-                {newsItems[currentNewsIndex].title}
-              </Text.Title>
-              <Text
-                size="xSmall"
-                style={{
-                  color:
-                    newsItems[currentNewsIndex].type === 'weather-alert'
-                      ? colors.text.secondary
-                      : colors.text.inverse,
-                  marginTop: spacing.xs,
-                  opacity: 0.9,
-                }}
-              >
-                {newsItems[currentNewsIndex].date}
-              </Text>
-            </div>
 
-            {/* News Dots */}
-            <div style={newsDotsStyles}>
-              {newsItems.map((_, index) => (
-                <div
-                  key={index}
-                  style={dotStyles(index === currentNewsIndex)}
-                  onClick={() => setCurrentNewsIndex(index)}
-                />
-              ))}
+              <div style={newsDotsStyles}>
+                {newsItems.map((_, index) => (
+                  <div
+                    key={index}
+                    style={dotStyles(index === currentNewsIndex)}
+                    onClick={() => setCurrentNewsIndex(index)}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            <Text size="small" style={{ color: colors.text.secondary }}>
+              Chưa có tin tức công khai.
+            </Text>
+          )}
         </div>
 
-        {/* Market Widget - Biểu đồ giá cả */}
+        {/* Market Widget - Biểu đồ giá (GET /forecasts, forecastData) */}
         <div style={marketWidgetStyles}>
           <div style={sectionTitleStyles}>📊 Xu hướng giá 7 ngày</div>
+          {newsAndForecastLoading && (
+            <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: spacing.sm, display: 'block' }}>
+              Đang tải dự báo…
+            </Text>
+          )}
 
           {/* Product Tabs */}
           <div style={productTabsStyles}>

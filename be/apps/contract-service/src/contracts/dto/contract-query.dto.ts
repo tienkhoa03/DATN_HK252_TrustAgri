@@ -1,4 +1,5 @@
-import { IsOptional, IsIn, IsString } from 'class-validator';
+import { IsOptional, IsIn, IsString, IsBoolean } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { PaginationQueryDto } from '@trustagri/shared';
 
 export class ContractQueryDto extends PaginationQueryDto {
@@ -8,6 +9,14 @@ export class ContractQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsIn(['farmer', 'trader', 'buyer'])
   role?: 'farmer' | 'trader' | 'buyer';
+
+  /**
+   * `me` = partyBuyerId = user hiện tại (chỉ role buyer).
+   * UUID = lọc hợp đồng theo người mua (admin hoặc thương lái).
+   */
+  @IsOptional()
+  @IsString()
+  buyerId?: string;
 
   @IsOptional()
   @IsIn(['active', 'pending_change', 'completed', 'cancelled'])
@@ -22,4 +31,13 @@ export class ContractQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   to?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === true || value === 'true' || value === '1') return true;
+    if (value === false || value === 'false' || value === '0') return false;
+    return undefined;
+  })
+  @IsBoolean()
+  includeSummary?: boolean;
 }

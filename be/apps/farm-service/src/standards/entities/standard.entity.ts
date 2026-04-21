@@ -1,10 +1,11 @@
 import {
-  Entity,
-  PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
   DeleteDateColumn,
+  Entity,
+  Index,
   OneToMany,
+  PrimaryGeneratedColumn,
 } from 'typeorm';
 import { StandardStepEntity } from './standard-step.entity';
 
@@ -22,6 +23,12 @@ export class StandardEntity {
   @Column({ type: 'text' })
   description: string;
 
+  /**
+   * Cross-service FK → users.user_id (auth-service).
+   * DB-level FK is enforced via manual SQL; TypeORM cannot define
+   * @ManyToOne here because UserEntity lives in a separate service.
+   */
+  @Index('idx_standards_owner_trader_id')
   @Column({ name: 'owner_trader_id', nullable: true, type: 'varchar' })
   ownerTraderId: string | null;
 

@@ -44,11 +44,26 @@ export interface VerifyResponseDto {
   valid: true;
 }
 
+/** UUID cố định — khớp `be/scripts/seed-dev-users.sql` (dev / mock). */
+export const MOCK_USER_IDS = {
+  farmer: 'a0000001-0000-4000-8000-000000000001',
+  trader: 'a0000001-0000-4000-8000-000000000002',
+  buyer: 'a0000001-0000-4000-8000-000000000003',
+  guest: 'a0000001-0000-4000-8000-000000000004',
+} as const;
+
+export const MOCK_ZALO_IDS = {
+  farmer: 'zalo_dev_farmer_001',
+  trader: 'zalo_dev_trader_001',
+  buyer: 'zalo_dev_buyer_001',
+  guest: 'zalo_dev_guest_001',
+} as const;
+
 // --------------- Mock data fixtures ---------------
 
 const MOCK_FARMER_PROFILE: UserProfileDto = {
-  userId: 'usr_farmer_001',
-  zaloId: 'zalo_farmer_001',
+  userId: MOCK_USER_IDS.farmer,
+  zaloId: MOCK_ZALO_IDS.farmer,
   role: 'farmer',
   displayName: 'Nguyễn Văn An',
   phone: '0901234567',
@@ -62,8 +77,8 @@ const MOCK_FARMER_PROFILE: UserProfileDto = {
 };
 
 const MOCK_TRADER_PROFILE: UserProfileDto = {
-  userId: 'usr_trader_001',
-  zaloId: 'zalo_trader_001',
+  userId: MOCK_USER_IDS.trader,
+  zaloId: MOCK_ZALO_IDS.trader,
   role: 'trader',
   displayName: 'Trần Thị Bích',
   phone: '0912345678',
@@ -79,8 +94,8 @@ const MOCK_TRADER_PROFILE: UserProfileDto = {
 };
 
 const MOCK_BUYER_PROFILE: UserProfileDto = {
-  userId: 'usr_buyer_001',
-  zaloId: 'zalo_buyer_001',
+  userId: MOCK_USER_IDS.buyer,
+  zaloId: MOCK_ZALO_IDS.buyer,
   role: 'buyer',
   displayName: 'Lê Minh Khoa',
   phone: '0934567890',
@@ -92,20 +107,54 @@ const MOCK_BUYER_PROFILE: UserProfileDto = {
   lastLogin: new Date().toISOString(),
 };
 
+const MOCK_GUEST_PROFILE: UserProfileDto = {
+  userId: MOCK_USER_IDS.guest,
+  zaloId: MOCK_ZALO_IDS.guest,
+  role: 'guest',
+  displayName: 'Khách trải nghiệm',
+  phone: '0945678901',
+  avatarUrl: 'https://picsum.photos/seed/guest001/64/64',
+  createdAt: '2025-01-01T00:00:00.000Z',
+  lastLogin: new Date().toISOString(),
+};
+
+// --------------- Role từ token giả (prefix) — dùng chung mockLogin & dev-login ─
+
+export type MockAuthRole = 'farmer' | 'trader' | 'buyer' | 'guest';
+
+/** Cùng quy tắc với mockLogin: guest… / trader… / buyer… / mặc định farmer. */
+export function inferMockRoleFromToken(zaloAccessToken: string): MockAuthRole {
+  return zaloAccessToken.startsWith('guest')
+    ? 'guest'
+    : zaloAccessToken.startsWith('trader')
+      ? 'trader'
+      : zaloAccessToken.startsWith('buyer')
+        ? 'buyer'
+        : 'farmer';
+}
+
+export function mockZaloIdForRole(role: MockAuthRole): string {
+  return MOCK_ZALO_IDS[role];
+}
+
 // --------------- Mock service functions ---------------
 
 /**
  * Simulates POST /api/v1/auth/login
- * Returns different roles based on the zaloAccessToken prefix for demo purposes.
+ * Returns different roles based on the zaloAccessToken prefix for demo purposes:
+ *   guest…, trader…, buyer…, mặc định farmer.
  */
 export async function mockLogin(zaloAccessToken: string): Promise<LoginResponseDto> {
-  const role: 'farmer' | 'trader' | 'buyer' =
-    zaloAccessToken.startsWith('trader') ? 'trader' :
-    zaloAccessToken.startsWith('buyer')  ? 'buyer'  : 'farmer';
+  const role: MockAuthRole = inferMockRoleFromToken(zaloAccessToken);
 
   const userId =
-    role === 'trader' ? 'usr_trader_001' :
-    role === 'buyer'  ? 'usr_buyer_001'  : 'usr_farmer_001';
+    role === 'guest'
+      ? MOCK_USER_IDS.guest
+      : role === 'trader'
+        ? MOCK_USER_IDS.trader
+        : role === 'buyer'
+          ? MOCK_USER_IDS.buyer
+          : MOCK_USER_IDS.farmer;
 
   return withMockDelay<LoginResponseDto>({
     accessToken: `mock.jwt.access.${role}.${Date.now()}`,
@@ -136,10 +185,10 @@ export async function mockLogout(): Promise<{ success: true }> {
  */
 export async function mockGetMe(role: 'farmer' | 'trader' | 'buyer' | 'guest' = 'farmer'): Promise<UserProfileDto> {
   const profiles: Record<string, UserProfileDto> = {
-    farmer:  MOCK_FARMER_PROFILE,
-    trader:  MOCK_TRADER_PROFILE,
-    buyer:   MOCK_BUYER_PROFILE,
-    guest:   { ...MOCK_FARMER_PROFILE, role: 'guest', userId: 'usr_guest', displayName: 'Khách vãng lai' },
+    farmer: MOCK_FARMER_PROFILE,
+    trader: MOCK_TRADER_PROFILE,
+    buyer: MOCK_BUYER_PROFILE,
+    guest: MOCK_GUEST_PROFILE,
   };
   return withMockDelay(profiles[role] ?? MOCK_FARMER_PROFILE);
 }

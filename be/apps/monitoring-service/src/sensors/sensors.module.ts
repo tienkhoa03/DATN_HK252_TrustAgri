@@ -1,20 +1,23 @@
 import { Module } from '@nestjs/common';
 import { SensorsController } from './sensors.controller';
+import { TraceabilityMonitoringController } from './traceability-monitoring.controller';
 import { SensorsService } from './sensors.service';
 import { RedisSensorService } from './services/redis-sensor.service';
 import { InfluxSensorService } from './services/influx-sensor.service';
 import { FarmAccessGuard } from './guards/farm-access.guard';
+import { TraceabilityInternalGuard } from './guards/traceability-internal.guard';
 import { MonitoringGateway } from '../gateway/monitoring.gateway';
 import { AlertsModule } from '../alerts/alerts.module';
 
 @Module({
   imports: [AlertsModule],
-  controllers: [SensorsController],
+  controllers: [SensorsController, TraceabilityMonitoringController],
   providers: [
     SensorsService,
     RedisSensorService,
     InfluxSensorService,
     FarmAccessGuard,
+    TraceabilityInternalGuard,
     MonitoringGateway,
   ],
   exports: [SensorsService, RedisSensorService],

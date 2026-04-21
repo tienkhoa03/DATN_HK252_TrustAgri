@@ -48,4 +48,13 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   async del(key: string): Promise<void> {
     await this.client.del(key);
   }
+
+  /** Tăng bộ đếm và gán TTL ở lần đầu (dùng cho rate limit). */
+  async incrWithTtl(key: string, ttlSeconds: number): Promise<number> {
+    const n = await this.client.incr(key);
+    if (n === 1) {
+      await this.client.expire(key, ttlSeconds);
+    }
+    return n;
+  }
 }

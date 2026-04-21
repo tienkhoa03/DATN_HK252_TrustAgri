@@ -32,7 +32,16 @@ export class FarmsService {
       standardId: dto.standardId ?? null,
     });
     const saved = await this.farmRepo.save(farm);
+    if (!saved.traceabilityCode) {
+      saved.traceabilityCode = this.buildTraceabilityCode(saved.id);
+      await this.farmRepo.save(saved);
+    }
     return this.toDto(saved);
+  }
+
+  /** Mã ngắn ổn định theo farmId — dùng cho QR truy xuất công khai */
+  buildTraceabilityCode(farmId: string): string {
+    return `TR-${farmId.replace(/-/g, '').slice(0, 12)}`;
   }
 
   async list(query: ListFarmsQueryDto): Promise<ListResponse<FarmDto>> {

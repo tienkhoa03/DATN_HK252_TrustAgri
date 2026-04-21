@@ -15,6 +15,14 @@ export interface ErrorResponse {
 }
 
 /**
+ * Tổng hợp lịch sử giao dịch người mua (FR-U06, `includeSummary=true`)
+ */
+export interface BuyerTransactionSummaryDto {
+  totalSpent: number;
+  completedCount: number;
+}
+
+/**
  * Phản hồi danh sách chuẩn (design.md §1.3)
  */
 export interface ListResponse<T> {
@@ -22,6 +30,8 @@ export interface ListResponse<T> {
   page: number;
   limit: number;
   total: number;
+  /** Có khi `includeSummary=true` trên GET /orders hoặc GET /contracts */
+  summary?: BuyerTransactionSummaryDto;
 }
 
 /**

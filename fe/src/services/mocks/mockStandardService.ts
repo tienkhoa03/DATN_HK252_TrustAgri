@@ -1,7 +1,7 @@
 /**
  * Mock Standard Service — Phase 4.1 (FR-T10, FR-F06)
  *
- * Giả lập tầng transport cho Standards Service — dùng khi VITE_USE_MOCK=true.
+ * Giả lập Standards Service (dùng thủ công / test; không gắn VITE_USE_MOCK).
  * Types import từ standardService.ts (nguồn sự thật duy nhất về hợp đồng DTO).
  *
  * Mỗi hàm trả Promise với độ trễ ~1 giây qua withMockDelay,

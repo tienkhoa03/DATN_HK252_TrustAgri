@@ -167,7 +167,7 @@ describe('Integration Tests - User Flows', () => {
     });
 
     test('Guest can scan QR and view traceability', () => {
-      const { container } = render(<GuestTraceabilityScanResultScreen productId="1" />);
+      const { container } = render(<GuestTraceabilityScanResultScreen qrCode="1" />);
       
       // Verify traceability screen renders
       expect(container).toBeInTheDocument();
@@ -186,7 +186,7 @@ describe('Integration Tests - User Flows', () => {
       expect(homeContainer).toBeInTheDocument();
       
       // Navigate to traceability
-      const { container: traceContainer } = render(<GuestTraceabilityScanResultScreen productId="1" />);
+      const { container: traceContainer } = render(<GuestTraceabilityScanResultScreen qrCode="1" />);
       expect(traceContainer).toBeInTheDocument();
     });
   });
@@ -283,7 +283,7 @@ describe('Integration Tests - User Flows', () => {
     test('All guest screens use consistent design tokens', () => {
       const guestScreens = [
         <GuestHomeMarketNewsScreen />,
-        <GuestTraceabilityScanResultScreen productId="1" />,
+        <GuestTraceabilityScanResultScreen qrCode="1" />,
         <GuestProductDetailScreen productId="1" />,
       ];
       

@@ -5,12 +5,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
 import {
   ContractDto,
   CreateContractDto,
   ListResponse,
   JwtPayload,
+  BuyerTransactionSummaryDto,
 } from '@trustagri/shared';
 import { ContractEntity } from './entities/contract.entity';
 import { ContractQueryDto } from './dto/contract-query.dto';
@@ -31,29 +32,36 @@ export class ContractsService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
-    const qb = this.contractRepo
-      .createQueryBuilder('c')
+    const baseQb = this.buildContractListQuery(query, user);
+
+    const [rows, total] = await baseQb
+      .clone()
       .orderBy('c.createdAt', 'DESC')
       .skip((page - 1) * limit)
-      .take(limit);
+      .take(limit)
+      .getManyAndCount();
 
-    if (user.role === 'admin') {
-      // Admin: toàn bộ hợp đồng, lọc status / khoảng thời gian
-    } else {
-      const roleFilter = query.role ?? user.role;
-      if (roleFilter !== user.role) {
-        throw new ForbiddenException('Tham số role không khớp vai trò tài khoản');
-      }
-      if (roleFilter === 'farmer') {
-        qb.andWhere('c.partyFarmerId = :uid', { uid: user.sub });
-      } else if (roleFilter === 'trader') {
-        qb.andWhere('c.partyTraderId = :uid', { uid: user.sub });
-      } else if (roleFilter === 'buyer') {
-        qb.andWhere('c.partyBuyerId = :uid', { uid: user.sub });
-      } else {
-        throw new ForbiddenException('Vai trò không được phép xem danh sách hợp đồng');
-      }
+    let summary: BuyerTransactionSummaryDto | undefined;
+    if (query.includeSummary) {
+      summary = await this.computeContractSummary(baseQb.clone());
     }
+
+    return {
+      items: rows.map((r) => this.toDto(r)),
+      page,
+      limit,
+      total,
+      ...(summary !== undefined ? { summary } : {}),
+    };
+  }
+
+  private buildContractListQuery(
+    query: ContractQueryDto,
+    user: JwtPayload,
+  ): SelectQueryBuilder<ContractEntity> {
+    const qb = this.contractRepo.createQueryBuilder('c');
+
+    this.applyContractPartyFilters(qb, query, user);
 
     if (query.status) {
       qb.andWhere('c.status = :st', { st: query.status });
@@ -65,13 +73,100 @@ export class ContractsService {
       qb.andWhere('c.createdAt <= :to', { to: query.to });
     }
 
-    const [rows, total] = await qb.getManyAndCount();
+    return qb;
+  }
+
+  private applyContractPartyFilters(
+    qb: SelectQueryBuilder<ContractEntity>,
+    query: ContractQueryDto,
+    user: JwtPayload,
+  ): void {
+    const resolvedBuyer = this.resolveBuyerIdForContracts(query.buyerId, user);
+
+    if (user.role === 'admin') {
+      if (query.buyerId?.trim().toLowerCase() === 'me') {
+        throw new ForbiddenException('Tham số buyerId=me không dùng với admin');
+      }
+      if (resolvedBuyer) {
+        qb.andWhere('c.partyBuyerId = :adminBuyer', { adminBuyer: resolvedBuyer });
+      }
+      return;
+    }
+
+    const roleFilter = query.role ?? user.role;
+    if (roleFilter !== user.role) {
+      throw new ForbiddenException('Tham số role không khớp vai trò tài khoản');
+    }
+
+    if (user.role === 'farmer') {
+      if (query.buyerId) {
+        throw new BadRequestException('Tham số buyerId không áp dụng cho nông dân');
+      }
+      qb.andWhere('c.partyFarmerId = :uid', { uid: user.sub });
+      return;
+    }
+
+    if (user.role === 'buyer') {
+      const targetBuyer = resolvedBuyer ?? user.sub;
+      qb.andWhere('c.partyBuyerId = :uid', { uid: targetBuyer });
+      return;
+    }
+
+    if (user.role === 'trader') {
+      qb.andWhere('c.partyTraderId = :uid', { uid: user.sub });
+      if (resolvedBuyer) {
+        qb.andWhere('c.partyBuyerId = :bid', { bid: resolvedBuyer });
+      }
+      return;
+    }
+
+    throw new ForbiddenException('Vai trò không được phép xem danh sách hợp đồng');
+  }
+
+  private resolveBuyerIdForContracts(
+    raw: string | undefined,
+    user: JwtPayload,
+  ): string | null {
+    if (raw === undefined || raw === '') {
+      return null;
+    }
+    const trimmed = raw.trim();
+    if (trimmed.toLowerCase() === 'me') {
+      if (user.role !== 'buyer') {
+        throw new ForbiddenException('Tham số buyerId=me chỉ dùng với vai trò buyer');
+      }
+      return user.sub;
+    }
+    if (!this.isUuidV4(trimmed)) {
+      throw new BadRequestException('Tham số buyerId không hợp lệ');
+    }
+    if (user.role === 'buyer' && trimmed !== user.sub) {
+      throw new ForbiddenException('Không được xem hợp đồng của người mua khác');
+    }
+    return trimmed;
+  }
+
+  private isUuidV4(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    );
+  }
+
+  private async computeContractSummary(
+    qb: SelectQueryBuilder<ContractEntity>,
+  ): Promise<BuyerTransactionSummaryDto> {
+    const raw = await qb
+      .select(
+        'COALESCE(SUM(CASE WHEN c.status = :done THEN c.totalPrice ELSE 0 END), 0)',
+        'totalSpent',
+      )
+      .addSelect('COALESCE(SUM(CASE WHEN c.status = :done THEN 1 ELSE 0 END), 0)', 'completedCount')
+      .setParameter('done', 'completed')
+      .getRawOne();
 
     return {
-      items: rows.map((r) => this.toDto(r)),
-      page,
-      limit,
-      total,
+      totalSpent: Number(raw?.totalSpent ?? 0),
+      completedCount: Number(raw?.completedCount ?? 0),
     };
   }
 
@@ -191,6 +286,6 @@ export interface ContractAuditLogEntryDto {
   contractId: string;
   previousStatus: string | null;
   newStatus: string;
-  actorUserId: string;
+  actorUserId: string | null;
   occurredAt: string;
 }

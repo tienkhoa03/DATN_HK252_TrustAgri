@@ -3,7 +3,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Text, useSnackbar } from 'zmp-ui';
+import { Text } from 'zmp-ui';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
 import { Icon } from '@/design-system/components/Icon';
@@ -11,6 +11,7 @@ import { Button } from '@/design-system/components/Button';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import type { ContractDto } from '@/services/contractService';
 import {
   acceptContractChangeRequest,
@@ -71,7 +72,7 @@ export const ContractChangeRequestsPanel: React.FC<ContractChangeRequestsPanelPr
   contract,
   onMutationSuccess,
 }) => {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const session = useAtomValue(authSessionAtom);
   const actingUserId = session?.userId ?? '';
 

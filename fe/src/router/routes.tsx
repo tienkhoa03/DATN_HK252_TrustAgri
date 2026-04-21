@@ -2,6 +2,13 @@ import React, { lazy, Suspense } from 'react';
 import { Route, AnimationRoutes } from 'zmp-ui';
 import { Box, Spinner } from 'zmp-ui';
 
+import { RequireRole } from '@/router/RequireRole';
+import type { UserRole } from '@/state/authAtoms';
+
+function RoleRoute({ role, children }: { role: UserRole; children: React.ReactNode }) {
+  return <RequireRole allowedRoles={[role]}>{children}</RequireRole>;
+}
+
 // ─── Lazy screen imports ──────────────────────────────────────────────────────
 
 const GuestHomeMarketNewsScreen = lazy(() =>
@@ -31,6 +38,9 @@ const BuyerDigitalTwinMonitorScreen = lazy(() =>
 );
 const BuyerProfileNotificationScreen = lazy(() =>
   import('@/screens/buyer/profile-notification').then((m) => ({ default: m.BuyerProfileNotificationScreen })),
+);
+const BuyerTransactionHistoryScreen = lazy(() =>
+  import('@/screens/buyer/transaction-history').then((m) => ({ default: m.BuyerTransactionHistoryScreen })),
 );
 
 const FarmerDashboardScreen = lazy(() =>
@@ -114,37 +124,38 @@ export function AppRoutes() {
         {/* ── Auth ──────────────────────────────────────────── */}
         <Route path="/login"                   element={<LoginScreen />} />
 
-        {/* ── Guest (public, no auth required) ──────────────── */}
-        <Route path="/guest"                   element={<GuestHomeMarketNewsScreen />} />
-        <Route path="/guest/products/:productId" element={<GuestProductDetailScreen />} />
-        <Route path="/guest/trace/:code"       element={<GuestTraceabilityScanResultScreen />} />
+        {/* ── Guest (chỉ role guest / chưa đăng nhập) ───────── */}
+        <Route path="/guest"                   element={<RoleRoute role="guest"><GuestHomeMarketNewsScreen /></RoleRoute>} />
+        <Route path="/guest/products/:productId" element={<RoleRoute role="guest"><GuestProductDetailScreen /></RoleRoute>} />
+        <Route path="/guest/trace/:code"       element={<RoleRoute role="guest"><GuestTraceabilityScanResultScreen /></RoleRoute>} />
 
         {/* ── Buyer ─────────────────────────────────────────── */}
-        <Route path="/buyer"                   element={<BuyerMarketplaceScreen />} />
-        <Route path="/buyer/products/:productId" element={<BuyerProductDetailScreen />} />
-        <Route path="/buyer/orders"            element={<BuyerOrdersProposalsScreen />} />
-        <Route path="/buyer/request"           element={<BuyerPostBuyingRequestScreen />} />
-        <Route path="/buyer/monitor"           element={<BuyerDigitalTwinMonitorScreen />} />
-        <Route path="/buyer/me"                element={<BuyerProfileNotificationScreen />} />
+        <Route path="/buyer"                   element={<RoleRoute role="buyer"><BuyerMarketplaceScreen /></RoleRoute>} />
+        <Route path="/buyer/products/:productId" element={<RoleRoute role="buyer"><BuyerProductDetailScreen /></RoleRoute>} />
+        <Route path="/buyer/orders"            element={<RoleRoute role="buyer"><BuyerOrdersProposalsScreen /></RoleRoute>} />
+        <Route path="/buyer/request"           element={<RoleRoute role="buyer"><BuyerPostBuyingRequestScreen /></RoleRoute>} />
+        <Route path="/buyer/monitor"           element={<RoleRoute role="buyer"><BuyerDigitalTwinMonitorScreen /></RoleRoute>} />
+        <Route path="/buyer/me"                element={<RoleRoute role="buyer"><BuyerProfileNotificationScreen /></RoleRoute>} />
+        <Route path="/buyer/history"           element={<RoleRoute role="buyer"><BuyerTransactionHistoryScreen /></RoleRoute>} />
 
         {/* ── Farmer ────────────────────────────────────────── */}
-        <Route path="/farmer"                  element={<FarmerDashboardScreen />} />
-        <Route path="/farmer/farm"             element={<FarmerFarmProfileScreen />} />
-        <Route path="/farmer/process"          element={<FarmerProcessScreen />} />
-        <Route path="/farmer/connect"          element={<FarmerMarketConnectScreen />} />
-        <Route path="/farmer/contracts"        element={<FarmerContractsScreen />} />
-        <Route path="/farmer/connections"      element={<ConnectionRequestsScreen role="farmer" />} />
-        <Route path="/farmer/alerts"           element={<FarmerAlertListScreen />} />
-        <Route path="/farmer/me"               element={<ProfileScreen />} />
+        <Route path="/farmer"                  element={<RoleRoute role="farmer"><FarmerDashboardScreen /></RoleRoute>} />
+        <Route path="/farmer/farm"             element={<RoleRoute role="farmer"><FarmerFarmProfileScreen /></RoleRoute>} />
+        <Route path="/farmer/process"          element={<RoleRoute role="farmer"><FarmerProcessScreen /></RoleRoute>} />
+        <Route path="/farmer/connect"          element={<RoleRoute role="farmer"><FarmerMarketConnectScreen /></RoleRoute>} />
+        <Route path="/farmer/contracts"        element={<RoleRoute role="farmer"><FarmerContractsScreen /></RoleRoute>} />
+        <Route path="/farmer/connections"      element={<RoleRoute role="farmer"><ConnectionRequestsScreen role="farmer" /></RoleRoute>} />
+        <Route path="/farmer/alerts"           element={<RoleRoute role="farmer"><FarmerAlertListScreen /></RoleRoute>} />
+        <Route path="/farmer/me"               element={<RoleRoute role="farmer"><ProfileScreen /></RoleRoute>} />
 
         {/* ── Trader ────────────────────────────────────────── */}
-        <Route path="/trader"                  element={<TraderDashboardScreen />} />
-        <Route path="/trader/supply"           element={<TraderSupplyMonitorScreen />} />
-        <Route path="/trader/trading"          element={<TraderTradingOrdersScreen />} />
-        <Route path="/trader/standards"        element={<TraderStandardLibraryScreen />} />
-        <Route path="/trader/news"             element={<TraderProfileNewsScreen />} />
-        <Route path="/trader/connections"      element={<ConnectionRequestsScreen role="trader" />} />
-        <Route path="/trader/me"               element={<ProfileScreen />} />
+        <Route path="/trader"                  element={<RoleRoute role="trader"><TraderDashboardScreen /></RoleRoute>} />
+        <Route path="/trader/supply"           element={<RoleRoute role="trader"><TraderSupplyMonitorScreen /></RoleRoute>} />
+        <Route path="/trader/trading"          element={<RoleRoute role="trader"><TraderTradingOrdersScreen /></RoleRoute>} />
+        <Route path="/trader/standards"        element={<RoleRoute role="trader"><TraderStandardLibraryScreen /></RoleRoute>} />
+        <Route path="/trader/news"             element={<RoleRoute role="trader"><TraderProfileNewsScreen /></RoleRoute>} />
+        <Route path="/trader/connections"      element={<RoleRoute role="trader"><ConnectionRequestsScreen role="trader" /></RoleRoute>} />
+        <Route path="/trader/me"               element={<RoleRoute role="trader"><ProfileScreen /></RoleRoute>} />
 
         {/* ── Dev / QA launcher (non-production) ────────────── */}
         <Route path="/dev/screens"             element={<DevScreenLauncher />} />

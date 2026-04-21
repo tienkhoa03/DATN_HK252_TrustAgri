@@ -146,49 +146,49 @@
 
 ## Phase 15: Trung tâm thông báo (FR-F08 in-app + dùng chung)
 
-- [ ] **`[FE Task]` 15.1:** Dựng `BuyerProfileNotificationScreen`, chuông thông báo trên navigation, toast nội tuyến. Tạo `mockNotificationService` (`list`, `read`, `readAll`) trả `NotificationDto` + số badge.
+- [x] **`[FE Task]` 15.1:** Dựng `BuyerProfileNotificationScreen`, chuông thông báo trên navigation, toast nội tuyến. Tạo `mockNotificationService` (`list`, `read`, `readAll`) trả `NotificationDto` + số badge.
 
-- [ ] **`[Integration Task]` 15.2:** Gọi `/api/v1/notifications*`. Dùng `notification.linkTo` để điều hướng tới cảnh báo / hợp đồng / kết nối tương ứng.
+- [x] **`[Integration Task]` 15.2:** Gọi `/api/v1/notifications*`. Dùng `notification.linkTo` để điều hướng tới cảnh báo / hợp đồng / kết nối tương ứng.
 
 ---
 
 ## Phase 16: Tin tức thị trường và dự báo (FR-T12, FR-G02)
 
-- [ ] **`[FE Task]` 16.1:** Dựng `TraderProfileNewsScreen` (CRUD tin + dự báo), `GuestHomeMarketNewsScreen` (feed tin public + widget dự báo). Tạo `mockNewsService`, `mockForecastService` trả `NewsArticleDto`, `ForecastDto`.
+- [x] **`[FE Task]` 16.1:** Dựng `TraderProfileNewsScreen` (CRUD tin + dự báo), `GuestHomeMarketNewsScreen` (feed tin public + widget dự báo). Tạo `mockNewsService`, `mockForecastService` trả `NewsArticleDto`, `ForecastDto`.
 
-- [ ] **`[Integration Task]` 16.2:** Gọi `/api/v1/news*` và `/forecasts*`, role-guard trader cho `POST`/`PUT`. Route khách không gửi header auth.
+- [x] **`[Integration Task]` 16.2:** Gọi `/api/v1/news*` và `/forecasts*`, role-guard trader cho `POST`/`PUT`. Route khách không gửi header auth.
 
 ---
 
 ## Phase 17: Dashboard thống kê (FR-T02 + tóm tắt nông dân / người mua)
 
-- [ ] **`[FE Task]` 17.1:** Dựng `TraderDashboardScreen`, phần KPI trên `FarmerDashboardScreen`, widget `BuyerDashboardScreen` với chart / khối số (ưu tiên trực quan hóa theo mục 4.3.5). Tạo `mockDashboardService` trả `DashboardTraderDto` (và tương đương).
+- [x] **`[FE Task]` 17.1:** Dựng `TraderDashboardScreen`, phần KPI trên `FarmerDashboardScreen`, widget `BuyerDashboardScreen` với chart / khối số (ưu tiên trực quan hóa theo mục 4.3.5). Tạo `mockDashboardService` trả `DashboardTraderDto` (và tương đương).
 
-- [ ] **`[Integration Task]` 17.2:** Gọi `GET /api/v1/dashboard/{trader|farmer|buyer}`. Tuân thủ ngưỡng bundle / hiệu năng bằng lazy load biểu đồ.
+- [x] **`[Integration Task]` 17.2:** Gọi `GET /api/v1/dashboard/{trader|farmer|buyer}`. Tuân thủ ngưỡng bundle / hiệu năng bằng lazy load biểu đồ.
 
 ---
 
 ## Phase 18: Truy xuất nguồn gốc công khai (FR-G01)
 
-- [ ] **`[FE Task]` 18.1:** Dựng `GuestTraceabilityScanResultScreen`: timeline care log + biểu đồ cảm biến + badge tiêu chuẩn. Tạo `mockTraceabilityService.getByQrCode` trả `TraceabilityDto`. UI 404 thân thiện khi mã không hợp lệ.
+- [x] **`[FE Task]` 18.1:** Dựng `GuestTraceabilityScanResultScreen`: timeline care log + biểu đồ cảm biến + badge tiêu chuẩn. Tạo `mockTraceabilityService.getByQrCode` trả `TraceabilityDto`. UI 404 thân thiện khi mã không hợp lệ.
 
-- [ ] **`[Integration Task]` 18.2:** Gọi `GET /api/v1/traceability/qr/:code` (không gửi header `Authorization`). Render nhanh khi quét QR.
+- [x] **`[Integration Task]` 18.2:** Gọi `GET /api/v1/traceability/qr/:code` (không gửi header `Authorization`). Render nhanh khi quét QR.
 
 ---
 
 ## Phase 19: Lịch sử giao dịch người mua (FR-U06)
 
-- [ ] **`[FE Task]` 19.1:** Thêm route `/buyer/history` và màn `BuyerTransactionHistoryScreen` với lọc `status`, `from`, `to` + phân trang. Tái sử dụng mock order/contract kèm query `includeSummary=true`.
+- [x] **`[FE Task]` 19.1:** Thêm route `/buyer/history` và màn `BuyerTransactionHistoryScreen` với lọc `status`, `from`, `to` + phân trang. Tái sử dụng mock order/contract kèm query `includeSummary=true`.
 
-- [ ] **`[Integration Task]` 19.2:** Gọi `GET /api/v1/orders?buyerId=me&...` và `GET /api/v1/contracts?role=buyer&...`, hiển thị KPI tóm tắt (`totalSpent`, `completedCount`).
+- [x] **`[Integration Task]` 19.2:** Gọi `GET /api/v1/orders?buyerId=me&...` và `GET /api/v1/contracts?role=buyer&...`, hiển thị KPI tóm tắt (`totalSpent`, `completedCount`).
 
 ---
 
 ## Phase 20: Quality gate tích hợp cuối (hardening)
 
-- [ ] **`[FE Task]` 20.1:** Audit cuối: gỡ sạch mọi `mockService` còn lại; kiểm tra token màu / typography / icon theo mục 4.3.6; xác minh quy tắc 3 lần chạm cho nông dân (`alert`, `care-log`); bundle < 20 MB; responsive 4,7"–6,7". Unit test `errors.ts` + mapper service. E2E Playwright: khách QR → đặt hàng người mua → proposal thương lái → care log nông dân → acknowledge cảnh báo.
+- [x] **`[FE Task]` 20.1:** Audit cuối: gỡ sạch mọi `mockService` còn lại; kiểm tra token màu / typography / icon theo mục 4.3.6; xác minh quy tắc 3 lần chạm cho nông dân (`alert`, `care-log`); bundle < 20 MB; responsive 4,7"–6,7". Unit test `errors.ts` + mapper service. E2E Playwright: khách QR → đặt hàng người mua → proposal thương lái → care log nông dân → acknowledge cảnh báo.
 
-- [ ] **`[Integration Task]` 20.2:** Regression E2E toàn chuỗi Phase 1–19 trên môi trường staging với Gateway thật. Đóng băng hợp đồng API phiên bản 5.0.
+- [x] **`[Integration Task]` 20.2:** Regression E2E toàn chuỗi Phase 1–19 trên môi trường staging với Gateway thật. Đóng băng hợp đồng API phiên bản 5.0.
 
 ---
 

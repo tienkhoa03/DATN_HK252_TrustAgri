@@ -27,3 +27,6 @@ export { BuyerProfileNotificationScreen } from './profile-notification';
 export { BuyerProfileNotificationScreenDemo } from './profile-notification';
 export * from './profile-notification';
 
+export { BuyerTransactionHistoryScreen } from './transaction-history';
+export * from './transaction-history';
+

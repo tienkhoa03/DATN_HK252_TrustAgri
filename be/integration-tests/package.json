@@ -1,0 +1,42 @@
+{
+  "name": "@trustagri/integration-tests",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "node -e \"process.exit(0)\"",
+    "test": "jest --runInBand --forceExit"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.4.15",
+    "@nestjs/config": "^3.3.0",
+    "@nestjs/core": "^10.4.15",
+    "@nestjs/jwt": "^10.2.0",
+    "@nestjs/passport": "^10.0.3",
+    "@nestjs/platform-express": "^10.4.15",
+    "@nestjs/terminus": "^10.2.3",
+    "@nestjs/testing": "^10.4.15",
+    "@nestjs/typeorm": "^10.0.2",
+    "@trustagri/auth-service": "*",
+    "@trustagri/contract-service": "*",
+    "@trustagri/farm-service": "*",
+    "@trustagri/monitoring-service": "*",
+    "@trustagri/notification-service": "*",
+    "@trustagri/shared": "*",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "typeorm": "^0.3.20"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/supertest": "^6.0.2",
+    "@testcontainers/postgresql": "^10.16.0",
+    "@testcontainers/redis": "^10.16.0",
+    "ioredis": "^5.10.1",
+    "jest": "^29.7.0",
+    "pg": "^8.11.0",
+    "supertest": "^7.0.0",
+    "testcontainers": "^10.16.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.3.3"
+  }
+}

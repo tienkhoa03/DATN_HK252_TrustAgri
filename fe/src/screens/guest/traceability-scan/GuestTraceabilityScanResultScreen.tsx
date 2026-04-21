@@ -1,155 +1,174 @@
 /**
- * Guest Traceability Scan Result Screen
- * Truy xuất nguồn gốc - Quét QR - Màn hình quan trọng nhất cho Khách khi quét QR trên bao bì
- * 
- * Requirements: FR-G01, US-G01, 22.1-22.4
- * 
- * Features:
- * - Ảnh bìa và Định danh: Ảnh chụp thực tế sản phẩm tại vườn, Tên sản phẩm và Tên Farm Lab
- * - Chứng nhận chất lượng: Huy hiệu (Badges) VietGAP, GlobalGAP, OCOP
- * - Biểu đồ Giám sát môi trường: 3 biểu đồ đường từ ra hoa đến thu hoạch (Nhiệt độ, Độ ẩm, Không thuốc BVTV)
- * - Nhật ký canh tác tóm tắt: 3 mốc quan trọng với ảnh minh chứng
- * - Nút Kêu gọi hành động: Sticky Footer để đăng nhập
+ * Guest Traceability Scan Result Screen — FR-G01 / US-G01
+ * GET /api/v1/traceability/qr/:code (public, không gửi Authorization).
  */
 
-import React, { useState } from 'react';
-import { Page, Box, Text } from 'zmp-ui';
-import { Icon } from '../../../design-system/components/Icon';
-import { Chart } from '../../../design-system/components/Chart';
-import { colors } from '../../../design-system/tokens/colors';
-import { spacing } from '../../../design-system/tokens/spacing';
-import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Page, Box, Text, Spinner, useNavigate, useParams } from 'zmp-ui';
+import { Icon } from '@/design-system/components/Icon';
+import { Chart } from '@/design-system/components/Chart';
+import { colors } from '@/design-system/tokens/colors';
+import { spacing } from '@/design-system/tokens/spacing';
+import { fontSize, fontWeight } from '@/design-system/tokens/typography';
+import { ApiError } from '@/api/errors';
+import {
+  getTraceabilityByQrCode,
+  toTraceabilityViMessage,
+  type TraceabilityDto,
+} from '@/services/traceabilityService';
+import { cropEmoji, cropLabel } from '@/services/marketplaceService';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 
 export interface GuestTraceabilityScanResultScreenProps {
-  productId?: string;
+  /** Khi nhúng ngoài router (demo / test), truyền mã QR; mặc định lấy từ `/guest/trace/:code`. */
+  qrCode?: string;
   onLogin?: () => void;
 }
 
-interface CertificationBadge {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
+const SENSOR_TAB_LABELS: Record<string, string> = {
+  temperature_c: '🌡️ Nhiệt độ',
+  soil_moisture_pct: '💧 Độ ẩm đất',
+  pesticide_residue_ppm: '🚫 Dư lượng BVTV',
+};
+
+const SENSOR_Y_LABELS: Record<string, string> = {
+  temperature_c: 'Nhiệt độ (°C)',
+  soil_moisture_pct: 'Độ ẩm (%)',
+  pesticide_residue_ppm: 'ppm',
+};
+
+const CARE_ACTION_VI: Record<string, string> = {
+  sowing: 'Xuống giống',
+  fertilizing: 'Bón phân',
+  watering: 'Tưới tiêu',
+  harvest: 'Thu hoạch',
+  pruning: 'Tỉa cành',
+  spraying: 'Phun thuốc',
+  monitoring: 'Giám sát',
+};
+
+function formatViDateTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString('vi-VN', { dateStyle: 'medium', timeStyle: 'short' });
+  } catch {
+    return iso;
+  }
 }
 
-interface TimelineEvent {
-  id: string;
-  title: string;
-  date: string;
-  description: string;
-  image: string;
+function chartLabelFromT(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+  } catch {
+    return iso;
+  }
 }
 
-interface EnvironmentalData {
-  label: string;
-  value: number;
+function formatFarmLocation(d: TraceabilityDto['farm']): string {
+  const { province, district, addressLine } = d.location;
+  return [addressLine, district, province].filter(Boolean).join(', ');
 }
 
-/**
- * Guest Traceability Scan Result Screen Component
- * Requirements: FR-G01, US-G01, 22.1-22.4
- */
+function sensorDescription(sensorType: string): string {
+  switch (sensorType) {
+    case 'temperature_c':
+      return 'Nhiệt độ được theo dõi theo tuần trong giai đoạn ra hoa đến thu hoạch, duy trì trong ngưỡng phù hợp cho cây trồng.';
+    case 'soil_moisture_pct':
+      return 'Độ ẩm đất phản ánh khả năng cấp nước cho rễ; giá trị ổn định giúp giảm stress sinh lý.';
+    case 'pesticide_residue_ppm':
+      return 'Theo dõi dư lượng thuốc BVTV (ppm). Giá trị 0 trong suốt chu kỳ minh chứng hướng canh tác an toàn.';
+    default:
+      return 'Dữ liệu cảm biến từ vườn (digital twin).';
+  }
+}
+
 export const GuestTraceabilityScanResultScreen: React.FC<GuestTraceabilityScanResultScreenProps> = ({
-  productId = 'PROD-001',
+  qrCode,
   onLogin,
 }) => {
-  const [selectedChart, setSelectedChart] = useState<'temperature' | 'humidity' | 'pesticide'>('temperature');
+  const navigate = useNavigate();
+  const openSnackbar = useStableOpenSnackbar();
+  const params = useParams<{ code?: string }>();
+  const effectiveCode = (qrCode ?? params.code ?? '').trim();
 
-  // Mock product data - Thông tin sản phẩm
-  const productInfo = {
-    name: 'Bưởi Da xanh Cô Ba',
-    farmName: 'Farm Lab Tiến Khoa',
-    farmLocation: 'Vĩnh Long, Đồng bằng sông Cửu Long',
-    farmArea: '2 hecta',
-    harvestDate: '15/12/2025',
-    productImage: '🍊',
-    farmImage: '🌳',
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
+  const [data, setData] = useState<TraceabilityDto | null>(null);
+  const [selectedSensorIndex, setSelectedSensorIndex] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setNotFound(false);
+    setLoadError(false);
+    setData(null);
+
+    if (!effectiveCode) {
+      setNotFound(true);
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    getTraceabilityByQrCode(effectiveCode)
+      .then((dto) => {
+        if (!cancelled) setData(dto);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        if (
+          err instanceof ApiError &&
+          (err.httpStatus === 404 || err.code === 'NOT_FOUND')
+        ) {
+          setNotFound(true);
+        } else {
+          setLoadError(true);
+          openSnackbar({
+            type: 'error',
+            text: toTraceabilityViMessage(err),
+            duration: 4500,
+            icon: true,
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveCode, retryTick]);
+
+  useEffect(() => {
+    if (data?.sensorChart?.length) setSelectedSensorIndex(0);
+  }, [data?.productCode]);
+
+  const sortedTimeline = useMemo(() => {
+    if (!data) return [];
+    return [...data.careLogTimeline].sort(
+      (a, b) => new Date(a.performedAt).getTime() - new Date(b.performedAt).getTime(),
+    );
+  }, [data]);
+
+  const currentSeries = data?.sensorChart?.[selectedSensorIndex];
+  const chartPoints = useMemo(() => {
+    if (!currentSeries?.series?.length) return [];
+    return currentSeries.series.map((p) => ({
+      label: chartLabelFromT(p.t),
+      value: p.value,
+    }));
+  }, [currentSeries]);
+
+  const handleCta = () => {
+    if (onLogin) onLogin();
+    else navigate('/login');
   };
 
-  // Certification badges - Chứng nhận chất lượng
-  const certifications: CertificationBadge[] = [
-    {
-      id: '1',
-      name: 'VietGAP',
-      icon: '✓',
-      color: colors.primary.agriGreen,
-    },
-    {
-      id: '2',
-      name: 'GlobalGAP',
-      icon: '🌍',
-      color: colors.primary.zaloBlue,
-    },
-    {
-      id: '3',
-      name: 'OCOP 4 sao',
-      icon: '⭐',
-      color: colors.functional.warningYellow,
-    },
-  ];
-
-  // Environmental monitoring data - Dữ liệu giám sát môi trường
-  const environmentalData = {
-    temperature: [
-      { label: 'Tuần 1', value: 26 },
-      { label: 'Tuần 2', value: 27 },
-      { label: 'Tuần 3', value: 28 },
-      { label: 'Tuần 4', value: 27 },
-      { label: 'Tuần 5', value: 26 },
-      { label: 'Tuần 6', value: 28 },
-      { label: 'Tuần 7', value: 27 },
-      { label: 'Tuần 8', value: 26 },
-    ],
-    humidity: [
-      { label: 'Tuần 1', value: 75 },
-      { label: 'Tuần 2', value: 78 },
-      { label: 'Tuần 3', value: 80 },
-      { label: 'Tuần 4', value: 77 },
-      { label: 'Tuần 5', value: 76 },
-      { label: 'Tuần 6', value: 79 },
-      { label: 'Tuần 7', value: 78 },
-      { label: 'Tuần 8', value: 75 },
-    ],
-    pesticide: [
-      { label: 'Tuần 1', value: 0 },
-      { label: 'Tuần 2', value: 0 },
-      { label: 'Tuần 3', value: 0 },
-      { label: 'Tuần 4', value: 0 },
-      { label: 'Tuần 5', value: 0 },
-      { label: 'Tuần 6', value: 0 },
-      { label: 'Tuần 7', value: 0 },
-      { label: 'Tuần 8', value: 0 },
-    ],
-  };
-
-  // Timeline events - Nhật ký canh tác
-  const timelineEvents: TimelineEvent[] = [
-    {
-      id: '1',
-      title: 'Xuống giống',
-      date: '01/10/2025',
-      description: 'Trồng cây giống Bưởi Da xanh chất lượng cao',
-      image: '🌱',
-    },
-    {
-      id: '2',
-      title: 'Bón phân lần cuối',
-      date: '25/11/2025',
-      description: 'Bón phân hữu cơ vi sinh, không sử dụng hóa chất',
-      image: '🌿',
-    },
-    {
-      id: '3',
-      title: 'Thu hoạch',
-      date: '15/12/2025',
-      description: 'Thu hoạch đúng độ chín, đảm bảo chất lượng',
-      image: '🍊',
-    },
-  ];
-
-  // Styles
   const containerStyles: React.CSSProperties = {
-    paddingBottom: '80px', // Space for sticky footer
+    paddingBottom: '80px',
   };
 
   const heroSectionStyles: React.CSSProperties = {
@@ -227,7 +246,7 @@ export const GuestTraceabilityScanResultScreen: React.FC<GuestTraceabilityScanRe
     borderRadius: '8px',
     fontSize: fontSize.caption,
     fontWeight: fontWeight.semibold,
-    color: color,
+    color,
   });
 
   const chartSectionStyles: React.CSSProperties = {
@@ -328,19 +347,6 @@ export const GuestTraceabilityScanResultScreen: React.FC<GuestTraceabilityScanRe
   const timelineDescriptionStyles: React.CSSProperties = {
     fontSize: fontSize.caption,
     color: colors.text.secondary,
-    marginBottom: spacing.sm,
-  };
-
-  const timelineImageStyles: React.CSSProperties = {
-    width: '80px',
-    height: '80px',
-    backgroundColor: colors.background.primary,
-    borderRadius: '8px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '40px',
-    border: `1px solid ${colors.background.tertiary}`,
   };
 
   const stickyFooterStyles: React.CSSProperties = {
@@ -372,179 +378,215 @@ export const GuestTraceabilityScanResultScreen: React.FC<GuestTraceabilityScanRe
     gap: spacing.sm,
   };
 
-  const getChartData = () => {
-    switch (selectedChart) {
-      case 'temperature':
-        return {
-          data: environmentalData.temperature,
-          title: 'Nhiệt độ trung bình',
-          unit: '°C',
-          description: 'Nhiệt độ được duy trì ổn định trong khoảng 26-28°C, phù hợp cho sự phát triển của cây Bưởi',
-          yAxisLabel: 'Nhiệt độ (°C)',
-        };
-      case 'humidity':
-        return {
-          data: environmentalData.humidity,
-          title: 'Độ ẩm đất',
-          unit: '%',
-          description: 'Độ ẩm đất được duy trì ở mức 75-80%, đảm bảo cây luôn đủ nước',
-          yAxisLabel: 'Độ ẩm (%)',
-        };
-      case 'pesticide':
-        return {
-          data: environmentalData.pesticide,
-          title: 'Không sử dụng thuốc BVTV',
-          unit: '',
-          description: 'Không phát hiện dư lượng thuốc bảo vệ thực vật trong suốt quá trình canh tác',
-          yAxisLabel: 'Dư lượng',
-        };
-      default:
-        return {
-          data: environmentalData.temperature,
-          title: 'Nhiệt độ trung bình',
-          unit: '°C',
-          description: 'Nhiệt độ được duy trì ổn định',
-          yAxisLabel: 'Nhiệt độ (°C)',
-        };
-    }
-  };
+  if (loading) {
+    return (
+      <Page className="guest-traceability-scan-result-screen">
+        <Box className="flex flex-col items-center justify-center" style={{ minHeight: '60vh' }}>
+          <Spinner />
+          <Text size="small" className="mt-3" style={{ color: colors.text.secondary }}>
+            Đang tải thông tin truy xuất…
+          </Text>
+        </Box>
+      </Page>
+    );
+  }
 
-  const currentChartData = getChartData();
+  if (loadError) {
+    return (
+      <Page className="guest-traceability-scan-result-screen">
+        <Box
+          className="flex flex-col items-center justify-center"
+          style={{ minHeight: '70vh', padding: spacing.lg, textAlign: 'center' }}
+        >
+          <Text style={{ fontSize: '48px', marginBottom: spacing.md }}>⚠️</Text>
+          <Text style={{ ...productNameStyles, textAlign: 'center' }}>Không tải được dữ liệu</Text>
+          <Text
+            size="small"
+            style={{ color: colors.text.secondary, marginBottom: spacing.lg, maxWidth: 320 }}
+          >
+            Đã có lỗi khi kết nối máy chủ. Bạn có thể thử lại hoặc quay về trang chủ.
+          </Text>
+          <Box className="flex flex-col gap-2" style={{ width: '100%', maxWidth: 280 }}>
+            <button
+              type="button"
+              style={ctaButtonStyles}
+              onClick={() => setRetryTick((n) => n + 1)}
+            >
+              Thử lại
+            </button>
+            <button
+              type="button"
+              style={{
+                ...ctaButtonStyles,
+                backgroundColor: colors.background.secondary,
+                color: colors.text.primary,
+                border: `1px solid ${colors.background.tertiary}`,
+              }}
+              onClick={() => navigate('/guest')}
+            >
+              Về trang chủ khách
+            </button>
+          </Box>
+        </Box>
+      </Page>
+    );
+  }
+
+  if (notFound || !data) {
+    return (
+      <Page className="guest-traceability-scan-result-screen">
+        <Box
+          className="flex flex-col items-center justify-center"
+          style={{ minHeight: '70vh', padding: spacing.lg, textAlign: 'center' }}
+        >
+          <Text style={{ fontSize: '48px', marginBottom: spacing.md }}>🔎</Text>
+          <Text style={{ ...productNameStyles, textAlign: 'center' }}>Không tìm thấy lô hàng</Text>
+          <Text
+            size="small"
+            style={{ color: colors.text.secondary, marginBottom: spacing.lg, maxWidth: 320 }}
+          >
+            Mã QR không hợp lệ, đã thu hồi hoặc chưa được kích hoạt trên hệ thống TrustAgri. Vui lòng
+            kiểm tra lại bao bì hoặc liên hệ người bán.
+          </Text>
+          <button
+            type="button"
+            style={{
+              ...ctaButtonStyles,
+              width: 'auto',
+              minWidth: 200,
+              backgroundColor: colors.primary.agriGreen,
+            }}
+            onClick={() => navigate('/guest')}
+          >
+            Về trang chủ khách
+          </button>
+        </Box>
+      </Page>
+    );
+  }
+
+  const cropIcon = cropEmoji(data.farm.cropType);
+  const cropTitle = cropLabel(data.farm.cropType);
 
   return (
     <Page className="guest-traceability-scan-result-screen">
       <div style={containerStyles}>
-        {/* Hero Section - Ảnh bìa sản phẩm */}
         <div style={heroSectionStyles}>
-          <div style={productImageStyles}>{productInfo.productImage}</div>
+          <div style={productImageStyles}>{cropIcon}</div>
         </div>
 
-        {/* Product Info Section - Định danh sản phẩm */}
         <div style={productInfoSectionStyles}>
-          <div style={productNameStyles}>{productInfo.name}</div>
+          <div style={productNameStyles}>{data.productCode}</div>
+          <Text size="small" style={{ color: colors.text.secondary, marginBottom: spacing.sm }}>
+            {cropTitle}
+          </Text>
           <div style={farmNameStyles}>
-            <span>{productInfo.farmImage}</span>
-            <span>{productInfo.farmName}</span>
+            <span>🌳</span>
+            <span>{data.farm.name}</span>
           </div>
           <div style={farmDetailsStyles}>
             <Icon name="location" size="sm" color={colors.text.secondary} />
-            <span>{productInfo.farmLocation}</span>
-          </div>
-          <div style={farmDetailsStyles}>
-            <Icon name="farm" size="sm" color={colors.text.secondary} />
-            <span>Diện tích: {productInfo.farmArea}</span>
-          </div>
-          <div style={farmDetailsStyles}>
-            <Icon name="calendar" size="sm" color={colors.text.secondary} />
-            <span>Thu hoạch: {productInfo.harvestDate}</span>
+            <span>{formatFarmLocation(data.farm)}</span>
           </div>
         </div>
 
-        {/* Certification Section - Chứng nhận chất lượng */}
         <div style={certificationSectionStyles}>
-          <div style={sectionTitleStyles}>🏆 Chứng nhận chất lượng</div>
-          <div style={badgeContainerStyles}>
-            {certifications.map((cert) => (
-              <div key={cert.id} style={badgeStyles(cert.color)}>
-                <span style={{ fontSize: fontSize.body }}>{cert.icon}</span>
-                <span>{cert.name}</span>
+          <div style={sectionTitleStyles}>🏆 Tiêu chuẩn & chứng nhận</div>
+          {data.standard ? (
+            <div style={badgeContainerStyles}>
+              <div style={badgeStyles(colors.primary.agriGreen)}>
+                <span style={{ fontSize: fontSize.body }}>✓</span>
+                <span>
+                  {data.standard.code} — {data.standard.name}
+                </span>
               </div>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <Text size="small" style={{ color: colors.text.secondary }}>
+              Chưa có thông tin tiêu chuẩn công khai cho lô hàng này.
+            </Text>
+          )}
         </div>
 
-        {/* Environmental Charts Section - Biểu đồ Giám sát môi trường */}
         <div style={chartSectionStyles}>
-          <div style={sectionTitleStyles}>📊 Giám sát môi trường</div>
-          <Text
-            size="small"
-            style={{ color: colors.text.secondary, marginBottom: spacing.md }}
-          >
-            Dữ liệu từ giai đoạn ra hoa đến thu hoạch (8 tuần)
+          <div style={sectionTitleStyles}>📊 Giám sát cảm biến</div>
+          <Text size="small" style={{ color: colors.text.secondary, marginBottom: spacing.md }}>
+            Dữ liệu minh họa theo thời gian (public traceability)
           </Text>
 
-          {/* Chart Tabs */}
-          <div style={chartTabsStyles}>
-            <button
-              style={chartTabStyles(selectedChart === 'temperature')}
-              onClick={() => setSelectedChart('temperature')}
-            >
-              🌡️ Nhiệt độ
-            </button>
-            <button
-              style={chartTabStyles(selectedChart === 'humidity')}
-              onClick={() => setSelectedChart('humidity')}
-            >
-              💧 Độ ẩm đất
-            </button>
-            <button
-              style={chartTabStyles(selectedChart === 'pesticide')}
-              onClick={() => setSelectedChart('pesticide')}
-            >
-              🚫 Không thuốc BVTV
-            </button>
-          </div>
-
-          {/* Chart Description */}
-          <div style={chartDescriptionStyles}>
-            <Text size="small" style={{ margin: 0 }}>
-              {currentChartData.description}
+          {data.sensorChart.length > 0 ? (
+            <>
+              <div style={chartTabsStyles}>
+                {data.sensorChart.map((s, idx) => (
+                  <button
+                    key={s.sensorType}
+                    type="button"
+                    style={chartTabStyles(selectedSensorIndex === idx)}
+                    onClick={() => setSelectedSensorIndex(idx)}
+                  >
+                    {SENSOR_TAB_LABELS[s.sensorType] ?? s.sensorType}
+                  </button>
+                ))}
+              </div>
+              <div style={chartDescriptionStyles}>
+                <Text size="small" style={{ margin: 0 }}>
+                  {currentSeries ? sensorDescription(currentSeries.sensorType) : ''}
+                </Text>
+              </div>
+              {chartPoints.length > 0 ? (
+                <Chart
+                  type="line"
+                  data={chartPoints}
+                  xAxis={{ label: 'Thời gian' }}
+                  yAxis={{
+                    label: currentSeries
+                      ? SENSOR_Y_LABELS[currentSeries.sensorType] ?? currentSeries.sensorType
+                      : '',
+                  }}
+                  colors={[colors.primary.agriGreen]}
+                  showGrid
+                  height={200}
+                />
+              ) : (
+                <Text size="small" style={{ color: colors.text.secondary }}>
+                  Chưa có điểm đo cho chuỗi cảm biến này.
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text size="small" style={{ color: colors.text.secondary }}>
+              Chưa có dữ liệu cảm biến công khai.
             </Text>
-          </div>
-
-          {/* Chart */}
-          <Chart
-            type="line"
-            data={currentChartData.data}
-            xAxis={{ label: 'Thời gian' }}
-            yAxis={{ label: currentChartData.yAxisLabel }}
-            colors={[colors.primary.agriGreen]}
-            showGrid={true}
-            height={200}
-          />
+          )}
         </div>
 
-        {/* Timeline Section - Nhật ký canh tác tóm tắt */}
         <div style={timelineSectionStyles}>
           <div style={sectionTitleStyles}>📅 Nhật ký canh tác</div>
-          <Text
-            size="small"
-            style={{ color: colors.text.secondary, marginBottom: spacing.md }}
-          >
-            3 mốc quan trọng trong quá trình canh tác
+          <Text size="small" style={{ color: colors.text.secondary, marginBottom: spacing.md }}>
+            Các mốc đã ghi nhận (care log)
           </Text>
 
           <div style={timelineContainerStyles}>
             <div style={timelineLineStyles} />
-            {timelineEvents.map((event, index) => (
-              <div key={event.id} style={timelineEventStyles}>
-                <div style={timelineIconStyles}>{event.image}</div>
+            {sortedTimeline.map((ev, index) => (
+              <div key={`${ev.performedAt}-${index}`} style={timelineEventStyles}>
+                <div style={timelineIconStyles}>🌾</div>
                 <div style={timelineContentStyles}>
-                  <div style={timelineTitleStyles}>{event.title}</div>
-                  <div style={timelineDateStyles}>📅 {event.date}</div>
-                  <div style={timelineDescriptionStyles}>{event.description}</div>
-                  <div style={timelineImageStyles}>{event.image}</div>
+                  <div style={timelineTitleStyles}>
+                    {CARE_ACTION_VI[ev.action] ?? ev.action}
+                  </div>
+                  <div style={timelineDateStyles}>📅 {formatViDateTime(ev.performedAt)}</div>
+                  {ev.notes ? (
+                    <div style={timelineDescriptionStyles}>{ev.notes}</div>
+                  ) : null}
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Sticky Footer - Call to Action */}
         <div style={stickyFooterStyles}>
-          <button
-            style={ctaButtonStyles}
-            onClick={onLogin}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#0052CC';
-              e.currentTarget.style.transform = 'scale(1.02)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = colors.primary.zaloBlue;
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            aria-label="Đăng nhập để xem chi tiết toàn bộ quá trình và đặt mua vụ sau"
-          >
+          <button type="button" style={ctaButtonStyles} onClick={handleCta}>
             <Icon name="user" size="md" color={colors.text.inverse} />
             <span>Đăng nhập để xem chi tiết toàn bộ quá trình và đặt mua vụ sau</span>
           </button>

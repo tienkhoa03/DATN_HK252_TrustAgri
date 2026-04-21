@@ -12,6 +12,7 @@
 
 import apiClient from '@/api/client';
 import { ApiError } from '@/api/errors';
+import type { BuyerTransactionSummaryDto } from '@/services/orderService';
 
 export interface ContractDto {
   id: string;
@@ -94,17 +95,22 @@ export interface ListResponse<T> {
   page: number;
   limit: number;
   total: number;
+  /** GET /contracts?includeSummary=true (Phase 19) */
+  summary?: BuyerTransactionSummaryDto;
 }
 
 export type ContractRoleFilter = 'farmer' | 'trader' | 'buyer';
 
 export interface ListContractsParams {
   role?: ContractRoleFilter;
+  /** `me` = partyBuyerId = user hiện tại (role buyer) */
+  buyerId?: string;
   status?: ContractDto['status'] | 'all';
   from?: string;
   to?: string;
   page?: number;
   limit?: number;
+  includeSummary?: boolean;
 }
 
 export interface CreateContractDto {
@@ -199,20 +205,41 @@ export function toContractViMessage(err: unknown, context: ContractCtx = 'list')
   return fallback[context];
 }
 
+function normalizeSummary(raw: unknown): BuyerTransactionSummaryDto | undefined {
+  if (raw == null || typeof raw !== 'object') return undefined;
+  const s = raw as Record<string, unknown>;
+  return {
+    totalSpent: Number(s.totalSpent ?? s.total_spent ?? 0),
+    completedCount: Number(s.completedCount ?? s.completed_count ?? 0),
+  };
+}
+
+function normalizeListContractsResponse(raw: unknown): ListResponse<ContractDto> {
+  const d = raw as Record<string, unknown>;
+  const itemsRaw = d.items;
+  const items = Array.isArray(itemsRaw) ? itemsRaw.map((x) => normalizeContract(x as ContractDto)) : [];
+  return {
+    items,
+    page: Number(d.page ?? 1),
+    limit: Number(d.limit ?? 20),
+    total: Number(d.total ?? 0),
+    ...(d.summary != null ? { summary: normalizeSummary(d.summary) } : {}),
+  };
+}
+
 export async function listContracts(params?: ListContractsParams): Promise<ListResponse<ContractDto>> {
   const q: Record<string, unknown> = {};
   if (params?.role) q.role = params.role;
+  if (params?.buyerId) q.buyerId = params.buyerId;
   if (params?.status && params.status !== 'all') q.status = params.status;
   if (params?.from) q.from = params.from;
   if (params?.to) q.to = params.to;
   if (params?.page) q.page = params.page;
   if (params?.limit) q.limit = params.limit;
+  if (params?.includeSummary === true) q.includeSummary = true;
 
-  const { data } = await apiClient.get<ListResponse<ContractDto>>('/contracts', { params: q });
-  return {
-    ...data,
-    items: data.items.map(normalizeContract),
-  };
+  const { data } = await apiClient.get<unknown>('/contracts', { params: q });
+  return normalizeListContractsResponse(data);
 }
 
 export async function getContract(id: string): Promise<ContractDto> {

@@ -1,13 +1,7 @@
 import { ENV } from '@/config/env';
 
-/**
- * Resolves after a random delay between [minMs, maxMs].
- * Used internally by withMockDelay.
- */
-function sleep(minMs: number, maxMs: number): Promise<void> {
-  const ms = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+/** Độ trễ mặc định giả lập mạng (Phase 20 — tasks.md 20.1): 1 giây cố định. */
+export const MOCK_NETWORK_DELAY_MS = 1000;
 
 /**
  * Wraps a payload value (or factory function) in a Promise with simulated network latency.
@@ -15,21 +9,19 @@ function sleep(minMs: number, maxMs: number): Promise<void> {
  * @example
  * return withMockDelay({ items: farms, page: 1, limit: 10, total: 2 });
  *
- * @param payload  The value to resolve with, or a zero-arg factory returning the value.
- * @param minMs    Minimum delay in ms. Defaults to 800.
- * @param maxMs    Maximum delay in ms. Defaults to 1200.
+ * @param payload   The value to resolve with, or a zero-arg factory returning the value.
+ * @param delayMs   Delay in ms. Defaults to MOCK_NETWORK_DELAY_MS (1000).
  */
 export async function withMockDelay<T>(
   payload: T | (() => T),
-  minMs = 800,
-  maxMs = 1200,
+  delayMs: number = MOCK_NETWORK_DELAY_MS,
 ): Promise<T> {
-  await sleep(minMs, maxMs);
+  await new Promise<void>((resolve) => setTimeout(resolve, delayMs));
   return typeof payload === 'function' ? (payload as () => T)() : payload;
 }
 
 /**
  * True when the app is running with mock services enabled.
- * Driven by the VITE_USE_MOCK environment variable.
+ * `USE_MOCK` chỉ dùng trong luồng auth/profile (xem `config/env.ts`).
  */
 export const USE_MOCK = ENV.USE_MOCK;

@@ -15,7 +15,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Page, Text, Spinner, useSnackbar } from 'zmp-ui';
+import { Page, Text, Spinner } from 'zmp-ui';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
 import { Icon } from '../../../design-system/components/Icon';
@@ -23,6 +23,7 @@ import { Button } from '../../../design-system/components/Button';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { useFarms } from '@/hooks/useFarms';
 import type { FarmDto, CreateFarmDto } from '@/hooks/useFarms';
 
@@ -186,7 +187,7 @@ export const FarmerFarmProfileScreen: React.FC = () => {
   } = useFarms();
 
   // ── Snackbar ─────────────────────────────────────────────────────────────────
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
 
   // Hiển thị lỗi qua Snackbar khi error thay đổi
   useEffect(() => {

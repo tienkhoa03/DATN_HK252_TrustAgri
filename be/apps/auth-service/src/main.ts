@@ -1,8 +1,7 @@
 import 'reflect-metadata';
-import { NestFactory, Reflector } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { GlobalHttpExceptionFilter, JwtAuthGuard, RolesGuard } from '@trustagri/shared';
+import { applyTrustagriHttpStack } from '@trustagri/shared';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -11,27 +10,21 @@ async function bootstrap() {
     origin: true,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Request-Id',
+      'X-Client-Api-Contract-Version',
+    ],
   });
 
-  const reflector = app.get(Reflector);
+  applyTrustagriHttpStack(app);
 
-  // Global ValidationPipe — whitelist + transform (design.md §8)
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      forbidNonWhitelisted: false,
-    }),
-  );
-
-  // Global exception filter → ErrorResponse chuẩn (design.md §1.2)
-  app.useGlobalFilters(new GlobalHttpExceptionFilter());
-
-  // Global guards
-  app.useGlobalGuards(new JwtAuthGuard(reflector), new RolesGuard(reflector));
-
-  app.setGlobalPrefix('api/v1');
+  // Tin cậy 1 hop proxy (nginx) để đọc X-Forwarded-For / IP thật cho dev-login & audit
+  const httpServer = app.getHttpAdapter().getInstance();
+  if (typeof httpServer?.set === 'function') {
+    httpServer.set('trust proxy', 1);
+  }
 
   const port = process.env.PORT ?? process.env.AUTH_SERVICE_PORT ?? 3001;
   await app.listen(port);

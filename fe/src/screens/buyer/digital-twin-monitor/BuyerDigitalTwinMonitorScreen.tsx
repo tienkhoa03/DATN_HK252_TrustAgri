@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Page, Box, Text, useSnackbar } from 'zmp-ui';
+import { Page, Box, Text } from 'zmp-ui';
 import { DigitalTwinViewer, GrowthStage, HealthStatus } from '../../../design-system/components/DigitalTwinViewer';
 import { Icon } from '../../../design-system/components/Icon';
 import { SensorLineChart } from '../../../design-system/components/SensorLineChart';
@@ -20,6 +20,7 @@ import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
 import { useMonitoring } from '@/hooks/useMonitoring';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import type { SensorReadingDto, SensorType } from '@/services/monitoringService';
 
 export interface BuyerDigitalTwinMonitorScreenProps {
@@ -55,7 +56,7 @@ export const BuyerDigitalTwinMonitorScreen: React.FC<BuyerDigitalTwinMonitorScre
   farmId = 'farm-001',
   onBack,
 }) => {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [selectedSensor, setSelectedSensor] = useState<SensorType>('temperature');

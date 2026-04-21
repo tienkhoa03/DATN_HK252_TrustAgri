@@ -1,4 +1,13 @@
-import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  NotFoundException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  ServiceUnavailableException,
+} from '@nestjs/common';
+import { timingSafeEqual } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -56,7 +65,66 @@ export class AuthService {
     user.lastLogin = new Date();
     await this.userRepo.save(user);
 
-    // 3. Phát hành JWT
+    return this.issueSessionForUser(user);
+  }
+
+  /**
+   * Dev-only: JWT thật + session Redis giống login(), lookup user theo zalo_id (seed).
+   * Bảo vệ: cờ env, localhost guard, rate limit, DEV_LOGIN_SECRET (không commit giá trị thật).
+   */
+  async devLogin(clientIp: string, secret: string, zaloId: string): Promise<AuthLoginResponseDto> {
+    if (this.configService.get<string>('NODE_ENV') === 'production') {
+      throw new ForbiddenException('Dev login không khả dụng');
+    }
+    if (this.configService.get<string>('AUTH_DEV_LOGIN_ENABLED') !== 'true') {
+      throw new ForbiddenException('Dev login không được bật');
+    }
+
+    const expectedSecret = this.configService.get<string>('DEV_LOGIN_SECRET', '');
+    if (!expectedSecret || expectedSecret.length < 16) {
+      throw new ServiceUnavailableException(
+        'DEV_LOGIN_SECRET chưa cấu hình (tối thiểu 16 ký tự) khi AUTH_DEV_LOGIN_ENABLED=true',
+      );
+    }
+    if (!this.timingSafeEqualUtf8(secret, expectedSecret)) {
+      throw new UnauthorizedException('Secret không hợp lệ');
+    }
+
+    const windowSec = 60;
+    const maxPerWindow = parseInt(
+      this.configService.get<string>('DEV_LOGIN_RATE_LIMIT_PER_MIN', '10'),
+      10,
+    );
+    const n = await this.redisService.incrWithTtl(`ratelimit:dev-login:${clientIp}`, windowSec);
+    if (n > maxPerWindow) {
+      throw new HttpException(
+        'Quá nhiều yêu cầu dev-login, thử lại sau',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const user = await this.userRepo.findOne({ where: { zaloId } });
+    if (!user) {
+      throw new NotFoundException(`Không tìm thấy user với zaloId=${zaloId} (đã chạy seed-dev-users.sql?)`);
+    }
+
+    user.lastLogin = new Date();
+    await this.userRepo.save(user);
+
+    return this.issueSessionForUser(user);
+  }
+
+  private timingSafeEqualUtf8(a: string, b: string): boolean {
+    const bufA = Buffer.from(a, 'utf8');
+    const bufB = Buffer.from(b, 'utf8');
+    if (bufA.length !== bufB.length) {
+      return false;
+    }
+    return timingSafeEqual(bufA, bufB);
+  }
+
+  /** Phát hành access/refresh JWT và lưu session Redis — dùng chung login() và devLogin(). */
+  private async issueSessionForUser(user: UserEntity): Promise<AuthLoginResponseDto> {
     const payload: JwtPayload = { sub: user.userId, role: user.role };
     const accessToken = this.jwtService.sign(payload);
 
@@ -68,7 +136,6 @@ export class AuthService {
       expiresIn: refreshExpiresIn,
     });
 
-    // 4. Lưu session vào Redis với TTL khớp với access token
     const decoded = this.jwtService.decode(accessToken) as {
       exp: number;
       iat: number;

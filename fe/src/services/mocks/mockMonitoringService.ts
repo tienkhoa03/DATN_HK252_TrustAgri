@@ -1,7 +1,7 @@
 /**
  * Mock Monitoring Service — Phase 6.1 (FR-F07, FR-T11, FR-U05)
  *
- * Giả lập tầng transport cho Monitoring Service — dùng khi VITE_USE_MOCK=true.
+ * Giả lập Monitoring Service (dùng thủ công / test; không gắn VITE_USE_MOCK).
  * Types import từ monitoringService.ts (nguồn sự thật duy nhất về hợp đồng DTO).
  *
  * Mỗi hàm trả Promise với độ trễ ~1 giây qua withMockDelay,
@@ -158,11 +158,11 @@ export async function getLatest(farmId: string): Promise<SensorReadingDto[]> {
 export async function getHistory(
   farmId: string,
   params?: HistoryParams,
-): Promise<{ items: SensorReadingDto[] }> {
+): Promise<SensorReadingDto[]> {
   const sensorType = params?.sensorType ?? 'temperature';
   const hoursBack = 24;
   const items = generateTimeSeries(farmId, sensorType, hoursBack);
-  return withMockDelay({ items });
+  return withMockDelay(items);
 }
 
 /**

@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Page, Text, useSnackbar } from 'zmp-ui';
+import { Page, Text } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
@@ -59,6 +59,7 @@ import {
   partyBuyerLabel,
   type ContractDto,
 } from '../../../services/contractService';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { ContractChangeRequestsPanel } from '@/screens/shared/contract-change-requests';
 
 export interface TraderTradingOrdersScreenProps {
@@ -317,7 +318,7 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
   traderId = 'trader-001',
   traderName = 'Thương lái',
 }) => {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const [activeTab, setActiveTab] = useState<TabType>('my-products');
   const [selectedOrder, setSelectedOrder] = useState<OrderDto | null>(null);
 

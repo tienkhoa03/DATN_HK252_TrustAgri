@@ -67,6 +67,19 @@ export class AuthLoginDto {
   zaloAccessToken: string;
 }
 
+/**
+ * POST /api/v1/auth/dev-login — chỉ bật khi AUTH_DEV_LOGIN_ENABLED=true (không dùng production).
+ * Body: secret + zaloId (user phải đã tồn tại trong DB, ví dụ sau seed-dev-users.sql).
+ */
+export class AuthDevLoginDto {
+  @IsString()
+  secret: string;
+
+  /** Ví dụ: zalo_dev_farmer_001 — khớp cột users.zalo_id */
+  @IsString()
+  zaloId: string;
+}
+
 /** Nested DTO cho traderProfile */
 export class TraderProfileUpdateDto {
   @IsString()

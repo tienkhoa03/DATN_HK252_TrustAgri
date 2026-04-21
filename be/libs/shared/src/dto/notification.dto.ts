@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsBoolean, IsIn } from 'class-validator';
+import { IsString, IsOptional, IsIn, Allow } from 'class-validator';
 
 /**
  * Thông báo trong app (design.md §4.2 NotificationDto)
@@ -95,6 +95,7 @@ export class ForecastCreateDto {
   @IsIn(['price', 'demand', 'weather'])
   type: 'price' | 'demand' | 'weather';
 
+  @Allow()
   forecastData: unknown;
 
   @IsString()
@@ -102,4 +103,30 @@ export class ForecastCreateDto {
 
   @IsString()
   validTo: string;
+}
+
+export class ForecastUpdateDto {
+  @IsOptional()
+  @IsString()
+  region?: string;
+
+  @IsOptional()
+  @IsString()
+  cropType?: string;
+
+  @IsOptional()
+  @IsIn(['price', 'demand', 'weather'])
+  type?: 'price' | 'demand' | 'weather';
+
+  @IsOptional()
+  @Allow()
+  forecastData?: unknown;
+
+  @IsOptional()
+  @IsString()
+  validFrom?: string;
+
+  @IsOptional()
+  @IsString()
+  validTo?: string;
 }

@@ -7,6 +7,9 @@ import { TerminusModule } from '@nestjs/terminus';
 import { SharedConfigModule, LoggerModule, databaseConfig, jwtConfig } from '@trustagri/shared';
 import { HealthController } from './health/health.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { NotificationsModule } from './notifications/notifications.module';
+import { NewsModule } from './news/news.module';
+import { ForecastsModule } from './forecasts/forecasts.module';
 
 @Module({
   imports: [
@@ -42,6 +45,10 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
 
     TerminusModule,
+
+    NotificationsModule,
+    NewsModule,
+    ForecastsModule,
   ],
   controllers: [HealthController],
   providers: [JwtStrategy],

@@ -17,7 +17,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Page, Box, Text, Spinner, useSnackbar } from 'zmp-ui';
+import { Page, Box, Text, Spinner } from 'zmp-ui';
 import { useProfile } from '@/hooks/useProfile';
 import type { UserProfileDto, UserProfileUpdateDto } from '@/hooks/useProfile';
 import { primaryColors, functionalColors } from '@/design-system/tokens/colors';
@@ -36,7 +36,7 @@ const ROLE_META: Record<Role, { label: string; emoji: string; color: string; bg:
 // ── ProfileScreen ─────────────────────────────────────────────────────────────
 
 export function ProfileScreen() {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const { profile, isLoading, isSaving, error, updateProfile } = useProfile();
   const [isEditing, setIsEditing] = useState(false);
 

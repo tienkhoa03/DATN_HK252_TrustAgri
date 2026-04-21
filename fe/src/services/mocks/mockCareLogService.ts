@@ -1,7 +1,7 @@
 /**
  * Mock Care Log Service — Phase 5.1 (FR-F09)
  *
- * Giả lập tầng transport cho Care Log Service — dùng khi VITE_USE_MOCK=true.
+ * Giả lập Care Log Service (dùng thủ công / test; không gắn VITE_USE_MOCK).
  * Types import từ careLogService.ts (nguồn sự thật duy nhất về hợp đồng DTO).
  *
  * Mỗi hàm trả Promise với độ trễ ~1 giây qua withMockDelay,

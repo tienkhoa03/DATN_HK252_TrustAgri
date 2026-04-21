@@ -1,7 +1,7 @@
 /**
  * Mock Farm Service — Phase 3.1 (FR-F01, FR-T07)
  *
- * Giả lập tầng transport cho Farm Service — dùng khi VITE_USE_MOCK=true.
+ * Giả lập Farm Service (dùng thủ công / test; không gắn VITE_USE_MOCK).
  * Types import từ farmService.ts (nguồn sự thật duy nhất về hợp đồng DTO).
  *
  * Mỗi hàm trả Promise với độ trễ ~1 giây qua withMockDelay,
@@ -27,7 +27,7 @@ export type { FarmDto, FarmLocation, ListResponse, ListFarmsParams, CreateFarmDt
 const SEED_FARMS: FarmDto[] = [
   {
     id: 'farm-001',
-    ownerId: 'user-farmer-001',
+    ownerId: 'usr_farmer_001',
     name: 'Farm Lab Đông A',
     location: {
       province: 'Tiền Giang',
@@ -44,7 +44,7 @@ const SEED_FARMS: FarmDto[] = [
   },
   {
     id: 'farm-002',
-    ownerId: 'user-farmer-001',
+    ownerId: 'usr_farmer_001',
     name: 'Vườn Bưởi Da Xanh',
     location: {
       province: 'Bến Tre',
@@ -157,7 +157,7 @@ export async function createFarm(data: CreateFarmDto): Promise<FarmDto> {
   const newFarm: FarmDto = {
     ...data,
     id: `farm-${Date.now()}`,
-    ownerId: 'user-farmer-001',
+    ownerId: 'usr_farmer_001',
     createdAt: now,
     updatedAt: now,
   };

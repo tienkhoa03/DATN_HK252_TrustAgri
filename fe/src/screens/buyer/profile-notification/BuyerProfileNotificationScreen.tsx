@@ -1,20 +1,31 @@
 /**
- * Buyer Profile & Notification Screen — Phase 2.2 (FR-T01, FR-U*, FR-S03) — Integration
+ * Buyer Profile & Notification Screen — Phase 2.2 + 15.2
  *
- * Tab "Hồ sơ" dùng useProfile() → GET /api/v1/auth/me (Bearer tự động).
- * Tab "Thông báo" và "Mã QR" giữ nguyên logic hiện tại.
- *
- * DTO: UserProfileDto camelCase từ backend, map 1-1 vào view — không cần mapper.
+ * Tab "Hồ sơ": useProfile() → GET /api/v1/auth/me.
+ * Tab "Thông báo": notificationService → GET/POST /api/v1/notifications*.
  */
 
-import React, { useState, useEffect } from 'react';
-import { Page, Box, Text, Spinner } from 'zmp-ui';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Page, Text, Spinner, useNavigate } from 'zmp-ui';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { Icon, IconName } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { useProfile } from '@/hooks/useProfile';
 import type { UserProfileDto } from '@/hooks/useProfile';
+import {
+  listNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  getUnreadNotificationCount,
+  toNotificationViMessage,
+  type NotificationDto,
+} from '@/services/notificationService';
+import { notificationLinkToAppPath } from '@/services/notificationNavigation';
+import { notificationUnreadCountAtom } from '@/state/notificationBadgeAtom';
+import { BUYER_ME_TAB_STORAGE_KEY } from '@/screens/buyer/components/BuyerNotificationBell';
 
 export interface BuyerProfileNotificationScreenProps {
   buyerName?: string;
@@ -24,14 +35,35 @@ export interface BuyerProfileNotificationScreenProps {
 
 type TabType = 'profile' | 'notifications' | 'qr';
 
-interface Notification {
-  id: string;
-  type: 'flowering' | 'order-confirmed' | 'payment-reminder' | 'delivery' | 'general';
-  title: string;
-  message: string;
-  timestamp: string;
-  isRead: boolean;
-  orderId?: string;
+function formatRelativeTimeVi(iso: string): string {
+  const t = new Date(iso).getTime();
+  const diff = Date.now() - t;
+  const sec = Math.floor(diff / 1000);
+  if (sec < 60) return 'Vừa xong';
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min} phút trước`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h} giờ trước`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d} ngày trước`;
+  return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+const notificationTypeConfig: Record<
+  NotificationDto['type'],
+  { icon: IconName; color: string }
+> = {
+  alert: { icon: 'alert', color: colors.functional.alertRed },
+  contract: { icon: 'book', color: colors.primary.zaloBlue },
+  connection: { icon: 'users', color: colors.primary.agriGreen },
+  system: { icon: 'info', color: colors.text.secondary },
+};
+
+function severityAccent(severity: NotificationDto['severity']): string | undefined {
+  if (severity === 'danger') return colors.functional.alertRed;
+  if (severity === 'warning') return colors.functional.warningYellow;
+  if (severity === 'info') return colors.primary.zaloBlue;
+  return undefined;
 }
 
 /**
@@ -43,6 +75,10 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
   buyerAvatar: buyerAvatarProp,
   buyerId: buyerIdProp,
 }) => {
+  const navigate = useNavigate();
+  const openSnackbar = useStableOpenSnackbar();
+  const setUnreadGlobal = useSetAtom(notificationUnreadCountAtom);
+  const unreadBadge = useAtomValue(notificationUnreadCountAtom);
   const [activeTab, setActiveTab] = useState<TabType>('profile');
 
   // ── Tải hồ sơ từ mockProfileService (Phase 2.1) ──────────────────────────
@@ -52,61 +88,59 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
   const buyerName   = profile?.displayName   ?? buyerNameProp   ?? 'Người mua';
   const buyerAvatar = profile?.avatarUrl      ?? buyerAvatarProp ?? undefined;
   const buyerId     = profile?.userId         ?? buyerIdProp     ?? 'BU001';
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: 'N001',
-      type: 'flowering',
-      title: 'Cây đã ra hoa 🌸',
-      message: 'Bưởi Da Xanh tại Vườn chú Bảy đã bước vào giai đoạn ra hoa. Dự kiến thu hoạch sau 60 ngày.',
-      timestamp: '2 giờ trước',
-      isRead: false,
-      orderId: 'O001',
-    },
-    {
-      id: 'N002',
-      type: 'order-confirmed',
-      title: 'Đơn hàng đã xác nhận ✓',
-      message: 'Thương lái Minh Tâm đã xác nhận đơn hàng #O003 của bạn. Số tiền đặt cọc: 1,125,000 VNĐ.',
-      timestamp: '5 giờ trước',
-      isRead: false,
-      orderId: 'O003',
-    },
-    {
-      id: 'N003',
-      type: 'payment-reminder',
-      title: 'Nhắc thanh toán 💰',
-      message: 'Đơn hàng #O002 sắp đến hạn giao. Vui lòng chuẩn bị thanh toán số tiền còn lại: 1,120,000 VNĐ.',
-      timestamp: '1 ngày trước',
-      isRead: true,
-      orderId: 'O002',
-    },
-    {
-      id: 'N004',
-      type: 'delivery',
-      title: 'Đơn hàng đang giao 🚚',
-      message: 'Đơn hàng #O004 đang trên đường giao đến bạn. Dự kiến giao trong 2 giờ tới.',
-      timestamp: '1 ngày trước',
-      isRead: true,
-      orderId: 'O004',
-    },
-    {
-      id: 'N005',
-      type: 'general',
-      title: 'Chương trình khuyến mãi 🎉',
-      message: 'Giảm 10% cho đơn hàng tiếp theo khi đặt cọc trước ngày 20/01/2025.',
-      timestamp: '2 ngày trước',
-      isRead: true,
-    },
-  ]);
 
-  // Notification type config
-  const notificationTypeConfig: Record<Notification['type'], { icon: IconName; color: string }> = {
-    flowering: { icon: 'plant', color: colors.primary.agriGreen },
-    'order-confirmed': { icon: 'check', color: colors.primary.agriGreen },
-    'payment-reminder': { icon: 'dollar-sign', color: colors.functional.warningYellow },
-    delivery: { icon: 'package', color: colors.primary.zaloBlue },
-    general: { icon: 'info', color: colors.text.secondary },
-  };
+  const [notifications, setNotifications] = useState<NotificationDto[]>([]);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifError, setNotifError] = useState<string | null>(null);
+
+  const syncUnreadBadge = useCallback(async () => {
+    try {
+      const n = await getUnreadNotificationCount();
+      setUnreadGlobal(n);
+    } catch {
+      setUnreadGlobal(0);
+    }
+  }, [setUnreadGlobal]);
+
+  const refreshNotifications = useCallback(async (): Promise<boolean> => {
+    setNotifLoading(true);
+    setNotifError(null);
+    try {
+      const res = await listNotifications({ page: 1, limit: 50 });
+      setNotifications(res.items);
+      await syncUnreadBadge();
+      return true;
+    } catch (err) {
+      const msg = toNotificationViMessage(err, 'list');
+      setNotifError(msg);
+      openSnackbar({ type: 'error', text: msg, duration: 4000, icon: true });
+      return false;
+    } finally {
+      setNotifLoading(false);
+    }
+  }, [openSnackbar, syncUnreadBadge]);
+
+  useEffect(() => {
+    try {
+      const pending = sessionStorage.getItem(BUYER_ME_TAB_STORAGE_KEY) as TabType | null;
+      if (pending === 'notifications' || pending === 'profile' || pending === 'qr') {
+        setActiveTab(pending);
+      }
+      sessionStorage.removeItem(BUYER_ME_TAB_STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'notifications') {
+      void refreshNotifications();
+    }
+  }, [activeTab, refreshNotifications]);
+
+  useEffect(() => {
+    void syncUnreadBadge();
+  }, [syncUnreadBadge]);
 
   // Styles
   const headerStyles: React.CSSProperties = {
@@ -346,13 +380,72 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
     color: colors.text.secondary,
   };
 
-  // Mark notification as read
-  const markAsRead = (notificationId: string) => {
-    setNotifications((prev) =>
-      prev.map((notif) =>
-        notif.id === notificationId ? { ...notif, isRead: true } : notif
-      )
-    );
+  const handleNotificationPress = async (n: NotificationDto) => {
+    const role = profile?.role ?? 'buyer';
+    try {
+      if (!n.read) {
+        await markNotificationRead(n.id);
+        setNotifications((prev) =>
+          prev.map((x) =>
+            x.id === n.id ? { ...x, read: true, readAt: new Date().toISOString() } : x,
+          ),
+        );
+        await syncUnreadBadge();
+        openSnackbar({
+          type: 'success',
+          text: 'Đã đánh dấu đã đọc.',
+          duration: 2200,
+          icon: true,
+        });
+      }
+
+      const target = notificationLinkToAppPath(n.linkTo, role);
+      if (target) {
+        navigate(target);
+        return;
+      }
+      if (n.linkTo) {
+        openSnackbar({
+          type: 'info',
+          text: 'Liên kết này chưa mở được trong app. Vui lòng kiểm tra trên phiên bản web (nếu có).',
+          duration: 3200,
+          icon: true,
+        });
+      }
+    } catch (err) {
+      openSnackbar({
+        type: 'error',
+        text: toNotificationViMessage(err, 'read'),
+        duration: 4000,
+        icon: true,
+      });
+    }
+  };
+
+  const handleReadAll = async () => {
+    try {
+      const { updated } = await markAllNotificationsRead();
+      await syncUnreadBadge();
+      const ok = await refreshNotifications();
+      if (ok) {
+        openSnackbar({
+          type: 'success',
+          text:
+            updated > 0
+              ? `Đã đọc ${updated} thông báo.`
+              : 'Không còn thông báo chưa đọc.',
+          duration: 2800,
+          icon: true,
+        });
+      }
+    } catch (err) {
+      openSnackbar({
+        type: 'error',
+        text: toNotificationViMessage(err, 'readAll'),
+        duration: 4000,
+        icon: true,
+      });
+    }
   };
 
   // Render Profile Tab
@@ -424,7 +517,7 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
 
         <div
           style={menuItemStyles}
-          onClick={() => console.log('Order history')}
+          onClick={() => navigate('/buyer/history')}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = colors.background.secondary;
           }}
@@ -434,7 +527,7 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
         >
           <div style={menuItemLeftStyles}>
             <Icon name="package" size="md" color={colors.text.primary} />
-            <span style={menuItemTextStyles}>Lịch sử đơn hàng</span>
+            <span style={menuItemTextStyles}>Lịch sử giao dịch</span>
           </div>
           <Icon name="chevron-right" size="sm" color={colors.text.secondary} />
         </div>
@@ -478,9 +571,47 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
 
   // Render Notifications Tab
   const renderNotifications = () => {
-    const unreadCount = notifications.filter((n) => !n.isRead).length;
+    if (notifLoading && notifications.length === 0) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: `${spacing.xl} ${spacing.md}` }}>
+          <Spinner />
+          <Text size="small" style={{ color: colors.text.secondary }}>
+            Đang tải thông báo…
+          </Text>
+        </div>
+      );
+    }
 
-    if (notifications.length === 0) {
+    const unreadCount = notifications.filter((n) => !n.read).length;
+
+    if (!notifLoading && notifError && notifications.length === 0) {
+      return (
+        <div style={emptyStateStyles}>
+          <div style={{ fontSize: '48px', marginBottom: spacing.md }}>⚠️</div>
+          <Text size="normal" style={{ color: colors.text.secondary, marginBottom: spacing.md }}>
+            {notifError}
+          </Text>
+          <button
+            type="button"
+            onClick={() => void refreshNotifications()}
+            style={{
+              border: 'none',
+              backgroundColor: colors.primary.zaloBlue,
+              color: colors.text.inverse,
+              borderRadius: 8,
+              padding: `${spacing.sm} ${spacing.md}`,
+              fontSize: fontSize.body,
+              fontWeight: fontWeight.semibold,
+              cursor: 'pointer',
+            }}
+          >
+            Thử lại
+          </button>
+        </div>
+      );
+    }
+
+    if (!notifLoading && notifications.length === 0) {
       return (
         <div style={emptyStateStyles}>
           <div style={{ fontSize: '48px', marginBottom: spacing.md }}>🔔</div>
@@ -493,26 +624,81 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
 
     return (
       <>
-        {unreadCount > 0 && (
-          <div style={{ ...instructionCardStyles, marginBottom: spacing.md }}>
-            <Text size="small" style={{ color: colors.text.secondary }}>
+        {notifError ? (
+          <div
+            style={{
+              ...instructionCardStyles,
+              marginBottom: spacing.md,
+              borderLeft: `4px solid ${colors.functional.warningYellow}`,
+            }}
+          >
+            <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+              {notifError}
+            </Text>
+            <button
+              type="button"
+              onClick={() => void refreshNotifications()}
+              style={{
+                marginTop: spacing.sm,
+                border: 'none',
+                background: 'transparent',
+                color: colors.primary.zaloBlue,
+                fontWeight: fontWeight.semibold,
+                cursor: 'pointer',
+                padding: 0,
+                fontSize: fontSize.small,
+              }}
+            >
+              Thử lại
+            </button>
+          </div>
+        ) : null}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: spacing.md,
+            gap: spacing.sm,
+          }}
+        >
+          {unreadCount > 0 ? (
+            <Text size="small" style={{ color: colors.text.secondary, margin: 0, flex: 1 }}>
               Bạn có <strong style={{ color: colors.primary.zaloBlue }}>{unreadCount}</strong> thông báo chưa đọc
             </Text>
-          </div>
-        )}
+          ) : (
+            <Text size="small" style={{ color: colors.text.secondary, margin: 0, flex: 1 }}>
+              Tất cả thông báo đã đọc
+            </Text>
+          )}
+          <button
+            type="button"
+            onClick={() => void handleReadAll()}
+            style={{
+              border: `1px solid ${colors.primary.zaloBlue}`,
+              background: colors.background.primary,
+              color: colors.primary.zaloBlue,
+              borderRadius: 8,
+              padding: `${spacing.xs} ${spacing.sm}`,
+              fontSize: fontSize.small,
+              fontWeight: fontWeight.semibold,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Đọc tất cả
+          </button>
+        </div>
 
         {notifications.map((notification) => {
-          const config = notificationTypeConfig[notification.type];
+          const base = notificationTypeConfig[notification.type];
+          const accent = severityAccent(notification.severity) ?? base.color;
+          const config = { ...base, color: accent };
           return (
             <div
               key={notification.id}
-              style={notificationCardStyles(notification.isRead)}
-              onClick={() => {
-                markAsRead(notification.id);
-                if (notification.orderId) {
-                  console.log('View order:', notification.orderId);
-                }
-              }}
+              style={notificationCardStyles(notification.read)}
+              onClick={() => void handleNotificationPress(notification)}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-2px)';
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
@@ -528,10 +714,15 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
                 </div>
                 <div style={notificationContentStyles}>
                   <div style={notificationTitleStyles}>{notification.title}</div>
-                  <div style={notificationMessageStyles}>{notification.message}</div>
-                  <div style={notificationTimestampStyles}>{notification.timestamp}</div>
+                  <div style={notificationMessageStyles}>{notification.body}</div>
+                  <div style={notificationTimestampStyles}>
+                    {formatRelativeTimeVi(notification.createdAt)}
+                    {notification.linkTo ? (
+                      <span style={{ color: colors.primary.zaloBlue, marginLeft: 8 }}> · {notification.linkTo}</span>
+                    ) : null}
+                  </div>
                 </div>
-                {!notification.isRead && <div style={unreadBadgeStyles} />}
+                {!notification.read && <div style={unreadBadgeStyles} />}
               </div>
             </div>
           );
@@ -607,8 +798,6 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
     );
   };
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
-
   return (
     <Page className="buyer-profile-notification-screen">
       {/* Header */}
@@ -628,7 +817,7 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
         </button>
         <button style={tabStyles(activeTab === 'notifications')} onClick={() => setActiveTab('notifications')}>
           Thông báo
-          {unreadCount > 0 && (
+          {unreadBadge > 0 && (
             <span
               style={{
                 marginLeft: spacing.xs,
@@ -639,7 +828,7 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
                 fontSize: fontSize.small,
               }}
             >
-              {unreadCount}
+              {unreadBadge > 99 ? '99+' : unreadBadge}
             </span>
           )}
         </button>

@@ -1,11 +1,16 @@
 import {
-  Entity,
-  PrimaryGeneratedColumn,
+  Check,
   Column,
   CreateDateColumn,
-  UpdateDateColumn,
   DeleteDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
+import { StandardEntity } from '../../standards/entities/standard.entity';
 
 export interface FarmLocation {
   province: string;
@@ -16,10 +21,17 @@ export interface FarmLocation {
 }
 
 @Entity('farms')
+@Check('"area" > 0')
 export class FarmEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  /**
+   * Cross-service FK → users.user_id (auth-service).
+   * DB-level constraint is enforced via migration SQL; TypeORM cannot
+   * define a @ManyToOne here because UserEntity lives in a separate service.
+   */
+  @Index('idx_farms_owner_id')
   @Column({ name: 'owner_id' })
   ownerId: string;
 
@@ -35,8 +47,17 @@ export class FarmEntity {
   @Column({ name: 'crop_type' })
   cropType: string;
 
+  @Index('idx_farms_standard_id')
   @Column({ name: 'standard_id', nullable: true })
   standardId: string | null;
+
+  @ManyToOne(() => StandardEntity, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'standard_id' })
+  standard: StandardEntity | null;
+
+  /** Mã QR truy xuất công khai (duy nhất); sinh khi tạo vườn */
+  @Column({ name: 'traceability_code', nullable: true, unique: true })
+  traceabilityCode: string | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

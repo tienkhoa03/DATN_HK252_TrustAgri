@@ -21,28 +21,30 @@
  */
 
 import React, { useEffect } from 'react';
-import { Page, Box, Text, Spinner, useSnackbar, useNavigate } from 'zmp-ui';
+import { Page, Box, Text, Spinner, useNavigate } from 'zmp-ui';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { useAuth } from '@/hooks/useAuth';
 import type { UserProfileDto } from '@/hooks/useAuth';
 import type { AuthSession } from '@/state/authAtoms';
+import { ROLE_HOME_PATH } from '@/router/roleHome';
 import { primaryColors, functionalColors } from '@/design-system/tokens/colors';
 
 // ── Role routing table ────────────────────────────────────────────────────────
 
 const ROLE_META: Record<
   'farmer' | 'trader' | 'buyer' | 'guest',
-  { label: string; emoji: string; color: string; homePath: string }
+  { label: string; emoji: string; color: string }
 > = {
-  farmer: { label: 'Nông dân',   emoji: '🌾', color: primaryColors.agriGreen, homePath: '/farmer' },
-  trader: { label: 'Thương lái', emoji: '🏢', color: primaryColors.zaloBlue,  homePath: '/trader' },
-  buyer:  { label: 'Người mua',  emoji: '🛒', color: '#8B5CF6',               homePath: '/buyer'  },
-  guest:  { label: 'Khách',      emoji: '👤', color: '#6B7280',               homePath: '/guest'  },
+  farmer: { label: 'Nông dân',   emoji: '🌾', color: primaryColors.agriGreen },
+  trader: { label: 'Thương lái', emoji: '🏢', color: primaryColors.zaloBlue },
+  buyer:  { label: 'Người mua',  emoji: '🛒', color: '#8B5CF6' },
+  guest:  { label: 'Khách',      emoji: '👤', color: '#6B7280' },
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function LoginScreen() {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const navigate = useNavigate();
   const { session, profile, isLoading, error, login, isAuthenticated, clearError } = useAuth();
 
@@ -62,7 +64,7 @@ export function LoginScreen() {
 
   const handleContinue = () => {
     const role = session?.role ?? 'guest';
-    const path = ROLE_META[role]?.homePath ?? '/';
+    const path = ROLE_HOME_PATH[role] ?? '/';
     navigate(path);
   };
 

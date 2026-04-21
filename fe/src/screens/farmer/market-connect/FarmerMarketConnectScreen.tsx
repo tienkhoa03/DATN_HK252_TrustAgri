@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Page, Text, Input, useSnackbar } from 'zmp-ui';
+import { Page, Text, Input } from 'zmp-ui';
 import { useNavigate } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { Button } from '../../../design-system/components/Button';
@@ -20,6 +20,7 @@ import { Chart } from '../../../design-system/components/Chart';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import {
   searchTraders,
   listConnections,
@@ -142,7 +143,7 @@ const chartData = [
 // ── Screen component ──────────────────────────────────────────────────────────
 
 export const FarmerMarketConnectScreen: React.FC = () => {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<'connect' | 'market'>('connect');

@@ -108,37 +108,37 @@
 
 ## Phase 15: Trung tâm thông báo (FR-F08 in-app, dùng chung)
 
-- [ ] **Task 15.1 (BE):** Triển khai module `notifications` trong `notification-service`: consumer sự kiện `alert.created`, `contract.changed`, `connection.requested`. Endpoint `GET /api/v1/notifications` (phân trang, `unreadOnly`), `POST /api/v1/notifications/:id/read`, `POST /api/v1/notifications/read-all`. Adapter gửi ZNS/OA với exponential backoff retry (tối đa 3 lần). Response theo `NotificationDto`.
+- [x] **Task 15.1 (BE):** Triển khai module `notifications` trong `notification-service`: consumer sự kiện `alert.created`, `contract.changed`, `connection.requested`. Endpoint `GET /api/v1/notifications` (phân trang, `unreadOnly`), `POST /api/v1/notifications/:id/read`, `POST /api/v1/notifications/read-all`. Adapter gửi ZNS/OA với exponential backoff retry (tối đa 3 lần). Response theo `NotificationDto`.
 
 ---
 
 ## Phase 16: Tin tức thị trường và dự báo (FR-T12, FR-G02)
 
-- [ ] **Task 16.1 (BE):** Triển khai module `news` và `forecasts` trong `notification-service`: `GET /api/v1/news` (public, lọc `category`), `GET /api/v1/news/:id`, `POST/PUT /api/v1/news` (chỉ trader), tương tự cho `/forecasts` (lọc `region`, `type`). Response theo `NewsArticleDto`, `ForecastDto`.
+- [x] **Task 16.1 (BE):** Triển khai module `news` và `forecasts` trong `notification-service`: `GET /api/v1/news` (public, lọc `category`), `GET /api/v1/news/:id`, `POST/PUT /api/v1/news` (chỉ trader), tương tự cho `/forecasts` (lọc `region`, `type`). Response theo `NewsArticleDto`, `ForecastDto`.
 
 ---
 
 ## Phase 17: Dashboard thống kê (FR-T02 và tương đương farmer/buyer)
 
-- [ ] **Task 17.1 (BE):** Triển khai module `dashboard` trong `contract-service`: `GET /api/v1/dashboard/trader`, `GET /api/v1/dashboard/farmer`, `GET /api/v1/dashboard/buyer`. Tính từ orders/buying-requests/connections + gọi Monitoring Service cho chỉ số nông dân. Cache Redis TTL 2 phút. Response theo `DashboardTraderDto` và DTO tương ứng.
+- [x] **Task 17.1 (BE):** Triển khai module `dashboard` trong `contract-service`: `GET /api/v1/dashboard/trader`, `GET /api/v1/dashboard/farmer`, `GET /api/v1/dashboard/buyer`. Tính từ orders/buying-requests/connections + gọi Monitoring Service cho chỉ số nông dân. Cache Redis TTL 2 phút. Response theo `DashboardTraderDto` và DTO tương ứng.
 
 ---
 
 ## Phase 18: Truy xuất nguồn gốc công khai (FR-G01)
 
-- [ ] **Task 18.1 (BE):** Triển khai `GET /api/v1/traceability/qr/:code` trong `farm-service` (**public**, bỏ qua auth guard ở whitelist Gateway). Kết hợp `FarmDto` + `StandardDto` + timeline care log + biểu đồ cảm biến (gọi Monitoring Service). Response theo `TraceabilityDto`. Rate limit chặt hơn (theo IP) vì public.
+- [x] **Task 18.1 (BE):** Triển khai `GET /api/v1/traceability/qr/:code` trong `farm-service` (**public**, bỏ qua auth guard ở whitelist Gateway). Kết hợp `FarmDto` + `StandardDto` + timeline care log + biểu đồ cảm biến (gọi Monitoring Service). Response theo `TraceabilityDto`. Rate limit chặt hơn (theo IP) vì public.
 
 ---
 
 ## Phase 19: Lịch sử giao dịch người mua (FR-U06)
 
-- [ ] **Task 19.1 (BE):** Mở rộng `GET /api/v1/orders` và `GET /api/v1/contracts` trong `contract-service` để hỗ trợ lọc `buyerId=me`, `status`, `from`, `to`, `page`, `limit`. Bổ sung trường tổng hợp tùy chọn `summary = { totalSpent, completedCount }` khi query `includeSummary=true`.
+- [x] **Task 19.1 (BE):** Mở rộng `GET /api/v1/orders` và `GET /api/v1/contracts` trong `contract-service` để hỗ trợ lọc `buyerId=me`, `status`, `from`, `to`, `page`, `limit`. Bổ sung trường tổng hợp tùy chọn `summary = { totalSpent, completedCount }` khi query `includeSummary=true`.
 
 ---
 
 ## Phase 20: Quality gate tích hợp cuối (hardening)
 
-- [ ] **Task 20.1 (BE):** Hoàn thiện cross-cutting: global `ExceptionFilter` map sang `ErrorResponse`, `ValidationPipe` whitelist + transform, structured log + correlation `requestId`, health check mỗi service, rate limit Gateway, audit log cho thao tác ghi, integration test (Testcontainers PostgreSQL/Redis/Influx) + e2e cho: auth flow, farm CRUD, đồng bộ care-log, acknowledge alert, order→proposal→contract, change-request hợp đồng, QR traceability, dashboard.
+- [x] **Task 20.1 (BE):** Hoàn thiện cross-cutting: global `ExceptionFilter` map sang `ErrorResponse`, `ValidationPipe` whitelist + transform, structured log + correlation `requestId`, health check mỗi service, rate limit Gateway, audit log cho thao tác ghi, integration test (Testcontainers PostgreSQL/Redis/Influx) + e2e cho: auth flow, farm CRUD, đồng bộ care-log, acknowledge alert, order→proposal→contract, change-request hợp đồng, QR traceability, dashboard.
 
 ---
 

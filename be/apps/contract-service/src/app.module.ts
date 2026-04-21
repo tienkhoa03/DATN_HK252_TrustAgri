@@ -14,6 +14,7 @@ import { OrdersModule } from './orders/orders.module';
 import { ProposalsModule } from './proposals/proposals.module';
 import { ContractsModule } from './contracts/contracts.module';
 import { ContractChangeRequestsModule } from './contract-change-requests/contract-change-requests.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { ContractChangeRequestsModule } from './contract-change-requests/contrac
     ProposalsModule,
     ContractsModule,
     ContractChangeRequestsModule,
+    DashboardModule,
   ],
   controllers: [HealthController],
   providers: [JwtStrategy],

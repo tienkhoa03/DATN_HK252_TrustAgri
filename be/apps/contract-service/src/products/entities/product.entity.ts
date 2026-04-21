@@ -1,21 +1,36 @@
 import {
-  Entity,
-  PrimaryGeneratedColumn,
+  Check,
   Column,
   CreateDateColumn,
   DeleteDateColumn,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
 } from 'typeorm';
 
 export type ProductStatus = 'active' | 'inactive';
 
 @Entity('products')
+@Check('"price" >= 0')
+@Check('"stock_quantity" IS NULL OR "stock_quantity" >= 0')
+@Check(`"status" IN ('active', 'inactive')`)
 export class ProductEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  /**
+   * Cross-service FK → users.user_id (auth-service).
+   * DB-level FK enforced via manual SQL; TypeORM cannot define
+   * @ManyToOne here because UserEntity lives in a separate service.
+   */
+  @Index('idx_products_trader_id')
   @Column({ name: 'trader_id' })
   traderId: string;
 
+  /**
+   * Cross-service FK → farms.id (farm-service).
+   */
+  @Index('idx_products_farm_id')
   @Column({ name: 'farm_id', nullable: true, type: 'varchar' })
   farmId: string | null;
 
@@ -46,6 +61,7 @@ export class ProductEntity {
   @Column({ type: 'text', nullable: true })
   description: string | null;
 
+  @Index('idx_products_status')
   @Column({ type: 'varchar', length: 20, default: 'active' })
   status: ProductStatus;
 

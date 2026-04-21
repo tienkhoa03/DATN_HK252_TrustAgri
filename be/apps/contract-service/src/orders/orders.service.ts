@@ -6,8 +6,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { OrderDto, CreateOrderDto, ListResponse } from '@trustagri/shared';
+import { Repository, SelectQueryBuilder } from 'typeorm';
+import {
+  OrderDto,
+  CreateOrderDto,
+  ListResponse,
+  BuyerTransactionSummaryDto,
+} from '@trustagri/shared';
 import { OrderEntity } from './entities/order.entity';
 import { OrderQueryDto } from './dto/order-query.dto';
 import { ProductEntity } from '../products/entities/product.entity';
@@ -31,6 +36,7 @@ export class OrdersService {
   /**
    * GET /api/v1/orders
    * Buyer thấy đơn hàng của mình; trader thấy đơn hàng thuộc sản phẩm của mình.
+   * Hỗ trợ `buyerId=me`, `includeSummary`, `status`, `from`, `to`, phân trang.
    */
   async listOrders(
     query: OrderQueryDto,
@@ -40,16 +46,49 @@ export class OrdersService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
-    const qb = this.orderRepo
-      .createQueryBuilder('o')
+    const baseQb = this.buildOrderListQuery(query, requesterId, requesterRole);
+
+    const [rows, total] = await baseQb
+      .clone()
       .orderBy('o.createdAt', 'DESC')
       .skip((page - 1) * limit)
-      .take(limit);
+      .take(limit)
+      .getManyAndCount();
+
+    let summary: BuyerTransactionSummaryDto | undefined;
+    if (query.includeSummary) {
+      summary = await this.computeOrderSummary(baseQb.clone());
+    }
+
+    return {
+      items: rows.map((r) => this.toDto(r)),
+      page,
+      limit,
+      total,
+      ...(summary !== undefined ? { summary } : {}),
+    };
+  }
+
+  private buildOrderListQuery(
+    query: OrderQueryDto,
+    requesterId: string,
+    requesterRole: string,
+  ): SelectQueryBuilder<OrderEntity> {
+    const qb = this.orderRepo.createQueryBuilder('o');
+
+    const buyerFilter = this.resolveBuyerIdForOrders(
+      query.buyerId,
+      requesterId,
+      requesterRole,
+    );
 
     if (requesterRole === 'buyer') {
-      qb.andWhere('o.buyerId = :id', { id: requesterId });
+      qb.andWhere('o.buyerId = :id', { id: buyerFilter ?? requesterId });
     } else if (requesterRole === 'trader') {
       qb.andWhere('o.traderId = :id', { id: requesterId });
+      if (buyerFilter) {
+        qb.andWhere('o.buyerId = :bid', { bid: buyerFilter });
+      }
     }
 
     if (query.status) {
@@ -64,14 +103,58 @@ export class OrdersService {
       qb.andWhere('o.createdAt <= :to', { to: query.to });
     }
 
-    const [rows, total] = await qb.getManyAndCount();
+    return qb;
+  }
+
+  /**
+   * `totalSpent` / `completedCount` theo cùng phạm vi lọc, không phụ thuộc trang.
+   */
+  private async computeOrderSummary(
+    qb: SelectQueryBuilder<OrderEntity>,
+  ): Promise<BuyerTransactionSummaryDto> {
+    const raw = await qb
+      .select(
+        'COALESCE(SUM(CASE WHEN o.status = :done THEN o.totalPrice ELSE 0 END), 0)',
+        'totalSpent',
+      )
+      .addSelect('COALESCE(SUM(CASE WHEN o.status = :done THEN 1 ELSE 0 END), 0)', 'completedCount')
+      .setParameter('done', 'completed')
+      .getRawOne();
 
     return {
-      items: rows.map((r) => this.toDto(r)),
-      page,
-      limit,
-      total,
+      totalSpent: Number(raw?.totalSpent ?? 0),
+      completedCount: Number(raw?.completedCount ?? 0),
     };
+  }
+
+  private resolveBuyerIdForOrders(
+    raw: string | undefined,
+    requesterId: string,
+    requesterRole: string,
+  ): string | null {
+    if (raw === undefined || raw === '') {
+      return null;
+    }
+    const trimmed = raw.trim();
+    if (trimmed.toLowerCase() === 'me') {
+      if (requesterRole !== 'buyer') {
+        throw new ForbiddenException('Tham số buyerId=me chỉ dùng với vai trò buyer');
+      }
+      return requesterId;
+    }
+    if (!this.isUuidV4(trimmed)) {
+      throw new BadRequestException('Tham số buyerId không hợp lệ');
+    }
+    if (requesterRole === 'buyer' && trimmed !== requesterId) {
+      throw new ForbiddenException('Không được xem đơn hàng của người mua khác');
+    }
+    return trimmed;
+  }
+
+  private isUuidV4(value: string): boolean {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value,
+    );
   }
 
   /**

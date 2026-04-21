@@ -18,7 +18,7 @@ export const BasicExample: React.FC = () => {
 
   return (
     <GuestTraceabilityScanResultScreen
-      productId="PROD-001"
+      qrCode="TRUST-DEMO-001"
       onLogin={handleLogin}
     />
   );
@@ -35,7 +35,7 @@ export const DifferentProductExample: React.FC = () => {
 
   return (
     <GuestTraceabilityScanResultScreen
-      productId="PROD-002"
+      qrCode="TRUST-DEMO-002"
       onLogin={handleLogin}
     />
   );
@@ -48,7 +48,7 @@ export const DifferentProductExample: React.FC = () => {
 export const WithoutLoginExample: React.FC = () => {
   return (
     <GuestTraceabilityScanResultScreen
-      productId="PROD-003"
+      qrCode="TRUST-DEMO-003"
     />
   );
 };
@@ -71,7 +71,7 @@ export const CustomLoginExample: React.FC = () => {
 
   return (
     <GuestTraceabilityScanResultScreen
-      productId="PROD-004"
+      qrCode="TRUST-DEMO-004"
       onLogin={handleLogin}
     />
   );
@@ -86,8 +86,8 @@ export const QRScannerIntegrationExample: React.FC = () => {
 
   const handleQRScan = (qrCode: string) => {
     // Extract product ID from QR code
-    const productId = qrCode.split('/').pop() || 'PROD-001';
-    setScannedProductId(productId);
+    const extracted = qrCode.split('/').pop() || 'TRUST-DEMO-005';
+    setScannedProductId(extracted);
   };
 
   const handleLogin = () => {
@@ -99,7 +99,7 @@ export const QRScannerIntegrationExample: React.FC = () => {
       <div style={{ padding: '20px', textAlign: 'center' }}>
         <h2>Quét mã QR trên bao bì sản phẩm</h2>
         <button
-          onClick={() => handleQRScan('https://example.com/product/PROD-005')}
+          onClick={() => handleQRScan('https://example.com/trace/TRUST-DEMO-005')}
           style={{
             padding: '12px 24px',
             backgroundColor: '#0068FF',
@@ -117,7 +117,7 @@ export const QRScannerIntegrationExample: React.FC = () => {
 
   return (
     <GuestTraceabilityScanResultScreen
-      productId={scannedProductId}
+      qrCode={scannedProductId}
       onLogin={handleLogin}
     />
   );

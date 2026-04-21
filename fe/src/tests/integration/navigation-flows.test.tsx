@@ -174,7 +174,7 @@ describe('Navigation Flows - 3-Click Rule Compliance', () => {
       expect(homeContainer).toBeInTheDocument();
       
       // Click 2: Scan QR and view traceability
-      const { container: traceContainer } = render(<GuestTraceabilityScanResultScreen productId="1" />);
+      const { container: traceContainer } = render(<GuestTraceabilityScanResultScreen qrCode="1" />);
       expect(traceContainer).toBeInTheDocument();
       
       // Total: 2 clicks to view traceability

@@ -52,6 +52,38 @@ export class SensorsService {
   }
 
   /**
+   * Gom nhóm lịch sử theo để vẽ biểu đồ công khai (TraceabilityDto.sensorChart).
+   */
+  async getSensorChartForTraceability(
+    farmId: string,
+    fromIso: string,
+    toIso: string,
+  ): Promise<
+    Array<{ sensorType: string; series: Array<{ t: string; value: number }> }>
+  > {
+    const readings = await this.getHistory(farmId, {
+      from: fromIso,
+      to: toIso,
+      interval: '1h',
+    });
+    const map = new Map<string, Array<{ t: string; value: number }>>();
+    for (const r of readings) {
+      const key = r.sensorType;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push({ t: r.recordedAt, value: r.value });
+    }
+    for (const series of map.values()) {
+      series.sort(
+        (a, b) => new Date(a.t).getTime() - new Date(b.t).getTime(),
+      );
+    }
+    return Array.from(map.entries()).map(([sensorType, series]) => ({
+      sensorType,
+      series,
+    }));
+  }
+
+  /**
    * Ghi một reading mới vào Redis, push WebSocket sensor_update,
    * và kiểm tra ngưỡng để tạo alert nếu cần.
    * Dùng khi có data ingestion pipeline (MQTT, HTTP ingestion, v.v.)

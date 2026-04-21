@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Page, Text, useSnackbar } from 'zmp-ui';
+import { Page, Text } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
@@ -47,7 +47,9 @@ import {
   toContractViMessage,
   type ContractDto,
 } from '../../../services/contractService';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { ContractChangeRequestsPanel } from '@/screens/shared/contract-change-requests';
+import { BuyerNotificationBell } from '@/screens/buyer/components/BuyerNotificationBell';
 
 export interface BuyerOrdersProposalsScreenProps {
   buyerId?: string;
@@ -102,7 +104,7 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
   buyerId = 'me',
   buyerName = 'Người mua',
 }) => {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const [activeTab, setActiveTab] = useState<TabType>('proposals');
 
   // Proposals state
@@ -830,14 +832,21 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
           padding: spacing.md,
           backgroundColor: colors.background.primary,
           borderBottom: `1px solid ${colors.background.secondary}`,
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: spacing.sm,
         }}
       >
-        <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-          Quản lý đơn hàng
-        </Text>
-        <Text.Title size="normal" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
-          {buyerName}
-        </Text.Title>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+            Quản lý đơn hàng
+          </Text>
+          <Text.Title size="normal" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
+            {buyerName}
+          </Text.Title>
+        </div>
+        <BuyerNotificationBell />
       </div>
 
       {/* Tab Bar */}

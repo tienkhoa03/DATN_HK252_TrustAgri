@@ -264,7 +264,7 @@ describe('Theme Consistency - Design System Integration', () => {
     test('All guest screens render with consistent theme', () => {
       const guestScreens = [
         { name: 'Home Market News', component: <GuestHomeMarketNewsScreen /> },
-        { name: 'Traceability Scan', component: <GuestTraceabilityScanResultScreen productId="1" /> },
+        { name: 'Traceability Scan', component: <GuestTraceabilityScanResultScreen qrCode="1" /> },
         { name: 'Product Detail', component: <GuestProductDetailScreen productId="1" /> },
       ];
       

@@ -13,13 +13,14 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Page, Text, useSnackbar } from 'zmp-ui';
+import { Page, Text } from 'zmp-ui';
 import { useNavigate } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { Button } from '../../../design-system/components/Button';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import {
   listConnections,
   acceptConnection,
@@ -110,7 +111,7 @@ export interface ConnectionRequestsScreenProps {
 export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> = ({
   role = 'farmer',
 }) => {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState<'incoming' | 'outgoing'>('incoming');

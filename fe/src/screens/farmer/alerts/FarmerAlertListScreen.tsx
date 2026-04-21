@@ -15,7 +15,8 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Page, Text, useSnackbar, useNavigate } from 'zmp-ui';
+import { Page, Text, useNavigate } from 'zmp-ui';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { Icon } from '@/design-system/components/Icon';
 import { colors } from '@/design-system/tokens/colors';
@@ -260,7 +261,7 @@ export const FarmerAlertListScreen: React.FC<FarmerAlertListScreenProps> = ({
   farmId: farmIdProp,
 }) => {
   const navigate = useNavigate();
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const session = useAtomValue(authSessionAtom);
   const decrementAlertBadge = useSetAtom(decrementFarmAlertBadgeAtom);
 

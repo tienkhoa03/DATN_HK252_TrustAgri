@@ -57,12 +57,33 @@ export interface VerifyResponseDto {
  * POST /api/v1/auth/login
  * Exchanges a Zalo access token (from ZMP SDK) for a TrustAgri session.
  */
+/**
+ * POST /api/v1/auth/dev-login — JWT thật (chỉ dev backend: localhost + secret).
+ */
+export async function devLogin(secret: string, zaloId: string): Promise<AuthSession> {
+  const { data } = await apiClient.post<{
+    accessToken: string;
+    refreshToken: string;
+    userId: string;
+    role: 'farmer' | 'trader' | 'buyer' | 'guest';
+    expiresAt: string;
+  }>('/auth/dev-login', { secret, zaloId });
+
+  return {
+    accessToken: data.accessToken,
+    refreshToken: data.refreshToken,
+    userId: data.userId,
+    role: data.role,
+    expiresAt: data.expiresAt,
+  };
+}
+
 export async function login(zaloAccessToken: string): Promise<AuthSession> {
   const { data } = await apiClient.post<{
     accessToken: string;
     refreshToken: string;
     userId: string;
-    role: 'farmer' | 'trader' | 'buyer';
+    role: 'farmer' | 'trader' | 'buyer' | 'guest';
     expiresAt: string;
   }>('/auth/login', { zaloAccessToken });
 

@@ -22,6 +22,9 @@ import * as authService from '@/services/authService';
 import { resolveZaloAccessToken } from '@/services/zaloAccessToken';
 import type { UserProfileDto } from '@/services/authService';
 import { ApiError } from '@/api/errors';
+import { ENV } from '@/config/env';
+import { mockLogout } from '@/services/mockService';
+import { bootstrapMockAuthSession, isMockOnlyJwt } from '@/services/mockAuthBootstrap';
 
 // ── Public interface ──────────────────────────────────────────────────────────
 
@@ -72,6 +75,13 @@ export function useAuth(): UseAuthReturn {
     setError(null);
 
     try {
+      if (ENV.USE_MOCK) {
+        const { session: newSession, profile: userProfile } = await bootstrapMockAuthSession();
+        setSession(newSession);
+        setProfile(userProfile);
+        return;
+      }
+
       // Bước 1: Lấy Zalo access token từ ZMP SDK
       let zaloToken: string;
       try {
@@ -105,8 +115,11 @@ export function useAuth(): UseAuthReturn {
   const logout = useCallback(async () => {
     setIsLoading(true);
     try {
-      // POST /api/v1/auth/logout → { success: true }
-      await authService.logout();
+      if (ENV.USE_MOCK && session && isMockOnlyJwt(session.accessToken)) {
+        await mockLogout();
+      } else if (session) {
+        await authService.logout();
+      }
     } catch {
       // Bỏ qua lỗi server; luôn xóa session local để tránh kẹt trạng thái
     } finally {
@@ -114,12 +127,15 @@ export function useAuth(): UseAuthReturn {
       setProfile(null);
       setIsLoading(false);
     }
-  }, [setSession]);
+  }, [setSession, session]);
 
   // ── verify ───────────────────────────────────────────────────────────────
 
   const verify = useCallback(async () => {
     if (!session) return null;
+    if (ENV.USE_MOCK && isMockOnlyJwt(session.accessToken)) {
+      return { userId: session.userId, role: session.role, valid: true as const };
+    }
     try {
       // POST /api/v1/auth/verify — Bearer được gắn tự động bởi interceptor
       const result = await authService.verify();

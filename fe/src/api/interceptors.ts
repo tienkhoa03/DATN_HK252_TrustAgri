@@ -1,6 +1,7 @@
 import type { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import type { AxiosError } from 'axios';
 import { getDefaultStore } from 'jotai';
+import { ENV } from '@/config/env';
 import { accessTokenAtom, authSessionAtom } from '@/state/authAtoms';
 import { parseAxiosError, isUnauthorized, type ErrorBody } from './errors';
 
@@ -9,10 +10,15 @@ import { parseAxiosError, isUnauthorized, type ErrorBody } from './errors';
  * Reads from the Jotai store so it always picks up the latest token.
  */
 function requestInterceptor(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
+  config.headers = config.headers ?? {};
+  config.headers['X-Client-Api-Contract-Version'] = ENV.API_CONTRACT_VERSION;
+  if (config.skipAuth) {
+    delete config.headers['Authorization'];
+    return config;
+  }
   const store = getDefaultStore();
   const token = store.get(accessTokenAtom);
   if (token) {
-    config.headers = config.headers ?? {};
     config.headers['Authorization'] = `Bearer ${token}`;
   }
   return config;

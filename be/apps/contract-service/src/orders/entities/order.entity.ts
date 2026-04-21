@@ -1,11 +1,16 @@
 import {
-  Entity,
-  PrimaryGeneratedColumn,
+  Check,
   Column,
   CreateDateColumn,
-  UpdateDateColumn,
   DeleteDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
+import { ProductEntity } from '../../products/entities/product.entity';
 
 export type OrderStatus =
   | 'pending'
@@ -16,18 +21,36 @@ export type OrderStatus =
   | 'completed';
 
 @Entity('orders')
+@Check('"quantity" > 0')
+@Check('"total_price" >= 0')
+@Check('"deposit" IS NULL OR "deposit" >= 0')
+@Check('"deposit" IS NULL OR "deposit" <= "total_price"')
+@Check(`"status" IN ('pending', 'accepted', 'rejected', 'cancelled', 'contracted', 'completed')`)
 export class OrderEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  /**
+   * Cross-service FK → users.user_id (auth-service).
+   */
+  @Index('idx_orders_buyer_id')
   @Column({ name: 'buyer_id' })
   buyerId: string;
 
+  /**
+   * Cross-service FK → users.user_id (auth-service).
+   */
+  @Index('idx_orders_trader_id')
   @Column({ name: 'trader_id' })
   traderId: string;
 
+  @Index('idx_orders_product_id')
   @Column({ name: 'product_id' })
   productId: string;
+
+  @ManyToOne(() => ProductEntity, { onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'product_id' })
+  product: ProductEntity;
 
   @Column({ type: 'numeric', precision: 15, scale: 3 })
   quantity: number;
@@ -46,6 +69,7 @@ export class OrderEntity {
   })
   deposit: number | null;
 
+  @Index('idx_orders_status')
   @Column({ type: 'varchar', length: 20, default: 'pending' })
   status: OrderStatus;
 

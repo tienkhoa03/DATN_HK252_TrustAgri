@@ -12,11 +12,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Page, Text, useSnackbar } from 'zmp-ui';
+import { Page, Text } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import {
   listProducts,
   standardLabel,
@@ -24,6 +25,8 @@ import {
   toMarketplaceViMessage,
   type ProductDto,
 } from '../../../services/marketplaceService';
+import { BuyerNotificationBell } from '../components/BuyerNotificationBell';
+import { BuyerDashboardScreen } from '../dashboard';
 
 export interface BuyerMarketplaceScreenProps {
   buyerName?: string;
@@ -104,7 +107,7 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
   onProductPress,
   onPostBuyingRequest,
 }) => {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
   const [products, setProducts] = useState<ProductDto[]>([]);
@@ -397,14 +400,19 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
     <Page className="buyer-marketplace-screen">
       <div style={contentStyles}>
         {/* Header */}
-        <div style={headerStyles}>
-          <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-            Xin chào,
-          </Text>
-          <Text.Title size="normal" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
-            {buyerName}
-          </Text.Title>
+        <div style={{ ...headerStyles, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+              Xin chào,
+            </Text>
+            <Text.Title size="normal" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
+              {buyerName}
+            </Text.Title>
+          </div>
+          <BuyerNotificationBell />
         </div>
+
+        <BuyerDashboardScreen />
 
         {/* Search Bar */}
         <div style={searchBarStyles}>

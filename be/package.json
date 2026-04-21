@@ -4,7 +4,8 @@
   "private": true,
   "workspaces": [
     "apps/*",
-    "libs/*"
+    "libs/*",
+    "integration-tests"
   ],
   "scripts": {
     "predev": "npm run build -w @trustagri/shared",
@@ -14,6 +15,7 @@
     "start:all": "turbo run start --parallel",
     "lint": "turbo run lint",
     "test": "turbo run test",
+    "test:integration": "npm run test -w @trustagri/integration-tests",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down"
   },

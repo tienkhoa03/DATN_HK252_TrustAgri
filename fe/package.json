@@ -27,7 +27,9 @@
     "test:visual:headed": "playwright test --headed",
     "test:visual:debug": "playwright test --debug",
     "test:visual:update": "playwright test --update-snapshots",
-    "test:visual:report": "playwright show-report"
+    "test:visual:report": "playwright show-report",
+    "test:e2e:regression": "playwright test --config=playwright.regression.config.ts",
+    "test:e2e:regression:staging": "cross-env E2E_STAGING=true playwright test --config=playwright.regression.config.ts"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.99.1",

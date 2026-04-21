@@ -12,11 +12,12 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Page, Text, useSnackbar } from 'zmp-ui';
+import { Page, Text } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import {
   listBuyingRequests,
   createBuyingRequest,
@@ -268,7 +269,7 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onEdit, onCancel, ca
 // ── Main component ────────────────────────────────────────────────────────────
 
 export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreenProps> = () => {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
 
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>('list');

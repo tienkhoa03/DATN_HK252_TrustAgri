@@ -55,11 +55,17 @@ interface ErrorResponse {
 - Chuẩn danh sách:
 
 ```typescript
+interface BuyerTransactionSummaryDto {
+  totalSpent: number;       // tổng totalPrice các bản ghi `completed` trong phạm vi lọc
+  completedCount: number;   // số bản ghi `completed` trong phạm vi lọc
+}
+
 interface ListResponse<T> {
   items: T[];
   page: number;
   limit: number;
   total: number;
+  summary?: BuyerTransactionSummaryDto; // khi `includeSummary=true` (GET /orders, GET /contracts)
 }
 ```
 
@@ -376,7 +382,7 @@ interface BuyingRequestDto {
 
 | Endpoint | FR |
 |---|---|
-| `GET /api/v1/orders` | FR-U06, FR-T05 (lọc `?status&role&from&to&page&limit`) |
+| `GET /api/v1/orders` | FR-U06, FR-T05 (lọc `?buyerId=me|uuid&status&role&from&to&page&limit&includeSummary`) |
 | `GET /api/v1/orders/:id` | Chi tiết |
 | `POST /api/v1/orders` (buyer) | FR-U01 (đặt mua trực tiếp) |
 | `POST /api/v1/orders/:id/accept` (trader) | FR-T05 |
@@ -430,7 +436,7 @@ interface ProposalDto {
 
 | Endpoint | FR |
 |---|---|
-| `GET /api/v1/contracts` | FR-F04, FR-U06 (filter `?role&status&page&limit`) |
+| `GET /api/v1/contracts` | FR-F04, FR-U06 (filter `?buyerId=me|uuid&role&status&from&to&page&limit&includeSummary`) |
 | `GET /api/v1/contracts/:id` | Chi tiết |
 | `POST /api/v1/contracts` | FR-T06/T09 (tạo thủ công khi không qua luồng order) |
 | `GET /api/v1/contracts/:id/change-requests` | FR-F05, FR-T06, FR-T09, FR-U04 |

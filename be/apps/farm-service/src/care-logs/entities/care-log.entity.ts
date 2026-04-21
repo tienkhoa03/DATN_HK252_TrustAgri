@@ -1,25 +1,42 @@
 import {
-  Entity,
-  PrimaryGeneratedColumn,
+  Check,
   Column,
   CreateDateColumn,
-  UpdateDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
   OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { EvidenceEntity } from './evidence.entity';
+import { FarmEntity } from '../../farms/entities/farm.entity';
+import { StandardStepEntity } from '../../standards/entities/standard-step.entity';
 
 export type SyncStatus = 'synced' | 'pending' | 'conflict';
 
 @Entity('care_logs')
+@Check(`"sync_status" IN ('synced', 'pending', 'conflict')`)
 export class CareLogEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index('idx_care_logs_farm_id')
   @Column({ name: 'farm_id' })
   farmId: string;
 
+  @ManyToOne(() => FarmEntity, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'farm_id' })
+  farm: FarmEntity;
+
+  @Index('idx_care_logs_standard_step_id')
   @Column({ name: 'standard_step_id', nullable: true, type: 'varchar' })
   standardStepId: string | null;
+
+  @ManyToOne(() => StandardStepEntity, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'standard_step_id' })
+  standardStep: StandardStepEntity | null;
 
   @Column()
   action: string;
@@ -27,6 +44,7 @@ export class CareLogEntity {
   @Column({ type: 'text', nullable: true })
   notes: string | null;
 
+  @Index('idx_care_logs_performed_at')
   @Column({ name: 'performed_at', type: 'timestamptz' })
   performedAt: Date;
 

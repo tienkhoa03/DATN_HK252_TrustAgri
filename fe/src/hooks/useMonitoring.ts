@@ -99,21 +99,26 @@ export function useMonitoring(farmId: string | null | undefined): UseMonitoringR
   const [alerts, setAlerts] = useState<AlertDto[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const inFlightLatestRef = useRef(false);
+  const latestFetchSeqRef = useRef(0);
+  const historyFetchSeqRef = useRef(0);
   const loadedFarmRef = useRef<string | null>(null);
 
   // Derived: latest readings từ Jotai atom cho farm này
   const latestReadings: SensorReadingDto[] =
     farmId ? (latestMap.get(farmId) ?? []) : [];
 
+  // Reset loaded guard when farmId changes (chạy trước effect cold-start bên dưới)
+  useEffect(() => {
+    loadedFarmRef.current = null;
+  }, [farmId]);
+
   // ── Cold start: load latest + alerts ───────────────────────────────────────
   useEffect(() => {
     if (!farmId) return;
     if (loadedFarmRef.current === farmId) return;
-    if (inFlightLatestRef.current) return;
 
+    const seq = ++latestFetchSeqRef.current;
     let cancelled = false;
-    inFlightLatestRef.current = true;
     setIsLatestLoading(true);
     setError(null);
 
@@ -122,7 +127,7 @@ export function useMonitoring(farmId: string | null | undefined): UseMonitoringR
       monitoringService.listAlerts(farmId, { status: 'unacknowledged' }),
     ])
       .then(([readings, alertsRes]) => {
-        if (cancelled) return;
+        if (cancelled || seq !== latestFetchSeqRef.current) return;
         seedLatest({ farmId, readings });
         const unacked = alertsRes.items.filter((a) => !a.acknowledged);
         setAlerts(unacked);
@@ -131,25 +136,20 @@ export function useMonitoring(farmId: string | null | undefined): UseMonitoringR
         loadedFarmRef.current = farmId;
       })
       .catch((err) => {
-        if (cancelled) return;
+        if (cancelled || seq !== latestFetchSeqRef.current) return;
         setError(toViMessage(err));
       })
       .finally(() => {
-        if (!cancelled) {
+        // Luôn tắt loading cho lần gọi mới nhất; tránh kẹt isLoading khi effect bị cleanup (đổi farm / Strict Mode)
+        if (seq === latestFetchSeqRef.current) {
           setIsLatestLoading(false);
-          inFlightLatestRef.current = false;
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [farmId, seedLatest]);
-
-  // Reset loaded guard when farmId changes
-  useEffect(() => {
-    loadedFarmRef.current = null;
-  }, [farmId]);
+  }, [farmId, seedLatest, setAlertBadge]);
 
   // ── WebSocket: sensor_update + alert_created ───────────────────────────────
   useEffect(() => {
@@ -182,7 +182,7 @@ export function useMonitoring(farmId: string | null | undefined): UseMonitoringR
     (sensorType: SensorType, extraParams?: Omit<HistoryParams, 'sensorType'>) => {
       if (!farmId) return;
 
-      let cancelled = false;
+      const seq = ++historyFetchSeqRef.current;
       setIsHistoryLoading(true);
 
       const now = new Date();
@@ -197,20 +197,18 @@ export function useMonitoring(farmId: string | null | undefined): UseMonitoringR
           ...extraParams,
         })
         .then((items) => {
-          if (!cancelled) {
-            setHistoryData(items);
-          }
+          if (seq !== historyFetchSeqRef.current) return;
+          setHistoryData(items);
         })
         .catch((err) => {
-          if (!cancelled) setError(toViMessage(err));
+          if (seq !== historyFetchSeqRef.current) return;
+          setError(toViMessage(err));
         })
         .finally(() => {
-          if (!cancelled) setIsHistoryLoading(false);
+          if (seq === historyFetchSeqRef.current) {
+            setIsHistoryLoading(false);
+          }
         });
-
-      return () => {
-        cancelled = true;
-      };
     },
     [farmId],
   );

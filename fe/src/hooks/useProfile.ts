@@ -22,9 +22,14 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { useAtomValue } from 'jotai';
 import * as authService from '@/services/authService';
 import type { UserProfileDto, UserProfileUpdateDto } from '@/services/authService';
 import { ApiError } from '@/api/errors';
+import { ENV } from '@/config/env';
+import { authSessionAtom } from '@/state/authAtoms';
+import { mockGetMe, mockUpdateMe } from '@/services/mockService';
+import { isMockOnlyJwt } from '@/services/mockAuthBootstrap';
 
 export type { UserProfileDto, UserProfileUpdateDto };
 
@@ -51,6 +56,7 @@ export interface UseProfileReturn {
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useProfile(): UseProfileReturn {
+  const session = useAtomValue(authSessionAtom);
   const [profile, setProfile] = useState<UserProfileDto | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -62,6 +68,20 @@ export function useProfile(): UseProfileReturn {
     setIsLoading(true);
     setError(null);
     try {
+      if (ENV.USE_MOCK) {
+        if (!session) {
+          setProfile(null);
+          return;
+        }
+        if (isMockOnlyJwt(session.accessToken)) {
+          const data = await mockGetMe(session.role);
+          setProfile(data);
+          return;
+        }
+        const data = await authService.getMe();
+        setProfile(data);
+        return;
+      }
       const data = await authService.getMe();
       setProfile(data);
     } catch (err) {
@@ -69,10 +89,10 @@ export function useProfile(): UseProfileReturn {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [session]);
 
   useEffect(() => {
-    fetchProfile();
+    void fetchProfile();
   }, [fetchProfile]);
 
   // ── PUT /api/v1/auth/me ──────────────────────────────────────────────────
@@ -81,6 +101,17 @@ export function useProfile(): UseProfileReturn {
     setIsSaving(true);
     setError(null);
     try {
+      if (ENV.USE_MOCK) {
+        if (!profile || !session) return false;
+        if (isMockOnlyJwt(session.accessToken)) {
+          const updated = await mockUpdateMe(profile, patch);
+          setProfile(updated);
+          return true;
+        }
+        const updated = await authService.updateMe(patch);
+        setProfile(updated);
+        return true;
+      }
       const updated = await authService.updateMe(patch);
       setProfile(updated);
       return true;
@@ -90,7 +121,7 @@ export function useProfile(): UseProfileReturn {
     } finally {
       setIsSaving(false);
     }
-  }, []);
+  }, [profile, session]);
 
   return { profile, isLoading, isSaving, error, updateProfile, refresh: fetchProfile };
 }

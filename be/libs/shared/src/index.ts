@@ -9,6 +9,11 @@ export * from './dto/notification.dto';
 // ─── FILTERS ──────────────────────────────────────────────────────────────────
 export * from './filters/http-exception.filter';
 
+// ─── HTTP STACK (cross-cutting) ───────────────────────────────────────────────
+export * from './bootstrap/http-stack';
+export * from './middleware/request-id.middleware';
+export * from './interceptors/audit.interceptor';
+
 // ─── GUARDS ───────────────────────────────────────────────────────────────────
 export * from './guards/jwt-auth.guard';
 export * from './guards/roles.guard';

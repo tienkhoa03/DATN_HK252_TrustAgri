@@ -10,6 +10,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { FarmsModule } from './farms/farms.module';
 import { StandardsModule } from './standards/standards.module';
 import { CareLogsModule } from './care-logs/care-logs.module';
+import { TraceabilityModule } from './traceability/traceability.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { CareLogsModule } from './care-logs/care-logs.module';
     FarmsModule,
     StandardsModule,
     CareLogsModule,
+    TraceabilityModule,
   ],
   controllers: [HealthController],
   providers: [JwtStrategy],

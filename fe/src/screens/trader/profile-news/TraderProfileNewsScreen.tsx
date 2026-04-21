@@ -1,99 +1,302 @@
 /**
  * Trader Profile & News Screen
- * Quản lý thương hiệu và truyền thông thị trường
- * 
+ * Quản lý thương hiệu, tin tức thị trường và dự báo (mock — Phase 16.1)
+ *
  * Requirements: FR-T01, FR-T12, US-T05
- * 
- * Features:
- * - Phần Thông tin Doanh nghiệp: Logo, Tên đơn vị, Giấy phép, Mô tả năng lực
- * - Phần Quản lý Tin tức: Trình soạn thảo văn bản đơn giản, Viết bài
- * - Lịch sử đăng bài: Danh sách bài viết đã đăng, Số lượt xem và tương tác
  */
 
-import React, { useState } from 'react';
-import { Page, Box, Text } from 'zmp-ui';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Page, Text, Spinner } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import {
+  createForecast,
+  createNews,
+  listForecasts,
+  listNews,
+  updateForecast,
+  updateNews,
+  toNewsForecastViMessage,
+  type ForecastDto,
+  type NewsArticleDto,
+} from '../../../services/newsForecastService';
 
 export interface TraderProfileNewsScreenProps {
+  /** Giữ tương thích ví dụ / tích hợp sau (hồ sơ mock hiện dùng companyName). */
   traderName?: string;
   companyName?: string;
 }
 
-interface NewsArticle {
-  id: string;
-  title: string;
-  content: string;
-  category: 'price-forecast' | 'farming-tips';
-  views: number;
-  likes: number;
-  publishedDate: Date;
+type MainTab = 'profile' | 'news' | 'forecasts';
+
+const CATEGORY_OPTIONS: { value: string; label: string }[] = [
+  { value: 'price_forecast', label: 'Dự báo giá' },
+  { value: 'weather_alert', label: 'Cảnh báo thời tiết' },
+  { value: 'farming_technique', label: 'Kỹ thuật canh tác' },
+];
+
+function categoryLabel(cat: string): string {
+  return CATEGORY_OPTIONS.find((c) => c.value === cat)?.label ?? cat;
 }
 
-/**
- * Trader Profile & News Screen Component
- * Requirements: FR-T01, FR-T12, US-T05
- */
+function formatIsoDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  } catch {
+    return iso;
+  }
+}
+
 export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = ({
-  traderName = 'Tiến Khoa',
+  traderName: _traderName,
   companyName = 'Công ty TNHH Nông sản Sầu riêng Monthong',
 }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'news'>('profile');
+  const openSnackbar = useStableOpenSnackbar();
+  const [activeTab, setActiveTab] = useState<MainTab>('profile');
   const [isEditing, setIsEditing] = useState(false);
   const [isWritingArticle, setIsWritingArticle] = useState(false);
-  
-  // Company profile state
+  const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
+
+  const [articles, setArticles] = useState<NewsArticleDto[]>([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+
+  const [forecasts, setForecasts] = useState<ForecastDto[]>([]);
+  const [forecastLoading, setForecastLoading] = useState(false);
+  const [isWritingForecast, setIsWritingForecast] = useState(false);
+  const [editingForecastId, setEditingForecastId] = useState<string | null>(null);
+
   const [companyProfile, setCompanyProfile] = useState({
     logo: '🏢',
     name: companyName,
     license: 'GP-2024-001234',
-    description: 'Chuyên cung cấp sầu riêng Monthong chất lượng cao, tuân thủ tiêu chuẩn VietGAP và GlobalGAP. Với hơn 10 năm kinh nghiệm trong ngành.',
+    description:
+      'Chuyên cung cấp sầu riêng Monthong chất lượng cao, tuân thủ tiêu chuẩn VietGAP và GlobalGAP. Với hơn 10 năm kinh nghiệm trong ngành.',
     address: 'Khu vực Đồng bằng sông Cửu Long',
     phone: '0901234567',
     email: 'contact@monthong.vn',
   });
 
-  // News article state
   const [newArticle, setNewArticle] = useState({
     title: '',
+    summary: '',
     content: '',
-    category: 'price-forecast' as 'price-forecast' | 'farming-tips',
+    category: 'price_forecast',
+    imageUrl: '',
   });
 
-  // Mock published articles - Requirements FR-T12
-  const [publishedArticles, setPublishedArticles] = useState<NewsArticle[]>([
-    {
-      id: '1',
-      title: 'Dự báo giá sầu riêng tháng 12/2024',
-      content: 'Giá sầu riêng dự kiến tăng 15% do nhu cầu cao trong dịp Tết...',
-      category: 'price-forecast',
-      views: 1250,
-      likes: 89,
-      publishedDate: new Date('2024-12-01'),
-    },
-    {
-      id: '2',
-      title: 'Kỹ thuật bón phân giai đoạn ra hoa',
-      content: 'Trong giai đoạn ra hoa, cây cần bổ sung kali và photpho để tăng tỷ lệ đậu quả...',
-      category: 'farming-tips',
-      views: 856,
-      likes: 67,
-      publishedDate: new Date('2024-11-28'),
-    },
-    {
-      id: '3',
-      title: 'Thị trường xuất khẩu Trung Quốc mở rộng',
-      content: 'Cơ hội mới cho nông dân với việc Trung Quốc tăng hạn ngạch nhập khẩu...',
-      category: 'price-forecast',
-      views: 2100,
-      likes: 145,
-      publishedDate: new Date('2024-11-25'),
-    },
-  ]);
+  const defaultPriceForecastJson = () =>
+    JSON.stringify(
+      {
+        productLabel: 'Nông sản',
+        trend: 'stable',
+        changePercent: 0,
+        series: [
+          { day: 'T2', price: 30 },
+          { day: 'T3', price: 31 },
+          { day: 'T4', price: 30 },
+        ],
+      },
+      null,
+      2,
+    );
 
-  // Styles
+  const [forecastForm, setForecastForm] = useState({
+    region: 'mekong_delta',
+    cropType: 'pomelo',
+    type: 'price' as 'price' | 'demand' | 'weather',
+    forecastDataJson: defaultPriceForecastJson(),
+    validFrom: '',
+    validTo: '',
+  });
+
+  const loadNews = useCallback(async () => {
+    setNewsLoading(true);
+    try {
+      const res = await listNews({ page: 1, limit: 50 });
+      setArticles(res.items);
+    } catch (e: unknown) {
+      openSnackbar({
+        type: 'error',
+        text: toNewsForecastViMessage(e, 'newsList'),
+        duration: 4000,
+        icon: true,
+      });
+    } finally {
+      setNewsLoading(false);
+    }
+  }, [openSnackbar]);
+
+  const loadForecasts = useCallback(async () => {
+    setForecastLoading(true);
+    try {
+      const res = await listForecasts({ page: 1, limit: 50 });
+      setForecasts(res.items);
+    } catch (e: unknown) {
+      openSnackbar({
+        type: 'error',
+        text: toNewsForecastViMessage(e, 'forecastList'),
+        duration: 4000,
+        icon: true,
+      });
+    } finally {
+      setForecastLoading(false);
+    }
+  }, [openSnackbar]);
+
+  useEffect(() => {
+    if (activeTab === 'news') void loadNews();
+  }, [activeTab, loadNews]);
+
+  useEffect(() => {
+    if (activeTab === 'forecasts') void loadForecasts();
+  }, [activeTab, loadForecasts]);
+
+  const resetArticleForm = () => {
+    setNewArticle({
+      title: '',
+      summary: '',
+      content: '',
+      category: 'price_forecast',
+      imageUrl: '',
+    });
+    setEditingArticleId(null);
+    setIsWritingArticle(false);
+  };
+
+  const startEditArticle = (a: NewsArticleDto) => {
+    setEditingArticleId(a.id);
+    setNewArticle({
+      title: a.title,
+      summary: a.summary,
+      content: a.content,
+      category: a.category,
+      imageUrl: a.imageUrl ?? '',
+    });
+    setIsWritingArticle(true);
+  };
+
+  const handlePublishArticle = async () => {
+    if (!newArticle.title.trim() || !newArticle.summary.trim() || !newArticle.content.trim()) {
+      openSnackbar({ type: 'error', text: 'Vui lòng nhập đủ tiêu đề, tóm tắt và nội dung', duration: 3000 });
+      return;
+    }
+    try {
+      if (editingArticleId) {
+        await updateNews(editingArticleId, {
+          title: newArticle.title,
+          summary: newArticle.summary,
+          content: newArticle.content,
+          category: newArticle.category,
+          imageUrl: newArticle.imageUrl || undefined,
+        });
+        openSnackbar({ type: 'success', text: 'Đã cập nhật bài viết', duration: 2500 });
+      } else {
+        await createNews({
+          title: newArticle.title,
+          summary: newArticle.summary,
+          content: newArticle.content,
+          category: newArticle.category,
+          imageUrl: newArticle.imageUrl || undefined,
+        });
+        openSnackbar({ type: 'success', text: 'Đã đăng bài', duration: 2500 });
+      }
+      resetArticleForm();
+      await loadNews();
+    } catch (e: unknown) {
+      openSnackbar({
+        type: 'error',
+        text: toNewsForecastViMessage(e, editingArticleId ? 'newsUpdate' : 'newsCreate'),
+        duration: 4000,
+        icon: true,
+      });
+    }
+  };
+
+  const resetForecastForm = () => {
+    setForecastForm({
+      region: 'mekong_delta',
+      cropType: 'pomelo',
+      type: 'price',
+      forecastDataJson: defaultPriceForecastJson(),
+      validFrom: '',
+      validTo: '',
+    });
+    setEditingForecastId(null);
+    setIsWritingForecast(false);
+  };
+
+  const startEditForecast = (f: ForecastDto) => {
+    setEditingForecastId(f.id);
+    setForecastForm({
+      region: f.region,
+      cropType: f.cropType,
+      type: f.type,
+      forecastDataJson: JSON.stringify(f.forecastData, null, 2),
+      validFrom: f.validFrom.slice(0, 16),
+      validTo: f.validTo.slice(0, 16),
+    });
+    setIsWritingForecast(true);
+  };
+
+  const handleSaveForecast = async () => {
+    if (!forecastForm.validFrom || !forecastForm.validTo) {
+      openSnackbar({ type: 'error', text: 'Chọn khoảng hiệu lực (từ — đến)', duration: 3000 });
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(forecastForm.forecastDataJson);
+    } catch {
+      openSnackbar({ type: 'error', text: 'forecastData không phải JSON hợp lệ', duration: 3000 });
+      return;
+    }
+    const validFrom = new Date(forecastForm.validFrom).toISOString();
+    const validTo = new Date(forecastForm.validTo).toISOString();
+    try {
+      if (editingForecastId) {
+        await updateForecast(editingForecastId, {
+          region: forecastForm.region,
+          cropType: forecastForm.cropType,
+          type: forecastForm.type,
+          forecastData: parsed,
+          validFrom,
+          validTo,
+        });
+        openSnackbar({ type: 'success', text: 'Đã cập nhật dự báo', duration: 2500 });
+      } else {
+        await createForecast({
+          region: forecastForm.region,
+          cropType: forecastForm.cropType,
+          type: forecastForm.type,
+          forecastData: parsed,
+          validFrom,
+          validTo,
+        });
+        openSnackbar({ type: 'success', text: 'Đã tạo dự báo', duration: 2500 });
+      }
+      resetForecastForm();
+      await loadForecasts();
+    } catch (e: unknown) {
+      openSnackbar({
+        type: 'error',
+        text: toNewsForecastViMessage(e, editingForecastId ? 'forecastUpdate' : 'forecastCreate'),
+        duration: 4000,
+        icon: true,
+      });
+    }
+  };
+
+  const handleSaveProfile = () => {
+    setIsEditing(false);
+  };
+
   const headerStyles: React.CSSProperties = {
     padding: spacing.md,
     backgroundColor: colors.background.primary,
@@ -106,17 +309,20 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
     padding: spacing.xs,
     margin: spacing.md,
     borderRadius: '8px',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
   };
 
   const tabButtonStyles = (isActive: boolean): React.CSSProperties => ({
-    flex: 1,
+    flex: '1 1 28%',
+    minWidth: '90px',
     padding: `${spacing.sm} ${spacing.md}`,
     backgroundColor: isActive ? colors.background.primary : 'transparent',
     color: isActive ? colors.primary.zaloBlue : colors.text.secondary,
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
-    fontSize: fontSize.body,
+    fontSize: fontSize.small,
     fontWeight: isActive ? fontWeight.semibold : fontWeight.regular,
     transition: 'all 0.2s',
   });
@@ -175,9 +381,8 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
 
   const buttonStyles = (variant: 'primary' | 'secondary' | 'outline'): React.CSSProperties => ({
     padding: `${spacing.sm} ${spacing.lg}`,
-    backgroundColor: variant === 'primary' ? colors.primary.zaloBlue : 
-                     variant === 'secondary' ? colors.primary.agriGreen : 
-                     'transparent',
+    backgroundColor:
+      variant === 'primary' ? colors.primary.zaloBlue : variant === 'secondary' ? colors.primary.agriGreen : 'transparent',
     color: variant === 'outline' ? colors.text.primary : colors.text.inverse,
     border: variant === 'outline' ? `1px solid ${colors.background.tertiary}` : 'none',
     borderRadius: '8px',
@@ -196,25 +401,27 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
     padding: spacing.md,
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
     marginBottom: spacing.md,
-    cursor: 'pointer',
-    transition: 'all 0.2s',
   };
 
   const categoryBadgeStyles = (category: string): React.CSSProperties => ({
     display: 'inline-block',
     padding: `${spacing.xs} ${spacing.sm}`,
-    backgroundColor: category === 'price-forecast' ? `${colors.primary.zaloBlue}15` : `${colors.primary.agriGreen}15`,
-    color: category === 'price-forecast' ? colors.primary.zaloBlue : colors.primary.agriGreen,
+    backgroundColor:
+      category === 'price_forecast'
+        ? `${colors.primary.zaloBlue}15`
+        : category === 'weather_alert'
+          ? `${colors.functional.warningYellow}35`
+          : `${colors.primary.agriGreen}15`,
+    color:
+      category === 'price_forecast'
+        ? colors.primary.zaloBlue
+        : category === 'weather_alert'
+          ? colors.text.primary
+          : colors.primary.agriGreen,
     borderRadius: '6px',
     fontSize: fontSize.small,
     fontWeight: fontWeight.medium,
   });
-
-  const statsContainerStyles: React.CSSProperties = {
-    display: 'flex',
-    gap: spacing.md,
-    marginTop: spacing.sm,
-  };
 
   const statItemStyles: React.CSSProperties = {
     display: 'flex',
@@ -224,41 +431,8 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
     fontSize: fontSize.small,
   };
 
-  const handleSaveProfile = () => {
-    setIsEditing(false);
-    // In real app, save to backend
-    console.log('Profile saved:', companyProfile);
-  };
-
-  const handlePublishArticle = () => {
-    if (newArticle.title && newArticle.content) {
-      const article: NewsArticle = {
-        id: Date.now().toString(),
-        title: newArticle.title,
-        content: newArticle.content,
-        category: newArticle.category,
-        views: 0,
-        likes: 0,
-        publishedDate: new Date(),
-      };
-      setPublishedArticles([article, ...publishedArticles]);
-      setNewArticle({ title: '', content: '', category: 'price-forecast' });
-      setIsWritingArticle(false);
-      console.log('Article published:', article);
-    }
-  };
-
-  const getCategoryLabel = (category: string) => {
-    return category === 'price-forecast' ? 'Dự báo giá' : 'Kỹ thuật canh tác';
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  };
-
   return (
     <Page className="trader-profile-news-screen">
-      {/* Header */}
       <div style={headerStyles}>
         <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
           Quản lý
@@ -268,34 +442,24 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
         </Text.Title>
       </div>
 
-      {/* Tab Navigation */}
       <div style={tabContainerStyles}>
-        <button
-          style={tabButtonStyles(activeTab === 'profile')}
-          onClick={() => setActiveTab('profile')}
-        >
-          Thông tin Doanh nghiệp
+        <button type="button" style={tabButtonStyles(activeTab === 'profile')} onClick={() => setActiveTab('profile')}>
+          Doanh nghiệp
         </button>
-        <button
-          style={tabButtonStyles(activeTab === 'news')}
-          onClick={() => setActiveTab('news')}
-        >
-          Quản lý Tin tức
+        <button type="button" style={tabButtonStyles(activeTab === 'news')} onClick={() => setActiveTab('news')}>
+          Tin tức
+        </button>
+        <button type="button" style={tabButtonStyles(activeTab === 'forecasts')} onClick={() => setActiveTab('forecasts')}>
+          Dự báo
         </button>
       </div>
 
-      {/* Content */}
       <div style={contentStyles}>
-        {/* Profile Tab */}
         {activeTab === 'profile' && (
           <div>
             <div style={profileCardStyles}>
-              {/* Logo */}
-              <div style={logoContainerStyles}>
-                {companyProfile.logo}
-              </div>
+              <div style={logoContainerStyles}>{companyProfile.logo}</div>
 
-              {/* Company Name */}
               <div style={fieldStyles}>
                 <label style={labelStyles}>Tên đơn vị</label>
                 {isEditing ? (
@@ -312,7 +476,6 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
                 )}
               </div>
 
-              {/* License */}
               <div style={fieldStyles}>
                 <label style={labelStyles}>Giấy phép kinh doanh</label>
                 {isEditing ? (
@@ -327,7 +490,6 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
                 )}
               </div>
 
-              {/* Description */}
               <div style={fieldStyles}>
                 <label style={labelStyles}>Mô tả năng lực</label>
                 {isEditing ? (
@@ -337,13 +499,10 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
                     onChange={(e) => setCompanyProfile({ ...companyProfile, description: e.target.value })}
                   />
                 ) : (
-                  <Text style={{ margin: 0, lineHeight: 1.6 }}>
-                    {companyProfile.description}
-                  </Text>
+                  <Text style={{ margin: 0, lineHeight: 1.6 }}>{companyProfile.description}</Text>
                 )}
               </div>
 
-              {/* Address */}
               <div style={fieldStyles}>
                 <label style={labelStyles}>Địa chỉ</label>
                 {isEditing ? (
@@ -358,7 +517,6 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
                 )}
               </div>
 
-              {/* Contact Info */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing.md }}>
                 <div style={fieldStyles}>
                   <label style={labelStyles}>Số điện thoại</label>
@@ -388,29 +546,19 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
                 </div>
               </div>
 
-              {/* Action Buttons */}
               <div style={{ display: 'flex', gap: spacing.md, marginTop: spacing.lg }}>
                 {isEditing ? (
                   <>
-                    <button
-                      style={buttonStyles('primary')}
-                      onClick={handleSaveProfile}
-                    >
+                    <button type="button" style={buttonStyles('primary')} onClick={handleSaveProfile}>
                       <Icon name="check" size="sm" color={colors.text.inverse} />
                       Lưu thay đổi
                     </button>
-                    <button
-                      style={buttonStyles('outline')}
-                      onClick={() => setIsEditing(false)}
-                    >
+                    <button type="button" style={buttonStyles('outline')} onClick={() => setIsEditing(false)}>
                       Hủy
                     </button>
                   </>
                 ) : (
-                  <button
-                    style={buttonStyles('primary')}
-                    onClick={() => setIsEditing(true)}
-                  >
+                  <button type="button" style={buttonStyles('primary')} onClick={() => setIsEditing(true)}>
                     <Icon name="edit" size="sm" color={colors.text.inverse} />
                     Chỉnh sửa thông tin
                   </button>
@@ -418,7 +566,6 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
               </div>
             </div>
 
-            {/* Public Display Note */}
             <div
               style={{
                 padding: spacing.md,
@@ -442,19 +589,27 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
           </div>
         )}
 
-        {/* News Tab */}
         {activeTab === 'news' && (
           <div>
-            {/* Write Article Section */}
+            {newsLoading && articles.length === 0 ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: spacing.xxl }}>
+                <Spinner />
+              </div>
+            ) : null}
+
             {!isWritingArticle ? (
               <button
+                type="button"
                 style={{
                   ...buttonStyles('primary'),
                   width: '100%',
                   justifyContent: 'center',
                   marginBottom: spacing.lg,
                 }}
-                onClick={() => setIsWritingArticle(true)}
+                onClick={() => {
+                  resetArticleForm();
+                  setIsWritingArticle(true);
+                }}
               >
                 <Icon name="edit" size="md" color={colors.text.inverse} />
                 Viết bài mới
@@ -462,37 +617,24 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
             ) : (
               <div style={profileCardStyles}>
                 <Text.Title size="small" style={{ marginBottom: spacing.md }}>
-                  Viết bài mới
+                  {editingArticleId ? 'Sửa bài viết' : 'Viết bài mới'}
                 </Text.Title>
 
-                {/* Category Selection */}
                 <div style={fieldStyles}>
                   <label style={labelStyles}>Danh mục</label>
-                  <div style={{ display: 'flex', gap: spacing.sm }}>
-                    <button
-                      style={{
-                        ...buttonStyles(newArticle.category === 'price-forecast' ? 'primary' : 'outline'),
-                        flex: 1,
-                        justifyContent: 'center',
-                      }}
-                      onClick={() => setNewArticle({ ...newArticle, category: 'price-forecast' })}
-                    >
-                      Dự báo giá
-                    </button>
-                    <button
-                      style={{
-                        ...buttonStyles(newArticle.category === 'farming-tips' ? 'secondary' : 'outline'),
-                        flex: 1,
-                        justifyContent: 'center',
-                      }}
-                      onClick={() => setNewArticle({ ...newArticle, category: 'farming-tips' })}
-                    >
-                      Kỹ thuật canh tác
-                    </button>
-                  </div>
+                  <select
+                    style={inputStyles}
+                    value={newArticle.category}
+                    onChange={(e) => setNewArticle({ ...newArticle, category: e.target.value })}
+                  >
+                    {CATEGORY_OPTIONS.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
-                {/* Title */}
                 <div style={fieldStyles}>
                   <label style={labelStyles}>Tiêu đề</label>
                   <input
@@ -504,7 +646,16 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
                   />
                 </div>
 
-                {/* Content */}
+                <div style={fieldStyles}>
+                  <label style={labelStyles}>Tóm tắt (summary)</label>
+                  <textarea
+                    style={{ ...textareaStyles, minHeight: '72px' }}
+                    placeholder="Mô tả ngắn hiển thị trên danh sách..."
+                    value={newArticle.summary}
+                    onChange={(e) => setNewArticle({ ...newArticle, summary: e.target.value })}
+                  />
+                </div>
+
                 <div style={fieldStyles}>
                   <label style={labelStyles}>Nội dung</label>
                   <textarea
@@ -515,62 +666,53 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
                   />
                 </div>
 
-                {/* Action Buttons */}
+                <div style={fieldStyles}>
+                  <label style={labelStyles}>Ảnh đại diện (URL hoặc emoji tùy chọn)</label>
+                  <input
+                    type="text"
+                    style={inputStyles}
+                    placeholder="https://... hoặc 📊"
+                    value={newArticle.imageUrl}
+                    onChange={(e) => setNewArticle({ ...newArticle, imageUrl: e.target.value })}
+                  />
+                </div>
+
                 <div style={{ display: 'flex', gap: spacing.md }}>
-                  <button
-                    style={buttonStyles('primary')}
-                    onClick={handlePublishArticle}
-                    disabled={!newArticle.title || !newArticle.content}
-                  >
+                  <button type="button" style={buttonStyles('primary')} onClick={() => void handlePublishArticle()}>
                     <Icon name="check" size="sm" color={colors.text.inverse} />
-                    Đăng bài
+                    {editingArticleId ? 'Cập nhật' : 'Đăng bài'}
                   </button>
-                  <button
-                    style={buttonStyles('outline')}
-                    onClick={() => {
-                      setIsWritingArticle(false);
-                      setNewArticle({ title: '', content: '', category: 'price-forecast' });
-                    }}
-                  >
+                  <button type="button" style={buttonStyles('outline')} onClick={resetArticleForm}>
                     Hủy
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Published Articles List */}
             <div>
               <Text.Title size="small" style={{ marginBottom: spacing.md }}>
-                Lịch sử đăng bài ({publishedArticles.length})
+                Bài đã đăng ({articles.length})
               </Text.Title>
 
-              {publishedArticles.map((article) => (
-                <div
-                  key={article.id}
-                  style={articleCardStyles}
-                  onClick={() => console.log('View article:', article.id)}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
-                  }}
-                >
-                  {/* Category Badge */}
-                  <div style={{ marginBottom: spacing.sm }}>
-                    <span style={categoryBadgeStyles(article.category)}>
-                      {getCategoryLabel(article.category)}
-                    </span>
+              {articles.map((article) => (
+                <div key={article.id} style={articleCardStyles}>
+                  <div style={{ marginBottom: spacing.sm, display: 'flex', justifyContent: 'space-between', gap: spacing.sm }}>
+                    <span style={categoryBadgeStyles(article.category)}>{categoryLabel(article.category)}</span>
+                    <button
+                      type="button"
+                      style={{ ...buttonStyles('outline'), padding: `${spacing.xs} ${spacing.sm}`, fontSize: fontSize.small }}
+                      onClick={() => startEditArticle(article)}
+                    >
+                      Sửa
+                    </button>
                   </div>
 
-                  {/* Title */}
+                  <div style={{ fontSize: '28px', marginBottom: spacing.xs }}>{article.imageUrl ?? '📰'}</div>
+
                   <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.xs }}>
                     {article.title}
                   </Text.Title>
 
-                  {/* Content Preview */}
                   <Text
                     size="small"
                     style={{
@@ -584,27 +726,160 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
                       WebkitBoxOrient: 'vertical',
                     }}
                   >
-                    {article.content}
+                    {article.summary}
                   </Text>
 
-                  {/* Stats */}
-                  <div style={statsContainerStyles}>
-                    <div style={statItemStyles}>
-                      <Icon name="eye" size="sm" color={colors.text.secondary} />
-                      <span>{article.views.toLocaleString()} lượt xem</span>
-                    </div>
-                    <div style={statItemStyles}>
-                      <Icon name="heart" size="sm" color={colors.text.secondary} />
-                      <span>{article.likes} tương tác</span>
-                    </div>
-                    <div style={statItemStyles}>
-                      <Icon name="calendar" size="sm" color={colors.text.secondary} />
-                      <span>{formatDate(article.publishedDate)}</span>
-                    </div>
+                  <div style={statItemStyles}>
+                    <Icon name="calendar" size="sm" color={colors.text.secondary} />
+                    <span>{formatIsoDate(article.publishedAt)}</span>
                   </div>
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {activeTab === 'forecasts' && (
+          <div>
+            {forecastLoading && forecasts.length === 0 ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: spacing.xxl }}>
+                <Spinner />
+              </div>
+            ) : null}
+
+            {!isWritingForecast ? (
+              <button
+                type="button"
+                style={{
+                  ...buttonStyles('secondary'),
+                  width: '100%',
+                  justifyContent: 'center',
+                  marginBottom: spacing.lg,
+                }}
+                onClick={() => {
+                  resetForecastForm();
+                  const now = new Date();
+                  const week = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+                  setForecastForm((f) => ({
+                    ...f,
+                    validFrom: now.toISOString().slice(0, 16),
+                    validTo: week.toISOString().slice(0, 16),
+                  }));
+                  setIsWritingForecast(true);
+                }}
+              >
+                <Icon name="edit" size="md" color={colors.text.inverse} />
+                Thêm dự báo
+              </button>
+            ) : (
+              <div style={profileCardStyles}>
+                <Text.Title size="small" style={{ marginBottom: spacing.md }}>
+                  {editingForecastId ? 'Sửa dự báo' : 'Dự báo mới'}
+                </Text.Title>
+
+                <div style={fieldStyles}>
+                  <label style={labelStyles}>Vùng (region)</label>
+                  <input
+                    type="text"
+                    style={inputStyles}
+                    value={forecastForm.region}
+                    onChange={(e) => setForecastForm({ ...forecastForm, region: e.target.value })}
+                  />
+                </div>
+
+                <div style={fieldStyles}>
+                  <label style={labelStyles}>Cây trồng (cropType)</label>
+                  <input
+                    type="text"
+                    style={inputStyles}
+                    value={forecastForm.cropType}
+                    onChange={(e) => setForecastForm({ ...forecastForm, cropType: e.target.value })}
+                  />
+                </div>
+
+                <div style={fieldStyles}>
+                  <label style={labelStyles}>Loại dự báo</label>
+                  <select
+                    style={inputStyles}
+                    value={forecastForm.type}
+                    onChange={(e) =>
+                      setForecastForm({
+                        ...forecastForm,
+                        type: e.target.value as 'price' | 'demand' | 'weather',
+                      })
+                    }
+                  >
+                    <option value="price">Giá (price)</option>
+                    <option value="demand">Nhu cầu (demand)</option>
+                    <option value="weather">Thời tiết (weather)</option>
+                  </select>
+                </div>
+
+                <div style={fieldStyles}>
+                  <label style={labelStyles}>forecastData (JSON)</label>
+                  <textarea
+                    style={{ ...textareaStyles, minHeight: '160px', fontFamily: 'monospace', fontSize: fontSize.small }}
+                    value={forecastForm.forecastDataJson}
+                    onChange={(e) => setForecastForm({ ...forecastForm, forecastDataJson: e.target.value })}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing.md }}>
+                  <div style={fieldStyles}>
+                    <label style={labelStyles}>Hiệu lực từ</label>
+                    <input
+                      type="datetime-local"
+                      style={inputStyles}
+                      value={forecastForm.validFrom}
+                      onChange={(e) => setForecastForm({ ...forecastForm, validFrom: e.target.value })}
+                    />
+                  </div>
+                  <div style={fieldStyles}>
+                    <label style={labelStyles}>Đến</label>
+                    <input
+                      type="datetime-local"
+                      style={inputStyles}
+                      value={forecastForm.validTo}
+                      onChange={(e) => setForecastForm({ ...forecastForm, validTo: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: spacing.md }}>
+                  <button type="button" style={buttonStyles('primary')} onClick={() => void handleSaveForecast()}>
+                    <Icon name="check" size="sm" color={colors.text.inverse} />
+                    {editingForecastId ? 'Cập nhật' : 'Lưu'}
+                  </button>
+                  <button type="button" style={buttonStyles('outline')} onClick={resetForecastForm}>
+                    Hủy
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <Text.Title size="small" style={{ marginBottom: spacing.md }}>
+              Danh sách dự báo ({forecasts.length})
+            </Text.Title>
+
+            {forecasts.map((f) => (
+              <div key={f.id} style={articleCardStyles}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.sm }}>
+                  <Text.Title size="small" style={{ margin: 0 }}>
+                    {f.region} · {f.cropType}
+                  </Text.Title>
+                  <button
+                    type="button"
+                    style={{ ...buttonStyles('outline'), padding: `${spacing.xs} ${spacing.sm}`, fontSize: fontSize.small }}
+                    onClick={() => startEditForecast(f)}
+                  >
+                    Sửa
+                  </button>
+                </div>
+                <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                  Loại: {f.type} · Từ {formatIsoDate(f.validFrom)} — {formatIsoDate(f.validTo)}
+                </Text>
+              </div>
+            ))}
           </div>
         )}
       </div>

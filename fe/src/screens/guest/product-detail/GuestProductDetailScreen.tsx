@@ -14,11 +14,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Page, Text, useSnackbar } from 'zmp-ui';
+import { Page, Text } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import {
   getProduct,
   standardLabel,
@@ -91,7 +92,7 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
   onBack,
   onLogin,
 }) => {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [product, setProduct] = useState<ProductDto | null>(null);
   const [loading, setLoading] = useState(true);

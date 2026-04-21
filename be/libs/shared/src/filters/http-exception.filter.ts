@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import {
   ExceptionFilter,
   Catch,
@@ -22,7 +23,11 @@ export class GlobalHttpExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
 
     const requestId =
-      (request.headers['x-request-id'] as string) ?? 'unknown';
+      request.requestId ??
+      (typeof request.headers['x-request-id'] === 'string'
+        ? request.headers['x-request-id']
+        : undefined) ??
+      randomUUID();
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let code = 'INTERNAL_ERROR';

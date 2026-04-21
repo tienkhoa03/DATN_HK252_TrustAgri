@@ -1,113 +1,135 @@
 /**
- * Trader Dashboard Screen
- * Màn hình trung tâm giúp thương lái nắm bắt bức tranh toàn cảnh
- * 
- * Requirements: FR-T02, FR-T12, US-T01, 7.1, 7.2, 17.1-17.4
- * 
- * Features:
- * - Khu vực Tổng quan (Overview Cards): 4 thẻ thống kê
- * - Biểu đồ Xu hướng thị trường: Biểu đồ đường hiển thị biến động giá
- * - Trung tâm Tác vụ (Action Center): Yêu cầu kết nối, Đơn hàng mới, Cảnh báo rủi ro
- * - Use outline icons for clean look
- * - Optimize for 4G network loading
+ * Trader Dashboard Screen — Phase 17.2 (FR-T02)
+ *
+ * GET /api/v1/dashboard/trader qua dashboardService; biểu đồ lazy load.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { Page, Box, Text } from 'zmp-ui';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { Icon } from '../../../design-system/components/Icon';
-import { Card } from '../../../design-system/components/Card';
-import { Chart } from '../../../design-system/components/Chart';
+import type { ChartDataPoint } from '../../../design-system/components/Chart';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import {
+  fetchTraderDashboard,
+  toDashboardViMessage,
+  type DashboardTraderDto,
+} from '@/services/dashboardService';
+import { orderStatusLabel, type OrderDto } from '@/services/orderService';
+
+const LazyChart = lazy(() =>
+  import('../../../design-system/components/Chart').then((m) => ({ default: m.Chart })),
+);
 
 export interface TraderDashboardScreenProps {
   traderName?: string;
   companyName?: string;
 }
 
-/**
- * Trader Dashboard Screen Component
- * Requirements: FR-T02, FR-T12, US-T01, 7.1, 7.2, 17.1-17.4
- */
+const ORDER_CARD_KEYS: OrderDto['status'][] = ['pending', 'accepted', 'contracted', 'completed'];
+
+function formatShortDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+  } catch {
+    return iso;
+  }
+}
+
+function formatPeriod(fromIso: string, toIso: string): string {
+  try {
+    const o: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' };
+    return `${new Date(fromIso).toLocaleDateString('vi-VN', o)} — ${new Date(toIso).toLocaleDateString('vi-VN', o)}`;
+  } catch {
+    return `${fromIso} — ${toIso}`;
+  }
+}
+
+const SkeletonPulse: React.FC<{ h?: string }> = ({ h = '120px' }) => (
+  <Box
+    className="trader-dash-skel"
+    style={{
+      height: h,
+      borderRadius: 8,
+      backgroundColor: colors.background.secondary,
+      animation: 'trader-dash-pulse 1.4s ease-in-out infinite',
+    }}
+  />
+);
+
+const ChartFallback: React.FC = () => (
+  <div
+    style={{
+      height: 220,
+      borderRadius: 8,
+      backgroundColor: colors.background.secondary,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}
+  >
+    <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+      Đang tải biểu đồ…
+    </Text>
+  </div>
+);
+
 export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
   traderName = 'Thương lái',
   companyName = 'Công ty TNHH Nông sản',
 }) => {
+  const openSnackbar = useStableOpenSnackbar();
   const [selectedPeriod, setSelectedPeriod] = useState<'7days' | '30days'>('7days');
+  const [data, setData] = useState<DashboardTraderDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock overview data - Requirements 17.1
-  const overviewData = {
-    estimatedRevenue: {
-      value: '250M',
-      label: 'Doanh thu ước tính',
-      icon: 'dollar-sign' as const,
-      color: colors.primary.agriGreen,
-    },
-    newOrders: {
-      value: '12',
-      label: 'Đơn hàng mới',
-      icon: 'shopping-cart' as const,
-      color: colors.primary.zaloBlue,
-    },
-    farmers: {
-      value: '45',
-      label: 'Số nông hộ',
-      icon: 'users' as const,
-      color: colors.primary.agriGreen,
-    },
-    expectedYield: {
-      value: '8.5 tấn',
-      label: 'Sản lượng dự kiến',
-      icon: 'package' as const,
-      color: colors.primary.zaloBlue,
-    },
-  };
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetchTraderDashboard()
+      .then((dto) => {
+        if (!cancelled) {
+          setData(dto);
+          setLoading(false);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          const msg = toDashboardViMessage(err);
+          setError(msg);
+          setLoading(false);
+          openSnackbar({ type: 'error', text: msg, duration: 4500, icon: true });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [openSnackbar]);
 
-  // Mock market trend data - Requirements 17.2
-  const marketTrendData = selectedPeriod === '7days' 
-    ? [
-        { x: 'T2', y: 45000 },
-        { x: 'T3', y: 47000 },
-        { x: 'T4', y: 46500 },
-        { x: 'T5', y: 48000 },
-        { x: 'T6', y: 49500 },
-        { x: 'T7', y: 51000 },
-        { x: 'CN', y: 50000 },
-      ]
-    : [
-        { x: 'T1', y: 42000 },
-        { x: 'T2', y: 45000 },
-        { x: 'T3', y: 47000 },
-        { x: 'T4', y: 50000 },
-      ];
+  const demandChartData: ChartDataPoint[] = useMemo(() => {
+    if (!data) return [];
+    const sliceLen = selectedPeriod === '7days' ? 7 : data.demandTrend.length;
+    const slice = data.demandTrend.slice(-sliceLen);
+    return slice.map((d) => ({
+      label: formatShortDate(d.date),
+      value: d.requestCount,
+    }));
+  }, [data, selectedPeriod]);
 
-  // Mock action center data - Requirements 17.3, 17.4
-  const actionCenterData = {
-    connectionRequests: {
-      count: 8,
-      label: 'Yêu cầu kết nối',
-      description: 'Nông dân mới gửi hồ sơ',
-      color: colors.primary.zaloBlue,
-      icon: 'users' as const,
-    },
-    newOrders: {
-      count: 5,
-      label: 'Đơn hàng mới',
-      description: 'Người mua vừa đặt cọc',
-      color: colors.primary.agriGreen,
-      icon: 'shopping-cart' as const,
-    },
-    riskAlerts: {
-      count: 2,
-      label: 'Cảnh báo rủi ro',
-      description: 'Farm Lab vi phạm quy trình',
-      color: colors.functional.warningYellow,
-      icon: 'alert-triangle' as const,
-    },
-  };
+  const topCropChartData: ChartDataPoint[] = useMemo(() => {
+    if (!data) return [];
+    return data.topCrops.map((c) => ({ label: c.cropType, value: c.volume }));
+  }, [data]);
 
-  // Styles
+  const totalOrders = useMemo(() => {
+    if (!data) return 0;
+    return Object.values(data.orderCountByStatus).reduce((a, b) => a + b, 0);
+  }, [data]);
+
   const headerStyles: React.CSSProperties = {
     padding: spacing.md,
     backgroundColor: colors.background.primary,
@@ -177,8 +199,10 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
 
   return (
     <Page className="trader-dashboard-screen">
+      <style>{`
+        @keyframes trader-dash-pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
+      `}</style>
       <div style={contentStyles}>
-        {/* Header */}
         <div style={headerStyles}>
           <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
             Xin chào,
@@ -189,362 +213,357 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
           <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
             {companyName}
           </Text>
+          {data && (
+            <Text size="xSmall" style={{ color: colors.text.secondary, margin: `${spacing.xs} 0 0` }}>
+              Kỳ thống kê: {formatPeriod(data.periodFrom, data.periodTo)}
+            </Text>
+          )}
         </div>
 
-        {/* Overview Cards - 4 thẻ thống kê */}
-        <div style={overviewGridStyles}>
-          {/* Estimated Revenue */}
-          <div style={overviewCardStyles}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                backgroundColor: `${overviewData.estimatedRevenue.color}15`,
-              }}
-            >
-              <Icon
-                name={overviewData.estimatedRevenue.icon}
-                size="lg"
-                color={overviewData.estimatedRevenue.color}
-              />
-            </div>
-            <Text.Title size="large" style={{ margin: 0, fontWeight: fontWeight.bold }}>
-              {overviewData.estimatedRevenue.value}
-            </Text.Title>
-            <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-              {overviewData.estimatedRevenue.label}
+        {error && (
+          <div style={{ padding: spacing.md }}>
+            <Text size="small" style={{ color: colors.functional.alertRed }}>
+              {error}
             </Text>
           </div>
+        )}
 
-          {/* New Orders */}
-          <div style={overviewCardStyles}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                backgroundColor: `${overviewData.newOrders.color}15`,
-              }}
-            >
-              <Icon
-                name={overviewData.newOrders.icon}
-                size="lg"
-                color={overviewData.newOrders.color}
-              />
-            </div>
-            <Text.Title size="large" style={{ margin: 0, fontWeight: fontWeight.bold }}>
-              {overviewData.newOrders.value}
-            </Text.Title>
-            <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-              {overviewData.newOrders.label}
-            </Text>
+        {loading && (
+          <div style={{ padding: spacing.md, display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
+            <SkeletonPulse h="88px" />
+            <SkeletonPulse h="88px" />
+            <SkeletonPulse h="200px" />
           </div>
+        )}
 
-          {/* Farmers */}
-          <div style={overviewCardStyles}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                backgroundColor: `${overviewData.farmers.color}15`,
-              }}
-            >
-              <Icon
-                name={overviewData.farmers.icon}
-                size="lg"
-                color={overviewData.farmers.color}
-              />
-            </div>
-            <Text.Title size="large" style={{ margin: 0, fontWeight: fontWeight.bold }}>
-              {overviewData.farmers.value}
-            </Text.Title>
-            <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-              {overviewData.farmers.label}
-            </Text>
-          </div>
-
-          {/* Expected Yield */}
-          <div style={overviewCardStyles}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '48px',
-                height: '48px',
-                borderRadius: '50%',
-                backgroundColor: `${overviewData.expectedYield.color}15`,
-              }}
-            >
-              <Icon
-                name={overviewData.expectedYield.icon}
-                size="lg"
-                color={overviewData.expectedYield.color}
-              />
-            </div>
-            <Text.Title size="large" style={{ margin: 0, fontWeight: fontWeight.bold }}>
-              {overviewData.expectedYield.value}
-            </Text.Title>
-            <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-              {overviewData.expectedYield.label}
-            </Text>
-          </div>
-        </div>
-
-        {/* Market Trend Chart - Biểu đồ xu hướng thị trường */}
-        <div style={chartSectionStyles}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text.Title size="small" style={{ margin: 0 }}>
-              Xu hướng thị trường
-            </Text.Title>
-            <Icon name="trending-up" size="md" color={colors.primary.agriGreen} />
-          </div>
-
-          {/* Period Selector */}
-          <div style={periodSelectorStyles}>
-            <button
-              style={periodButtonStyles(selectedPeriod === '7days')}
-              onClick={() => setSelectedPeriod('7days')}
-              onMouseEnter={(e) => {
-                if (selectedPeriod !== '7days') {
-                  e.currentTarget.style.backgroundColor = colors.background.tertiary;
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (selectedPeriod !== '7days') {
-                  e.currentTarget.style.backgroundColor = colors.background.secondary;
-                }
-              }}
-            >
-              7 ngày
-            </button>
-            <button
-              style={periodButtonStyles(selectedPeriod === '30days')}
-              onClick={() => setSelectedPeriod('30days')}
-              onMouseEnter={(e) => {
-                if (selectedPeriod !== '30days') {
-                  e.currentTarget.style.backgroundColor = colors.background.tertiary;
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (selectedPeriod !== '30days') {
-                  e.currentTarget.style.backgroundColor = colors.background.tertiary;
-                }
-              }}
-            >
-              30 ngày
-            </button>
-          </div>
-
-          {/* Chart */}
-          <div style={{ marginTop: spacing.md }}>
-            <Chart
-              type="line"
-              data={marketTrendData}
-              xAxis={{
-                label: selectedPeriod === '7days' ? 'Ngày trong tuần' : 'Tuần',
-                dataKey: 'x',
-              }}
-              yAxis={{
-                label: 'Giá (VNĐ/kg)',
-                dataKey: 'y',
-              }}
-              colors={[colors.primary.agriGreen]}
-              showGrid={true}
-              showLegend={false}
-            />
-          </div>
-
-          <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.sm }}>
-            Giá trung bình: {selectedPeriod === '7days' ? '48,000' : '46,000'} VNĐ/kg
-          </Text>
-        </div>
-
-        {/* Action Center - Trung tâm Tác vụ */}
-        <div style={actionCenterStyles}>
-          <Text.Title size="small" style={{ marginBottom: spacing.md }}>
-            Trung tâm Tác vụ
-          </Text.Title>
-
-          {/* Connection Requests */}
-          <div
-            style={actionCardStyles(actionCenterData.connectionRequests.color)}
-            onClick={() => console.log('View connection requests')}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '50%',
-                  backgroundColor: actionCenterData.connectionRequests.color,
-                }}
-              >
-                <Icon
-                  name={actionCenterData.connectionRequests.icon}
-                  size="lg"
-                  color={colors.text.inverse}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                  <Text.Title size="small" style={{ margin: 0 }}>
-                    {actionCenterData.connectionRequests.label}
-                  </Text.Title>
-                  <div
-                    style={{
-                      padding: `${spacing.xs} ${spacing.sm}`,
-                      backgroundColor: actionCenterData.connectionRequests.color,
-                      color: colors.text.inverse,
-                      borderRadius: '12px',
-                      fontSize: fontSize.small,
-                      fontWeight: fontWeight.bold,
-                    }}
-                  >
-                    {actionCenterData.connectionRequests.count}
-                  </div>
+        {!loading && data && (
+          <>
+            <div style={overviewGridStyles}>
+              <div style={overviewCardStyles}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    backgroundColor: `${colors.primary.zaloBlue}15`,
+                  }}
+                >
+                  <Icon name="shopping-cart" size="lg" color={colors.primary.zaloBlue} />
                 </div>
+                <Text.Title size="large" style={{ margin: 0, fontWeight: fontWeight.bold }}>
+                  {totalOrders}
+                </Text.Title>
                 <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-                  {actionCenterData.connectionRequests.description}
+                  Tổng đơn hàng (mọi trạng thái)
+                </Text>
+              </div>
+
+              <div style={overviewCardStyles}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    backgroundColor: `${colors.primary.agriGreen}15`,
+                  }}
+                >
+                  <Icon name="book" size="lg" color={colors.primary.agriGreen} />
+                </div>
+                <Text.Title size="large" style={{ margin: 0, fontWeight: fontWeight.bold }}>
+                  {data.activeContracts}
+                </Text.Title>
+                <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                  Hợp đồng đang hoạt động
+                </Text>
+              </div>
+
+              <div style={overviewCardStyles}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    backgroundColor: `${colors.functional.warningYellow}22`,
+                  }}
+                >
+                  <Icon name="users" size="lg" color={colors.primary.zaloBlue} />
+                </div>
+                <Text.Title size="large" style={{ margin: 0, fontWeight: fontWeight.bold }}>
+                  {data.pendingConnections}
+                </Text.Title>
+                <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                  Kết nối chờ phản hồi
+                </Text>
+              </div>
+
+              <div style={overviewCardStyles}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '50%',
+                    backgroundColor: `${colors.primary.agriGreen}15`,
+                  }}
+                >
+                  <Icon name="trending-up" size="lg" color={colors.primary.agriGreen} />
+                </div>
+                <Text.Title size="large" style={{ margin: 0, fontWeight: fontWeight.bold }}>
+                  {data.demandTrend[data.demandTrend.length - 1]?.requestCount ?? 0}
+                </Text.Title>
+                <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                  Nhu cầu mua (ngày gần nhất)
                 </Text>
               </div>
             </div>
-          </div>
 
-          {/* New Orders */}
-          <div
-            style={actionCardStyles(actionCenterData.newOrders.color)}
-            onClick={() => console.log('View new orders')}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
+            <div style={{ padding: `0 ${spacing.md}` }}>
+              <Text.Title size="small" style={{ margin: `0 0 ${spacing.sm}` }}>
+                Đơn hàng theo trạng thái
+              </Text.Title>
               <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '50%',
-                  backgroundColor: actionCenterData.newOrders.color,
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: spacing.sm,
                 }}
               >
-                <Icon
-                  name={actionCenterData.newOrders.icon}
-                  size="lg"
-                  color={colors.text.inverse}
-                />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                  <Text.Title size="small" style={{ margin: 0 }}>
-                    {actionCenterData.newOrders.label}
-                  </Text.Title>
-                  <div
-                    style={{
-                      padding: `${spacing.xs} ${spacing.sm}`,
-                      backgroundColor: actionCenterData.newOrders.color,
-                      color: colors.text.inverse,
-                      borderRadius: '12px',
-                      fontSize: fontSize.small,
-                      fontWeight: fontWeight.bold,
-                    }}
-                  >
-                    {actionCenterData.newOrders.count}
-                  </div>
-                </div>
-                <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-                  {actionCenterData.newOrders.description}
-                </Text>
+                {ORDER_CARD_KEYS.map((key) => {
+                  const n = data.orderCountByStatus[key] ?? 0;
+                  return (
+                    <div
+                      key={key}
+                      style={{
+                        padding: spacing.sm,
+                        backgroundColor: colors.background.secondary,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                        {orderStatusLabel(key)}
+                      </Text>
+                      <Text.Title size="small" style={{ margin: 0, fontWeight: fontWeight.bold }}>
+                        {n}
+                      </Text.Title>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          </div>
 
-          {/* Risk Alerts */}
-          <div
-            style={actionCardStyles(actionCenterData.riskAlerts.color)}
-            onClick={() => console.log('View risk alerts')}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-2px)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '50%',
-                  backgroundColor: actionCenterData.riskAlerts.color,
-                }}
-              >
-                <Icon
-                  name={actionCenterData.riskAlerts.icon}
-                  size="lg"
-                  color={colors.text.primary}
-                />
+            <div style={{ ...chartSectionStyles, marginTop: spacing.md }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text.Title size="small" style={{ margin: 0 }}>
+                  Xu hướng nhu cầu mua
+                </Text.Title>
+                <Icon name="trending-up" size="md" color={colors.primary.agriGreen} />
               </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                  <Text.Title size="small" style={{ margin: 0 }}>
-                    {actionCenterData.riskAlerts.label}
-                  </Text.Title>
-                  <div
-                    style={{
-                      padding: `${spacing.xs} ${spacing.sm}`,
-                      backgroundColor: actionCenterData.riskAlerts.color,
-                      color: colors.text.primary,
-                      borderRadius: '12px',
-                      fontSize: fontSize.small,
-                      fontWeight: fontWeight.bold,
-                    }}
-                  >
-                    {actionCenterData.riskAlerts.count}
-                  </div>
-                </div>
-                <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-                  {actionCenterData.riskAlerts.description}
-                </Text>
+
+              <div style={periodSelectorStyles}>
+                <button
+                  type="button"
+                  style={periodButtonStyles(selectedPeriod === '7days')}
+                  onClick={() => setSelectedPeriod('7days')}
+                >
+                  7 ngày
+                </button>
+                <button
+                  type="button"
+                  style={periodButtonStyles(selectedPeriod === '30days')}
+                  onClick={() => setSelectedPeriod('30days')}
+                >
+                  30 ngày
+                </button>
+              </div>
+
+              <div style={{ marginTop: spacing.md }}>
+                {demandChartData.length === 0 ? (
+                  <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                    Chưa có dữ liệu xu hướng nhu cầu trong kỳ này.
+                  </Text>
+                ) : (
+                  <Suspense fallback={<ChartFallback />}>
+                    <LazyChart
+                      type="area"
+                      data={demandChartData}
+                      xAxis={{ label: 'Ngày' }}
+                      yAxis={{ label: 'Số nhu cầu' }}
+                      colors={[colors.primary.agriGreen]}
+                      showGrid
+                      showLegend={false}
+                      width={340}
+                      height={220}
+                    />
+                  </Suspense>
+                )}
               </div>
             </div>
-          </div>
-        </div>
+
+            <div style={chartSectionStyles}>
+              <Text.Title size="small" style={{ margin: 0 }}>
+                Cây trồng nguồn cung nổi bật (khối lượng)
+              </Text.Title>
+              <div style={{ marginTop: spacing.md }}>
+                {topCropChartData.length === 0 ? (
+                  <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                    Chưa có dữ liệu cây trồng theo đơn hàng trong kỳ này.
+                  </Text>
+                ) : (
+                  <Suspense fallback={<ChartFallback />}>
+                    <LazyChart
+                      type="bar"
+                      data={topCropChartData}
+                      xAxis={{ label: 'Loại cây' }}
+                      yAxis={{ label: 'Tấn' }}
+                      colors={[colors.primary.zaloBlue, colors.primary.agriGreen, '#FFCC00', '#9B59B6']}
+                      showGrid
+                      showLegend={false}
+                      width={340}
+                      height={220}
+                    />
+                  </Suspense>
+                )}
+              </div>
+            </div>
+
+            <div style={actionCenterStyles}>
+              <Text.Title size="small" style={{ marginBottom: spacing.md }}>
+                Trung tâm tác vụ
+              </Text.Title>
+
+              <div style={actionCardStyles(colors.primary.zaloBlue)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '50%',
+                      backgroundColor: colors.primary.zaloBlue,
+                    }}
+                  >
+                    <Icon name="users" size="lg" color={colors.text.inverse} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+                      <Text.Title size="small" style={{ margin: 0 }}>
+                        Kết nối chờ xử lý
+                      </Text.Title>
+                      <div
+                        style={{
+                          padding: `${spacing.xs} ${spacing.sm}`,
+                          backgroundColor: colors.primary.zaloBlue,
+                          color: colors.text.inverse,
+                          borderRadius: '12px',
+                          fontSize: fontSize.small,
+                          fontWeight: fontWeight.bold,
+                        }}
+                      >
+                        {data.pendingConnections}
+                      </div>
+                    </div>
+                    <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                      Nông dân / đối tác đang chờ bạn phản hồi
+                    </Text>
+                  </div>
+                </div>
+              </div>
+
+              <div style={actionCardStyles(colors.primary.agriGreen)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '50%',
+                      backgroundColor: colors.primary.agriGreen,
+                    }}
+                  >
+                    <Icon name="shopping-cart" size="lg" color={colors.text.inverse} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+                      <Text.Title size="small" style={{ margin: 0 }}>
+                        Đơn chờ xác nhận
+                      </Text.Title>
+                      <div
+                        style={{
+                          padding: `${spacing.xs} ${spacing.sm}`,
+                          backgroundColor: colors.primary.agriGreen,
+                          color: colors.text.inverse,
+                          borderRadius: '12px',
+                          fontSize: fontSize.small,
+                          fontWeight: fontWeight.bold,
+                        }}
+                      >
+                        {data.orderCountByStatus.pending ?? 0}
+                      </div>
+                    </div>
+                    <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                      Theo trạng thái «Chờ xác nhận»
+                    </Text>
+                  </div>
+                </div>
+              </div>
+
+              <div style={actionCardStyles(colors.functional.warningYellow)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '56px',
+                      height: '56px',
+                      borderRadius: '50%',
+                      backgroundColor: colors.functional.warningYellow,
+                    }}
+                  >
+                    <Icon name="book" size="lg" color={colors.text.primary} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+                      <Text.Title size="small" style={{ margin: 0 }}>
+                        Hợp đồng đang chạy
+                      </Text.Title>
+                      <div
+                        style={{
+                          padding: `${spacing.xs} ${spacing.sm}`,
+                          backgroundColor: colors.functional.warningYellow,
+                          color: colors.text.primary,
+                          borderRadius: '12px',
+                          fontSize: fontSize.small,
+                          fontWeight: fontWeight.bold,
+                        }}
+                      >
+                        {data.activeContracts}
+                      </div>
+                    </div>
+                    <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                      Theo tổng hợp dashboard
+                    </Text>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </Page>
   );

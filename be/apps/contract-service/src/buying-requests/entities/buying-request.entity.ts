@@ -1,19 +1,29 @@
 import {
-  Entity,
-  PrimaryGeneratedColumn,
+  Check,
   Column,
   CreateDateColumn,
-  UpdateDateColumn,
   DeleteDateColumn,
+  Entity,
+  Index,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 
 export type BuyingRequestStatus = 'open' | 'matched' | 'closed';
 
 @Entity('buying_requests')
+@Check('"quantity" > 0')
+@Check('"expected_price" IS NULL OR "expected_price" >= 0')
+@Check('"deposit_offered" IS NULL OR "deposit_offered" >= 0')
+@Check(`"status" IN ('open', 'matched', 'closed')`)
 export class BuyingRequestEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  /**
+   * Cross-service FK → users.user_id (auth-service).
+   */
+  @Index('idx_buying_requests_buyer_id')
   @Column({ name: 'buyer_id' })
   buyerId: string;
 
@@ -50,6 +60,7 @@ export class BuyingRequestEntity {
   @Column({ name: 'delivery_date', type: 'date' })
   deliveryDate: string;
 
+  @Index('idx_buying_requests_status')
   @Column({ type: 'varchar', length: 20, default: 'open' })
   status: BuyingRequestStatus;
 

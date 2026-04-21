@@ -6,23 +6,24 @@
  *  2. Gọi POST /api/v1/auth/login để đổi sang JWT accessToken của hệ thống.
  *  3. Gọi POST /api/v1/auth/verify với JWT vừa nhận để xác minh Gateway + Axios client.
  *  4. Nếu verify thành công → gọi tiếp GET /api/v1/auth/me và hiển thị UserProfileDto.
- *  5. Mọi lỗi ApiError đều hiện Snackbar tiếng Việt (useSnackbar).
+ *  5. Mọi lỗi ApiError đều hiện Snackbar tiếng Việt (useStableOpenSnackbar).
  *
- * Cờ VITE_USE_MOCK=true: dùng mockAuthService làm fallback (giữ trải nghiệm dev khi BE chưa sẵn sàng).
- * Cờ VITE_USE_MOCK=false: gọi API thật hoàn toàn, không có mock.
+ * VITE_USE_MOCK=true: mockLogin + mockGetMe, hoặc nếu có VITE_DEV_LOGIN_SECRET thì dev-login → JWT thật + GET /auth/me (các trang sau dùng Bearer).
+ * VITE_USE_MOCK=false: auth qua Zalo + Gateway.
  */
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { Page, Box, Text, Spinner, useSnackbar, useNavigate } from 'zmp-ui';
+import { Page, Box, Text, Spinner, useNavigate } from 'zmp-ui';
 import { useSetAtom } from 'jotai';
 
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { ENV } from '@/config/env';
 import { ApiError } from '@/api/errors';
 import * as authService from '@/services/authService';
 import { resolveZaloAccessToken } from '@/services/zaloAccessToken';
 import type { UserProfileDto } from '@/services/authService';
 import { authSessionAtom } from '@/state/authAtoms';
-import { mockGetMe } from '@/services/mocks/mockAuthService';
+import { bootstrapMockAuthSession, isMockOnlyJwt } from '@/services/mockAuthBootstrap';
 import { primaryColors, functionalColors } from '@/design-system/tokens/colors';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ function toVietnameseError(err: unknown): string {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function AppInitScreen() {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const navigate = useNavigate();
   const setAuthSession = useSetAtom(authSessionAtom);
 
@@ -75,13 +76,16 @@ export function AppInitScreen() {
 
     try {
       if (ENV.USE_MOCK) {
-        // ── Mock path (VITE_USE_MOCK=true) ────────────────────────────
-        const profile = await mockGetMe('farmer');
-        setResult({
-          zaloToken: 'mock.zalo.token.xxx',
-          verifyResponse: { userId: profile.userId, role: profile.role, valid: true },
-          profile,
-        });
+        const { session: authSession, profile } = await bootstrapMockAuthSession();
+        setAuthSession(authSession);
+        const zaloToken = ENV.ZALO_API_KEY || 'farmer';
+        let verifyResponse: { userId: string; role: string; valid: boolean };
+        if (isMockOnlyJwt(authSession.accessToken)) {
+          verifyResponse = { userId: profile.userId, role: profile.role, valid: true };
+        } else {
+          verifyResponse = await authService.verify(authSession.accessToken);
+        }
+        setResult({ zaloToken, verifyResponse, profile });
         setStatus('ok');
         return;
       }
@@ -145,7 +149,9 @@ export function AppInitScreen() {
         </Text>
         <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>
           {ENV.USE_MOCK
-            ? '🟡 Chế độ Mock (VITE_USE_MOCK=true)'
+            ? ENV.DEV_LOGIN_SECRET
+              ? '🟡 Mock + JWT dev (VITE_DEV_LOGIN_SECRET)'
+              : '🟡 Chế độ Mock (VITE_USE_MOCK=true)'
             : `🟢 Kết nối thật — ${ENV.API_BASE_URL}`}
         </Text>
       </Box>
@@ -177,7 +183,11 @@ export function AppInitScreen() {
                 Smoke Test — POST /api/v1/auth/verify
               </Text>
               <Text style={{ fontSize: 11, color: '#9CA3AF' }}>
-                {ENV.USE_MOCK ? 'mockAuthService (fallback)' : 'ZMP SDK → Gateway → Auth Service'}
+                {ENV.USE_MOCK
+                  ? ENV.DEV_LOGIN_SECRET
+                    ? 'dev-login → JWT thật (session Redis)'
+                    : 'mockAuthService (mock.jwt)'
+                  : 'ZMP SDK → Gateway → Auth Service'}
               </Text>
             </Box>
             <StatusBadge status={status} />
@@ -188,7 +198,11 @@ export function AppInitScreen() {
             <Box style={{ padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
               <Spinner />
               <Text style={{ fontSize: 14, color: '#9CA3AF' }}>
-                {ENV.USE_MOCK ? 'Gọi mockAuthService…' : 'Đang lấy Zalo token + gọi /auth/verify…'}
+                {ENV.USE_MOCK
+                  ? ENV.DEV_LOGIN_SECRET
+                    ? 'Đang dev-login + GET /auth/me…'
+                    : 'Gọi mockAuthService…'
+                  : 'Đang lấy Zalo token + gọi /auth/verify…'}
               </Text>
             </Box>
           )}
@@ -262,7 +276,7 @@ export function AppInitScreen() {
           <InfraItem label="src/config/env.ts"           value={`HTTPS-only enforcement (${ENV.IS_LOCAL ? 'local' : 'production'})`} />
           <InfraItem label="src/state/authAtoms.ts"      value="Jotai: authSession + role + token" />
           <InfraItem label="src/services/authService.ts" value="login / verify / logout / getMe / updateMe" />
-          <InfraItem label="src/services/mocks/"         value="withMockDelay + mockAuthService" />
+          <InfraItem label="src/services/mockService.ts" value="mockAuth only (VITE_USE_MOCK)" />
           <InfraItem label="src/router/routes.tsx"       value="20+ routes + RoleGuard" />
         </Box>
 
@@ -363,11 +377,13 @@ function InfraItem({ label, value }: { label: string; value: string }) {
 function ProfileCard({ profile }: { profile: UserProfileDto }) {
   const roleColor =
     profile.role === 'farmer' ? primaryColors.agriGreen :
-    profile.role === 'trader' ? primaryColors.zaloBlue  : '#8B5CF6';
+    profile.role === 'trader' ? primaryColors.zaloBlue :
+    profile.role === 'buyer' ? '#8B5CF6' : '#6B7280';
 
   const roleEmoji =
     profile.role === 'farmer' ? '🌾' :
-    profile.role === 'trader' ? '🏢' : '🛒';
+    profile.role === 'trader' ? '🏢' :
+    profile.role === 'buyer' ? '🛒' : '👤';
 
   return (
     <Box>

@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Page, Text, Spinner, useSnackbar } from 'zmp-ui';
+import { Page, Text, Spinner } from 'zmp-ui';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
 import { Icon } from '../../../design-system/components/Icon';
@@ -26,6 +26,7 @@ import { ApiError } from '@/api/errors';
 import type { SensorType } from '@/services/monitoringService';
 import { SensorLineChart } from '../../../design-system/components/SensorLineChart';
 import { useMonitoring } from '@/hooks/useMonitoring';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import {
   listConnections,
   acceptConnection,
@@ -204,7 +205,7 @@ const FarmerMonitoringPanel: React.FC<FarmerMonitoringPanelProps> = ({
   monitoringSectionStyles,
   deviationBoxStyles,
 }) => {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const [monitoringHistorySensor, setMonitoringHistorySensor] = useState<SensorType>('temperature');
 
   const {
@@ -352,7 +353,7 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
   const [selectedFarmer, setSelectedFarmer] = useState<MyFarmer | null>(null);
 
   // ── Snackbar ──────────────────────────────────────────────────────────────
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
 
   // ── Search tab state ──────────────────────────────────────────────────────
   const [searchFilter, setSearchFilter] = useState({ cropType: 'all', region: 'all' });

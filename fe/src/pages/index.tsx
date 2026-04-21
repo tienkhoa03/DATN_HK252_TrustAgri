@@ -1,5 +1,8 @@
 import React, { useState, lazy, Suspense } from "react";
+import { useAtomValue } from "jotai";
 import { Box, Page, Text, Button, Spinner } from "zmp-ui";
+
+import { currentRoleAtom, type UserRole } from "@/state/authAtoms";
 
 // Lazy load all screen demos for better performance
 const FarmerDashboardScreenDemo = lazy(() => 
@@ -70,7 +73,15 @@ const LoadingScreen = () => (
   </Box>
 );
 
+const ROLE_LABEL_VI: Record<UserRole, string> = {
+  farmer: "Nông dân",
+  trader: "Thương lái",
+  buyer: "Người mua",
+  guest: "Khách",
+};
+
 function HomePage() {
+  const role = useAtomValue(currentRoleAtom);
   const [activeDemo, setActiveDemo] = useState<string | null>(null);
 
   // If a demo is active, show it with Suspense wrapper
@@ -237,11 +248,16 @@ function HomePage() {
           Hệ thống thiết kế giao diện cho ứng dụng nông nghiệp
         </Text>
 
+        <Text className="text-center text-gray-500 mb-2" size="small">
+          Menu demo theo vai trò: <strong>{ROLE_LABEL_VI[role]}</strong> ({role})
+        </Text>
+
         <Box className="mt-8 p-4 bg-white rounded-lg shadow">
           <Text.Title size="small" className="mb-4">
             📱 Màn hình Demo
           </Text.Title>
           
+          {role === "farmer" && (
           <div className="space-y-2">
             <Text.Title size="xSmall" className="mb-2 font-semibold">
               Nông dân (Farmer)
@@ -282,8 +298,10 @@ function HomePage() {
               Hồ sơ Vườn
             </Button>
           </div>
+          )}
 
-          <div className="space-y-2 mt-6">
+          {role === "trader" && (
+          <div className="space-y-2">
             <Text.Title size="xSmall" className="mb-2 font-semibold">
               Thương lái (Trader)
             </Text.Title>
@@ -323,8 +341,10 @@ function HomePage() {
               Hồ sơ và Tin tức
             </Button>
           </div>
+          )}
 
-          <div className="space-y-2 mt-6">
+          {role === "buyer" && (
+          <div className="space-y-2">
             <Text.Title size="xSmall" className="mb-2 font-semibold">
               Người mua (Buyer)
             </Text.Title>
@@ -371,8 +391,10 @@ function HomePage() {
               Tài khoản và Thông báo
             </Button>
           </div>
+          )}
 
-          <div className="space-y-2 mt-6">
+          {role === "guest" && (
+          <div className="space-y-2">
             <Text.Title size="xSmall" className="mb-2 font-semibold">
               Khách (Guest)
             </Text.Title>
@@ -398,6 +420,7 @@ function HomePage() {
               Chi tiết Nông sản - Chế độ xem thử
             </Button>
           </div>
+          )}
         </Box>
 
         <Box className="mt-4 p-4 bg-white rounded-lg shadow">

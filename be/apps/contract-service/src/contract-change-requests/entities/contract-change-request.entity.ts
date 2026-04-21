@@ -1,18 +1,33 @@
 import {
-  Entity,
-  PrimaryGeneratedColumn,
+  Check,
   Column,
   CreateDateColumn,
+  Entity,
+  Index,
+  JoinColumn,
+  ManyToOne,
+  PrimaryGeneratedColumn,
 } from 'typeorm';
+import { ContractEntity } from '../../contracts/entities/contract.entity';
 
 @Entity('contract_change_requests')
+@Check(`"status" IN ('pending', 'accepted', 'rejected')`)
 export class ContractChangeRequestEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index('idx_ccr_contract_id')
   @Column({ name: 'contract_id', type: 'varchar' })
   contractId: string;
 
+  @ManyToOne(() => ContractEntity, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'contract_id' })
+  contract: ContractEntity;
+
+  /**
+   * Cross-service FK → users.user_id (auth-service).
+   */
+  @Index('idx_ccr_requested_by')
   @Column({ name: 'requested_by', type: 'varchar' })
   requestedBy: string;
 
@@ -25,6 +40,9 @@ export class ContractChangeRequestEntity {
   @Column({ type: 'varchar', length: 20 })
   status: 'pending' | 'accepted' | 'rejected';
 
+  /**
+   * Cross-service FK → users.user_id (auth-service).
+   */
   @Column({ name: 'responded_by', type: 'varchar', nullable: true })
   respondedBy: string | null;
 

@@ -11,9 +11,10 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Page, Text, useSnackbar, useNavigate } from 'zmp-ui';
+import { Page, Text, useNavigate } from 'zmp-ui';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { listFarms } from '@/services/farmService';
 import { Icon } from '../../../design-system/components/Icon';
 import { SensorDisplay } from '../../../design-system/components/SensorDisplay';
@@ -23,8 +24,14 @@ import { SensorLineChart } from '../../../design-system/components/SensorLineCha
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import { ApiError } from '@/api/errors';
 import { useMonitoring } from '@/hooks/useMonitoring';
 import type { SensorType } from '@/services/monitoringService';
+import {
+  fetchFarmerDashboard,
+  toDashboardViMessage,
+  type DashboardFarmerDto,
+} from '@/services/dashboardService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -112,9 +119,8 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
   notificationCount = 0,
 }) => {
   const navigate = useNavigate();
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const session = useAtomValue(authSessionAtom);
-  const openSnackbarRef = useRef(openSnackbar);
   const resolvedOwnerRef = useRef<string | null>(null);
   const resolvingOwnerRef = useRef(false);
 
@@ -127,6 +133,8 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
   const [fanActive, setFanActive] = useState(false);
   const [selectedSensor, setSelectedSensor] = useState<SensorType>('temperature');
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+  const [farmSummary, setFarmSummary] = useState<DashboardFarmerDto | null>(null);
+  const [farmSummaryLoading, setFarmSummaryLoading] = useState(true);
 
   const {
     latestReadings,
@@ -141,7 +149,30 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
   } = useMonitoring(resolvedFarmId);
 
   useEffect(() => {
-    openSnackbarRef.current = openSnackbar;
+    let cancelled = false;
+    setFarmSummaryLoading(true);
+    fetchFarmerDashboard()
+      .then((dto) => {
+        if (!cancelled) {
+          setFarmSummary(dto);
+          setFarmSummaryLoading(false);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setFarmSummary(null);
+          setFarmSummaryLoading(false);
+          openSnackbar({
+            type: 'error',
+            text: toDashboardViMessage(err),
+            duration: 4500,
+            icon: true,
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [openSnackbar]);
 
   useEffect(() => {
@@ -175,7 +206,7 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
         if (!firstFarm) {
           resolvedOwnerRef.current = session.userId;
           setResolvedFarmId(null);
-          openSnackbarRef.current({
+          openSnackbar({
             type: 'error',
             text: 'Bạn chưa có vườn nào. Vui lòng tạo hồ sơ vườn trước khi xem dashboard.',
             duration: 4500,
@@ -187,10 +218,17 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
         resolvedOwnerRef.current = session.userId;
         setResolvedFarmId(firstFarm.id);
         setResolvedFarmName(firstFarm.name);
-      } catch {
+      } catch (err: unknown) {
         if (cancelled) return;
         resolvedOwnerRef.current = null;
         setResolvedFarmId(null);
+        const msg =
+          err instanceof ApiError && err.code === 'NETWORK_ERROR'
+            ? 'Không có phản hồi từ máy chủ. Vui lòng kiểm tra kết nối mạng.'
+            : err instanceof ApiError
+              ? err.message || 'Không thể tải danh sách vườn.'
+              : 'Không thể tải danh sách vườn. Vui lòng thử lại.';
+        openSnackbar({ type: 'error', text: msg, duration: 4500, icon: true });
       } finally {
         if (!cancelled) {
           resolvingOwnerRef.current = false;
@@ -303,6 +341,102 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
               </div>
             )}
           </button>
+        </div>
+
+        {/* ── KPI tóm tắt vườn (dashboard farmer — Phase 17.1) ───────────── */}
+        <div style={{ padding: `${spacing.sm} ${spacing.md} 0` }}>
+          <Text.Title size="small" style={{ margin: `0 0 ${spacing.sm}` }}>
+            Tóm tắt vườn
+          </Text.Title>
+          {farmSummaryLoading && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing.sm }}>
+              {[0, 1, 2].map((i) => (
+                <SensorCardSkeleton key={i} />
+              ))}
+            </div>
+          )}
+          {!farmSummaryLoading && farmSummary && (
+            <>
+              <div
+                style={{
+                  padding: spacing.md,
+                  backgroundColor: colors.background.primary,
+                  borderRadius: 8,
+                  border: `1px solid ${colors.background.secondary}`,
+                  marginBottom: spacing.sm,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
+                  <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                    Điểm tuân thủ quy trình
+                  </Text>
+                  <Text.Title size="small" style={{ margin: 0, color: colors.primary.agriGreen }}>
+                    {farmSummary.complianceScore}%
+                  </Text.Title>
+                </div>
+                <div style={{ height: 8, borderRadius: 99, backgroundColor: colors.background.secondary, overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      width: `${Math.min(100, Math.max(0, farmSummary.complianceScore))}%`,
+                      height: '100%',
+                      borderRadius: 99,
+                      backgroundColor: colors.primary.agriGreen,
+                      transition: 'width 0.4s ease',
+                    }}
+                  />
+                </div>
+                <Text size="xSmall" style={{ color: colors.text.secondary, margin: `${spacing.xs} 0 0` }}>
+                  Kỳ: {new Date(farmSummary.periodFrom).toLocaleDateString('vi-VN')} —{' '}
+                  {new Date(farmSummary.periodTo).toLocaleDateString('vi-VN')}
+                </Text>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing.sm }}>
+                {[
+                  {
+                    icon: 'alert-triangle' as const,
+                    color: farmSummary.recentAlerts > 0 ? colors.functional.warningYellow : colors.primary.agriGreen,
+                    value: farmSummary.recentAlerts,
+                    label: 'Cảnh báo gần đây',
+                  },
+                  {
+                    icon: 'book' as const,
+                    color: colors.primary.zaloBlue,
+                    value: farmSummary.activeContracts,
+                    label: 'Hợp đồng hoạt động',
+                  },
+                  {
+                    icon: 'list' as const,
+                    color: colors.primary.agriGreen,
+                    value: farmSummary.careLogCount,
+                    label: 'Nhật ký chăm sóc (kỳ)',
+                  },
+                ].map((cell) => (
+                  <div
+                    key={cell.label}
+                    style={{
+                      padding: spacing.md,
+                      backgroundColor: colors.background.primary,
+                      borderRadius: 8,
+                      border: `1px solid ${colors.background.secondary}`,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: spacing.xs,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+                      <Icon name={cell.icon} size="md" color={cell.color} />
+                      <Text.Title size="small" style={{ margin: 0, fontWeight: fontWeight.bold }}>
+                        {cell.value}
+                      </Text.Title>
+                    </div>
+                    <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                      {cell.label}
+                    </Text>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* ── Alert Zone (ưu tiên trên fold) ──────────────────────────────── */}

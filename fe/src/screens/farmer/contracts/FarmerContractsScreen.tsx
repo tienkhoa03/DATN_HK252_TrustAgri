@@ -14,7 +14,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Text, useSnackbar } from 'zmp-ui';
+import { Text } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { Card } from '../../../design-system/components/Card';
 import { colors } from '../../../design-system/tokens/colors';
@@ -29,6 +29,7 @@ import {
   type ContractAuditLogDto,
 } from '../../../services/contractService';
 import { traderDisplayName, productDisplayName } from '../../../services/orderService';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { ContractChangeRequestsPanel } from '@/screens/shared/contract-change-requests';
 
 export interface Contract {
@@ -135,7 +136,7 @@ export const FarmerContractsScreen: React.FC<FarmerContractsScreenProps> = ({
   onViewDetails,
   onBack,
 }) => {
-  const { openSnackbar } = useSnackbar();
+  const openSnackbar = useStableOpenSnackbar();
   const isControlled = externalContracts !== undefined;
   const [contracts, setContracts] = useState<Contract[]>(() => externalContracts ?? []);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
