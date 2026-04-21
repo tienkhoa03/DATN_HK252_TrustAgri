@@ -1,9 +1,9 @@
 /**
  * Guest Product Detail Screen
  * Chi tiết Nông sản - Chế độ xem thử (Preview Mode)
- * 
+ *
  * Requirements: FR-G03
- * 
+ *
  * Features:
  * - Thông tin sản phẩm: Hình ảnh, mô tả hương vị, quy cách đóng gói
  * - Địa chỉ vườn trồng (có bản đồ)
@@ -13,24 +13,24 @@
  * - Thanh tác vụ giới hạn: Nút "Đăng ký để mua ngay" thay vì "Đặt cọc"
  */
 
-import React, { useState } from 'react';
-import { Page, Box, Text } from 'zmp-ui';
+import React, { useState, useEffect } from 'react';
+import { Page, Text, useSnackbar } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import {
+  getProduct,
+  standardLabel,
+  cropEmoji,
+  toMarketplaceViMessage,
+  type ProductDto,
+} from '../../../services/marketplaceService';
 
 export interface GuestProductDetailScreenProps {
   productId?: string;
   onBack?: () => void;
   onLogin?: () => void;
-}
-
-interface ProductImage {
-  id: string;
-  url: string;
-  type: 'photo' | 'video';
-  emoji: string;
 }
 
 interface Review {
@@ -41,66 +41,87 @@ interface Review {
   date: string;
 }
 
+const IMAGE_EMOJIS = ['🌳', '🌿', '🍃'];
+
+const MOCK_REVIEWS: Review[] = [
+  {
+    id: '1',
+    userName: 'Nguyễn Văn A',
+    rating: 5,
+    comment: 'Sầu riêng rất ngon, ngọt đậm, múi dày. Giao hàng đúng hẹn!',
+    date: '15/12/2024',
+  },
+  {
+    id: '2',
+    userName: 'Trần Thị B',
+    rating: 5,
+    comment: 'Chất lượng tuyệt vời, đúng như mô tả. Sẽ mua lại!',
+    date: '10/12/2024',
+  },
+  {
+    id: '3',
+    userName: 'Lê Văn C',
+    rating: 4,
+    comment: 'Sản phẩm tốt, giá hợp lý. Đóng gói cẩn thận.',
+    date: '05/12/2024',
+  },
+];
+
+const SkeletonBlock: React.FC<{ height?: number | string; width?: string }> = ({
+  height = 16,
+  width = '100%',
+}) => (
+  <div
+    style={{
+      height,
+      width,
+      backgroundColor: colors.background.secondary,
+      borderRadius: '6px',
+      marginBottom: spacing.xs,
+    }}
+  />
+);
+
 /**
  * Guest Product Detail Screen Component
  * Requirements: FR-G03
  */
 export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> = ({
-  productId = '1',
+  productId = 'prod-001',
   onBack,
   onLogin,
 }) => {
+  const { openSnackbar } = useSnackbar();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [product, setProduct] = useState<ProductDto | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock product data
-  const product = {
-    id: productId,
-    name: 'Sầu riêng Monthong',
-    farmName: 'Farm Lab Tiến Khoa',
-    farmerName: 'Tiến Khoa',
-    traderName: 'Công ty TNHH Nông sản Xanh',
-    location: 'Cái Bè, Tiền Giang',
-    standard: 'GlobalGAP',
-    price: 120000,
-    rating: 4.8,
-    reviewCount: 127,
-    description: 'Sầu riêng Monthong chất lượng cao, vị ngọt đậm đà, múi dày, hạt lép. Được trồng theo quy trình GlobalGAP, đảm bảo an toàn thực phẩm.',
-    packaging: 'Đóng gói hộp carton chuyên dụng, trọng lượng 2.5-3.5 kg/trái',
-  };
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    getProduct(productId)
+      .then((data) => {
+        if (!cancelled) {
+          setProduct(data);
+          setLoading(false);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          const msg = toMarketplaceViMessage(err, 'detail');
+          setError(msg);
+          setLoading(false);
+          openSnackbar({ type: 'error', text: msg, duration: 4000, icon: true });
+        }
+      });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId]);
 
-  // Image slider data
-  const images: ProductImage[] = [
-    { id: '1', url: '', type: 'photo', emoji: '🌳' },
-    { id: '2', url: '', type: 'photo', emoji: '🌿' },
-    { id: '3', url: '', type: 'photo', emoji: '🍃' },
-  ];
+  // ── Styles ──────────────────────────────────────────────────────────────────
 
-  // Mock reviews
-  const reviews: Review[] = [
-    {
-      id: '1',
-      userName: 'Nguyễn Văn A',
-      rating: 5,
-      comment: 'Sầu riêng rất ngon, ngọt đậm, múi dày. Giao hàng đúng hẹn!',
-      date: '15/12/2024',
-    },
-    {
-      id: '2',
-      userName: 'Trần Thị B',
-      rating: 5,
-      comment: 'Chất lượng tuyệt vời, đúng như mô tả. Sẽ mua lại!',
-      date: '10/12/2024',
-    },
-    {
-      id: '3',
-      userName: 'Lê Văn C',
-      rating: 4,
-      comment: 'Sản phẩm tốt, giá hợp lý. Đóng gói cẩn thận.',
-      date: '05/12/2024',
-    },
-  ];
-
-  // Styles
   const headerStyles: React.CSSProperties = {
     position: 'fixed',
     top: 0,
@@ -131,7 +152,7 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
 
   const contentStyles: React.CSSProperties = {
     marginTop: '56px',
-    paddingBottom: '100px', // Space for sticky footer
+    paddingBottom: '100px',
   };
 
   const imageSliderStyles: React.CSSProperties = {
@@ -182,13 +203,6 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
     marginBottom: spacing.xs,
   };
 
-  const ratingStyles: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  };
-
   const standardBadgeStyles: React.CSSProperties = {
     display: 'inline-block',
     padding: `${spacing.xs} ${spacing.sm}`,
@@ -218,7 +232,6 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
     fontSize: '48px',
   };
 
-  // Blurred section styles
   const blurredSectionStyles: React.CSSProperties = {
     position: 'relative',
     padding: spacing.md,
@@ -260,11 +273,6 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
     textAlign: 'center',
   };
 
-  const lockIconStyles: React.CSSProperties = {
-    fontSize: '48px',
-    marginBottom: spacing.md,
-  };
-
   const lockMessageStyles: React.CSSProperties = {
     fontSize: fontSize.body,
     fontWeight: fontWeight.medium,
@@ -285,7 +293,6 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
     transition: 'all 0.2s',
   };
 
-  // Review styles
   const reviewCardStyles: React.CSSProperties = {
     padding: spacing.md,
     backgroundColor: colors.background.secondary,
@@ -293,19 +300,6 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
     marginBottom: spacing.sm,
   };
 
-  const reviewHeaderStyles: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  };
-
-  const reviewStarsStyles: React.CSSProperties = {
-    display: 'flex',
-    gap: '2px',
-  };
-
-  // Sticky footer styles
   const stickyFooterStyles: React.CSSProperties = {
     position: 'fixed',
     bottom: 0,
@@ -338,20 +332,219 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
     transition: 'all 0.2s',
   };
 
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, index) => (
+  const renderStars = (rating: number) =>
+    Array.from({ length: 5 }, (_, i) => (
       <Icon
-        key={index}
-        name={index < rating ? 'star-filled' : 'star'}
+        key={i}
+        name={i < rating ? 'star-filled' : 'star'}
         size="sm"
-        color={index < rating ? colors.functional.warningYellow : colors.text.disabled}
+        color={i < rating ? colors.functional.warningYellow : colors.text.disabled}
       />
     ));
+
+  const renderLockSection = (icon: string, label: string) => (
+    <div style={blurredSectionStyles}>
+      <div style={blurredContentStyles}>
+        <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.sm }}>
+          {label}
+        </Text.Title>
+        <div style={blurredPlaceholderStyles}>{icon}</div>
+      </div>
+      <div style={lockOverlayStyles}>
+        <div style={{ fontSize: '48px', marginBottom: spacing.md }}>🔒</div>
+        <div style={lockMessageStyles}>
+          Tính năng Giám sát vườn và Bản sao số chỉ dành cho thành viên đã đặt cọc
+        </div>
+        <button
+          style={unlockButtonStyles}
+          onClick={onLogin}
+          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#0052CC'; }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = colors.primary.zaloBlue;
+          }}
+        >
+          Đăng nhập để mở khóa
+        </button>
+      </div>
+    </div>
+  );
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
+  const renderBody = () => {
+    if (loading) {
+      return (
+        <div style={contentStyles}>
+          <div style={{ ...imageSliderStyles, backgroundColor: colors.background.secondary }} />
+          <div style={sectionStyles}>
+            <SkeletonBlock height={28} />
+            <SkeletonBlock height={14} />
+            <SkeletonBlock height={14} width="60%" />
+          </div>
+        </div>
+      );
+    }
+
+    if (error || !product) {
+      return (
+        <div style={{ ...contentStyles, padding: spacing.lg, textAlign: 'center' }}>
+          <div style={{ fontSize: '48px', marginBottom: spacing.md }}>⚠️</div>
+          <Text size="small" style={{ color: colors.functional.alertRed }}>
+            {error ?? 'Sản phẩm không tồn tại.'}
+          </Text>
+        </div>
+      );
+    }
+
+    const emoji = product.images[0] ?? cropEmoji(product.cropType);
+    const std = standardLabel(product.standardCode);
+
+    return (
+      <>
+        <div style={contentStyles}>
+          {/* Image Slider */}
+          <div style={imageSliderStyles}>
+            <div style={imageStyles}>
+              {IMAGE_EMOJIS[currentImageIndex] ?? emoji}
+            </div>
+            <div style={imageDotsStyles}>
+              {IMAGE_EMOJIS.map((_, index) => (
+                <div
+                  key={index}
+                  style={dotStyles(index === currentImageIndex)}
+                  onClick={() => setCurrentImageIndex(index)}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Product Info */}
+          <div style={sectionStyles}>
+            <h1 style={titleStyles}>{product.name}</h1>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: spacing.xs,
+                marginBottom: spacing.sm,
+              }}
+            >
+              <Icon name="star-filled" size="sm" color={colors.functional.warningYellow} />
+              <Text size="small" style={{ margin: 0, fontWeight: fontWeight.medium }}>
+                4.8
+              </Text>
+              <Text size="small" style={{ margin: 0, color: colors.text.secondary }}>
+                (127 đánh giá)
+              </Text>
+            </div>
+
+            {std && <div style={standardBadgeStyles}>{std}</div>}
+
+            {product.description && (
+              <Text size="small" style={{ marginTop: spacing.md, lineHeight: 1.6 }}>
+                {product.description}
+              </Text>
+            )}
+
+            <div style={{ marginTop: spacing.md }}>
+              <Text
+                size="small"
+                style={{ fontWeight: fontWeight.semibold, marginBottom: spacing.xs }}
+              >
+                Quy cách đóng gói:
+              </Text>
+              <Text size="small" style={{ color: colors.text.secondary }}>
+                Đóng gói hộp carton chuyên dụng, đơn vị: {product.unit}
+              </Text>
+            </div>
+          </div>
+
+          {/* Farm Location */}
+          <div style={sectionStyles}>
+            <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.sm }}>
+              Địa chỉ vườn trồng
+            </Text.Title>
+
+            <div style={infoRowStyles}>
+              <Icon name="map-pin" size="md" color={colors.text.secondary} />
+              <div>
+                <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>
+                  Vườn nguồn
+                </Text>
+                <Text size="small" style={{ margin: 0, fontWeight: fontWeight.medium }}>
+                  {product.farmId ?? 'Chưa có thông tin'}
+                </Text>
+              </div>
+            </div>
+
+            <div style={mapPlaceholderStyles}>🗺️</div>
+          </div>
+
+          {/* Blurred Sections */}
+          {renderLockSection('📹', 'Camera giám sát thời gian thực')}
+          {renderLockSection('🌱', 'Mô hình Bản sao số (Digital Twin)')}
+
+          {/* Reviews */}
+          <div style={sectionStyles}>
+            <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.md }}>
+              Đánh giá từ người mua ({MOCK_REVIEWS.length})
+            </Text.Title>
+
+            {MOCK_REVIEWS.map((review) => (
+              <div key={review.id} style={reviewCardStyles}>
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: spacing.xs,
+                  }}
+                >
+                  <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
+                    {review.userName}
+                  </Text>
+                  <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>
+                    {review.date}
+                  </Text>
+                </div>
+
+                <div style={{ display: 'flex', gap: '2px', marginBottom: spacing.xs }}>
+                  {renderStars(review.rating)}
+                </div>
+
+                <Text size="small" style={{ margin: 0, color: colors.text.secondary, lineHeight: 1.5 }}>
+                  {review.comment}
+                </Text>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Sticky Footer */}
+        <div style={stickyFooterStyles}>
+          <div style={priceStyles}>
+            {product.price.toLocaleString('vi-VN')} VNĐ/{product.unit}
+          </div>
+
+          <button
+            style={loginButtonStyles}
+            onClick={onLogin}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#0052CC'; }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = colors.primary.zaloBlue;
+            }}
+          >
+            Đăng ký để mua ngay
+          </button>
+        </div>
+      </>
+    );
   };
 
   return (
     <Page className="guest-product-detail-screen">
-      {/* Header with back button */}
+      {/* Header */}
       <div style={headerStyles}>
         {onBack && (
           <button
@@ -368,201 +561,17 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
             <Icon name="chevron-left" size="md" color={colors.text.primary} />
           </button>
         )}
-      </div>
-
-      <div style={contentStyles}>
-        {/* Image Slider */}
-        <div style={imageSliderStyles}>
-          <div style={imageStyles}>{images[currentImageIndex].emoji}</div>
-
-          {/* Image dots */}
-          <div style={imageDotsStyles}>
-            {images.map((_, index) => (
-              <div
-                key={index}
-                style={dotStyles(index === currentImageIndex)}
-                onClick={() => setCurrentImageIndex(index)}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Product Info */}
-        <div style={sectionStyles}>
-          <h1 style={titleStyles}>{product.name}</h1>
-
-          {/* Rating */}
-          <div style={ratingStyles}>
-            <Icon name="star-filled" size="sm" color={colors.functional.warningYellow} />
-            <Text size="small" style={{ margin: 0, fontWeight: fontWeight.medium }}>
-              {product.rating}
-            </Text>
-            <Text size="small" style={{ margin: 0, color: colors.text.secondary }}>
-              ({product.reviewCount} đánh giá)
-            </Text>
-          </div>
-
-          {/* Standard badge */}
-          <div style={standardBadgeStyles}>{product.standard}</div>
-
-          {/* Description */}
-          <Text size="small" style={{ marginTop: spacing.md, lineHeight: 1.6 }}>
-            {product.description}
+        {product && (
+          <Text
+            size="small"
+            style={{ flex: 1, textAlign: 'center', fontWeight: fontWeight.semibold, margin: 0 }}
+          >
+            {product.name}
           </Text>
-
-          {/* Packaging */}
-          <div style={{ marginTop: spacing.md }}>
-            <Text size="small" style={{ fontWeight: fontWeight.semibold, marginBottom: spacing.xs }}>
-              Quy cách đóng gói:
-            </Text>
-            <Text size="small" style={{ color: colors.text.secondary }}>
-              {product.packaging}
-            </Text>
-          </div>
-        </div>
-
-        {/* Farm Location */}
-        <div style={sectionStyles}>
-          <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.sm }}>
-            Địa chỉ vườn trồng
-          </Text.Title>
-
-          <div style={infoRowStyles}>
-            <Icon name="user" size="md" color={colors.text.secondary} />
-            <div>
-              <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>
-                Nông hộ
-              </Text>
-              <Text size="small" style={{ margin: 0, fontWeight: fontWeight.medium }}>
-                {product.farmerName} - {product.farmName}
-              </Text>
-            </div>
-          </div>
-
-          <div style={infoRowStyles}>
-            <Icon name="map-pin" size="md" color={colors.text.secondary} />
-            <div>
-              <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>
-                Địa chỉ
-              </Text>
-              <Text size="small" style={{ margin: 0, fontWeight: fontWeight.medium }}>
-                {product.location}
-              </Text>
-            </div>
-          </div>
-
-          {/* Map placeholder */}
-          <div style={mapPlaceholderStyles}>🗺️</div>
-        </div>
-
-        {/* Blurred Section - Camera Monitoring */}
-        <div style={blurredSectionStyles}>
-          <div style={blurredContentStyles}>
-            <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.sm }}>
-              Camera giám sát thời gian thực
-            </Text.Title>
-            <div style={blurredPlaceholderStyles}>📹</div>
-          </div>
-
-          {/* Lock Overlay */}
-          <div style={lockOverlayStyles}>
-            <div style={lockIconStyles}>🔒</div>
-            <div style={lockMessageStyles}>
-              Tính năng Giám sát vườn và Bản sao số chỉ dành cho thành viên đã đặt cọc
-            </div>
-            <button
-              style={unlockButtonStyles}
-              onClick={onLogin}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#0052CC';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = colors.primary.zaloBlue;
-              }}
-            >
-              Đăng nhập để mở khóa
-            </button>
-          </div>
-        </div>
-
-        {/* Blurred Section - Digital Twin */}
-        <div style={blurredSectionStyles}>
-          <div style={blurredContentStyles}>
-            <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.sm }}>
-              Mô hình Bản sao số (Digital Twin)
-            </Text.Title>
-            <div style={blurredPlaceholderStyles}>🌱</div>
-          </div>
-
-          {/* Lock Overlay */}
-          <div style={lockOverlayStyles}>
-            <div style={lockIconStyles}>🔒</div>
-            <div style={lockMessageStyles}>
-              Tính năng Giám sát vườn và Bản sao số chỉ dành cho thành viên đã đặt cọc
-            </div>
-            <button
-              style={unlockButtonStyles}
-              onClick={onLogin}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#0052CC';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = colors.primary.zaloBlue;
-              }}
-            >
-              Đăng nhập để mở khóa
-            </button>
-          </div>
-        </div>
-
-        {/* Reviews Section */}
-        <div style={sectionStyles}>
-          <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.md }}>
-            Đánh giá từ người mua ({reviews.length})
-          </Text.Title>
-
-          {reviews.map((review) => (
-            <div key={review.id} style={reviewCardStyles}>
-              <div style={reviewHeaderStyles}>
-                <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
-                  {review.userName}
-                </Text>
-                <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>
-                  {review.date}
-                </Text>
-              </div>
-
-              <div style={{ ...reviewStarsStyles, marginBottom: spacing.xs }}>
-                {renderStars(review.rating)}
-              </div>
-
-              <Text size="small" style={{ margin: 0, color: colors.text.secondary, lineHeight: 1.5 }}>
-                {review.comment}
-              </Text>
-            </div>
-          ))}
-        </div>
+        )}
       </div>
 
-      {/* Sticky Footer - Limited Actions */}
-      <div style={stickyFooterStyles}>
-        <div style={priceStyles}>
-          {product.price.toLocaleString('vi-VN')} VNĐ/kg
-        </div>
-
-        <button
-          style={loginButtonStyles}
-          onClick={onLogin}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#0052CC';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = colors.primary.zaloBlue;
-          }}
-        >
-          Đăng ký để mua ngay
-        </button>
-      </div>
+      {renderBody()}
     </Page>
   );
 };

@@ -13,23 +13,23 @@
  * - Sticky Footer: Nút Đồng ý/Từ chối thay đổi
  */
 
-import React, { useState } from 'react';
-import { Text } from 'zmp-ui';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Text, useSnackbar } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
-import { Button } from '../../../design-system/components/Button';
 import { Card } from '../../../design-system/components/Card';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
-
-export interface ContractChange {
-  id?: string; // Add ID to track individual changes
-  field: string;
-  oldValue: string;
-  newValue: string;
-  reason?: string;
-  status?: 'pending' | 'accepted' | 'rejected'; // Track status of each change
-}
+import {
+  listContracts,
+  listContractAuditLogs,
+  toContractViMessage,
+  contractStatusLabelVi,
+  type ContractDto,
+  type ContractAuditLogDto,
+} from '../../../services/contractService';
+import { traderDisplayName, productDisplayName } from '../../../services/orderService';
+import { ContractChangeRequestsPanel } from '@/screens/shared/contract-change-requests';
 
 export interface Contract {
   id: string;
@@ -44,19 +44,83 @@ export interface Contract {
   terms: string[];
   depositAmount?: number;
   depositPaid?: boolean;
-  changes?: ContractChange[];
   createdDate: Date;
+  partyFarmerId?: string;
+  partyTraderId: string;
+  partyBuyerId?: string;
 }
 
 export interface FarmerContractsScreenProps {
   farmerName?: string;
   farmName?: string;
+  traderId?: string;
   contracts?: Contract[];
   onAcceptChange?: (contractId: string) => void;
   onRejectChange?: (contractId: string) => void;
   onViewDetails?: (contractId: string) => void;
   onBack?: () => void;
 }
+
+function mapDtoToContract(dto: ContractDto): Contract {
+  const traderName = traderDisplayName(dto.partyTraderId);
+  const productType = dto.productId ? productDisplayName(dto.productId) : 'Sản phẩm';
+  const unitNorm =
+    dto.unit === 'tấn' || dto.unit === 't' ? ('tấn' as const) : ('kg' as const);
+  const qty = dto.quantity;
+  const pricePerUnit = qty > 0 ? Math.round(dto.totalPrice / qty) : 0;
+  const terms = dto.terms
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  return {
+    id: dto.id,
+    traderName,
+    productType,
+    quantity: dto.quantity,
+    unit: unitNorm,
+    harvestDate: new Date(dto.endDate),
+    price: pricePerUnit,
+    status: dto.status,
+    terms: terms.length > 0 ? terms : [dto.terms],
+    depositAmount: dto.deposit,
+    depositPaid: dto.deposit != null && dto.deposit > 0,
+    createdDate: new Date(dto.createdAt),
+    partyFarmerId: dto.partyFarmerId,
+    partyTraderId: dto.partyTraderId,
+    partyBuyerId: dto.partyBuyerId,
+  };
+}
+
+const ContractsSkeleton: React.FC = () => (
+  <div style={{ marginBottom: spacing.md }}>
+    {[1, 2].map((k) => (
+      <div
+        key={k}
+        style={{
+          padding: spacing.md,
+          backgroundColor: colors.background.primary,
+          borderRadius: '8px',
+          marginBottom: spacing.md,
+          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+        }}
+      >
+        {[90, 70, 55, 40].map((w, i) => (
+          <div
+            key={i}
+            style={{
+              height: '12px',
+              width: `${w}%`,
+              backgroundColor: colors.background.secondary,
+              borderRadius: '6px',
+              marginBottom: spacing.sm,
+            }}
+          />
+        ))}
+      </div>
+    ))}
+  </div>
+);
 
 /**
  * Farmer Contracts Screen Component
@@ -65,195 +129,113 @@ export interface FarmerContractsScreenProps {
 export const FarmerContractsScreen: React.FC<FarmerContractsScreenProps> = ({
   farmerName = 'Tiến Khoa',
   farmName = 'Sầu riêng Monthong',
-  contracts: initialContracts,
-  onAcceptChange,
-  onRejectChange,
+  contracts: externalContracts,
+  onAcceptChange: _onAcceptChange,
+  onRejectChange: _onRejectChange,
   onViewDetails,
   onBack,
 }) => {
-  // Default contracts data
-  const defaultContracts: Contract[] = [
-    {
-      id: '1',
-      traderName: 'Công ty TNHH Trái cây Miền Nam',
-      productType: 'Sầu riêng Monthong',
-      quantity: 2,
-      unit: 'tấn',
-      harvestDate: new Date('2024-03-15'),
-      price: 120000,
-      status: 'active',
-      terms: [
-        'Chất lượng: Loại 1, độ ngọt tối thiểu 28 Brix',
-        'Kích thước: Trung bình 2-3kg/trái',
-        'Không dư lượng thuốc BVTV',
-        'Thanh toán: 50% đặt cọc, 50% khi giao hàng',
-        'Giao hàng tại vườn',
-      ],
-      depositAmount: 120000000,
-      depositPaid: true,
-      createdDate: new Date('2024-01-10'),
-    },
-    {
-      id: '2',
-      traderName: 'Hợp tác xã Nông sản Đồng Tháp',
-      productType: 'Sầu riêng Ri6',
-      quantity: 1500,
-      unit: 'kg',
-      harvestDate: new Date('2024-03-20'),
-      price: 110000,
-      status: 'pending_change',
-      terms: [
-        'Chất lượng: Loại 1, độ ngọt tối thiểu 26 Brix',
-        'Kích thước: Trung bình 1.5-2kg/trái',
-        'Không dư lượng thuốc BVTV',
-        'Thanh toán: 30% đặt cọc, 70% khi giao hàng',
-        'Giao hàng tại kho HTX',
-      ],
-      depositAmount: 49500000,
-      depositPaid: true,
-      changes: [
-        {
-          id: 'change-1',
-          field: 'Ngày thu hoạch',
-          oldValue: '15/03/2024',
-          newValue: '20/03/2024',
-          reason: 'Thời tiết mưa kéo dài, cần thêm thời gian để trái chín đều',
-          status: 'pending',
-        },
-        {
-          id: 'change-2',
-          field: 'Số lượng',
-          oldValue: '2 tấn',
-          newValue: '1.5 tấn',
-          reason: 'Một số cây bị ảnh hưởng bởi sâu bệnh',
-          status: 'pending',
-        },
-      ],
-      createdDate: new Date('2024-01-15'),
-    },
-    {
-      id: '3',
-      traderName: 'Thương lái Nguyễn Văn A',
-      productType: 'Sầu riêng Monthong',
-      quantity: 800,
-      unit: 'kg',
-      harvestDate: new Date('2024-04-01'),
-      price: 115000,
-      status: 'active',
-      terms: [
-        'Chất lượng: Loại 1-2 hỗn hợp',
-        'Kích thước: Không yêu cầu',
-        'Thanh toán: 100% khi giao hàng',
-        'Giao hàng tại chợ đầu mối',
-      ],
-      depositAmount: 0,
-      depositPaid: false,
-      createdDate: new Date('2024-02-01'),
-    },
-  ];
-
-  const [contracts, setContracts] = useState<Contract[]>(initialContracts || defaultContracts);
+  const { openSnackbar } = useSnackbar();
+  const isControlled = externalContracts !== undefined;
+  const [contracts, setContracts] = useState<Contract[]>(() => externalContracts ?? []);
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
+  const [loading, setLoading] = useState(!isControlled);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [auditEntries, setAuditEntries] = useState<ContractAuditLogDto[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
 
-  // Debug log
-  React.useEffect(() => {
-    console.log('FarmerContractsScreen mounted with', contracts.length, 'contracts');
-  }, []);
+  useEffect(() => {
+    if (!isControlled) return;
+    setContracts(externalContracts ?? []);
+  }, [isControlled, externalContracts]);
 
-  // Handle accept individual change
-  const handleAcceptIndividualChange = (contractId: string, changeId: string) => {
-    setContracts(prev =>
-      prev.map(contract => {
-        if (contract.id === contractId && contract.changes) {
-          const updatedChanges = contract.changes.map(change =>
-            change.id === changeId ? { ...change, status: 'accepted' as const } : change
-          );
-          
-          // Check if all changes are processed (accepted or rejected)
-          const allProcessed = updatedChanges.every(c => c.status === 'accepted' || c.status === 'rejected');
-          
-          // If all accepted, update contract status to active
-          const allAccepted = updatedChanges.every(c => c.status === 'accepted');
-          
-          return {
-            ...contract,
-            changes: updatedChanges,
-            status: allProcessed && allAccepted ? 'active' : contract.status,
-          };
-        }
-        return contract;
+  useEffect(() => {
+    if (isControlled) return;
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    listContracts({
+      role: 'farmer',
+      page: 1,
+      limit: 50,
+    })
+      .then((res) => {
+        if (cancelled) return;
+        setContracts(res.items.map(mapDtoToContract));
       })
-    );
-    
-    // Update selected contract
-    if (selectedContract && selectedContract.id === contractId && selectedContract.changes) {
-      const updatedChanges = selectedContract.changes.map(change =>
-        change.id === changeId ? { ...change, status: 'accepted' as const } : change
-      );
-      setSelectedContract({ ...selectedContract, changes: updatedChanges });
-    }
-  };
-
-  // Handle reject individual change
-  const handleRejectIndividualChange = (contractId: string, changeId: string) => {
-    setContracts(prev =>
-      prev.map(contract => {
-        if (contract.id === contractId && contract.changes) {
-          const updatedChanges = contract.changes.map(change =>
-            change.id === changeId ? { ...change, status: 'rejected' as const } : change
-          );
-          
-          // Check if all changes are processed
-          const allProcessed = updatedChanges.every(c => c.status === 'accepted' || c.status === 'rejected');
-          
-          return {
-            ...contract,
-            changes: updatedChanges,
-            status: allProcessed ? 'active' : contract.status,
-          };
-        }
-        return contract;
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        const msg = toContractViMessage(err, 'list');
+        setLoadError(msg);
+        openSnackbar({ type: 'error', text: msg, duration: 4000, icon: true });
       })
-    );
-    
-    // Update selected contract
-    if (selectedContract && selectedContract.id === contractId && selectedContract.changes) {
-      const updatedChanges = selectedContract.changes.map(change =>
-        change.id === changeId ? { ...change, status: 'rejected' as const } : change
-      );
-      setSelectedContract({ ...selectedContract, changes: updatedChanges });
-    }
-  };
+      .then(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isControlled, openSnackbar]);
 
-  // Handle accept all changes (legacy - kept for compatibility)
-  const handleAcceptChange = (contractId: string) => {
-    setContracts(prev =>
-      prev.map(contract =>
-        contract.id === contractId
-          ? { ...contract, status: 'active', changes: undefined }
-          : contract
-      )
-    );
-    setSelectedContract(null);
-    if (onAcceptChange) {
-      onAcceptChange(contractId);
+  useEffect(() => {
+    if (!selectedContract) {
+      setAuditEntries([]);
+      return;
     }
-  };
+    let cancelled = false;
+    setAuditLoading(true);
+    listContractAuditLogs(selectedContract.id)
+      .then((rows) => {
+        if (!cancelled) setAuditEntries(rows);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setAuditEntries([]);
+          openSnackbar({ type: 'error', text: toContractViMessage(err, 'audit'), duration: 3800, icon: true });
+        }
+      })
+      .then(() => {
+        if (!cancelled) setAuditLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedContract?.id, openSnackbar]);
 
-  // Handle reject all changes (legacy - kept for compatibility)
-  const handleRejectChange = (contractId: string) => {
-    setContracts(prev =>
-      prev.map(contract =>
-        contract.id === contractId
-          ? { ...contract, status: 'active', changes: undefined }
-          : contract
-      )
-    );
-    setSelectedContract(null);
-    if (onRejectChange) {
-      onRejectChange(contractId);
-    }
-  };
+  const refetchContracts = useCallback(() => {
+    if (isControlled) return;
+    setLoading(true);
+    setLoadError(null);
+    listContracts({
+      role: 'farmer',
+      page: 1,
+      limit: 50,
+    })
+      .then((res) => {
+        const mapped = res.items.map(mapDtoToContract);
+        setContracts(mapped);
+        setSelectedContract((prev) => {
+          if (!prev) return null;
+          return mapped.find((x) => x.id === prev.id) ?? prev;
+        });
+      })
+      .catch((err: unknown) => {
+        const msg = toContractViMessage(err, 'list');
+        setLoadError(msg);
+        openSnackbar({ type: 'error', text: msg, duration: 4000, icon: true });
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [isControlled, openSnackbar]);
+
+  const summaryCounts = useMemo(() => {
+    return {
+      active: contracts.filter((c) => c.status === 'active').length,
+      pending: contracts.filter((c) => c.status === 'pending_change').length,
+      done: contracts.filter((c) => c.status === 'completed').length,
+    };
+  }, [contracts]);
 
   // Handle view details
   const handleViewDetails = (contract: Contract) => {
@@ -358,20 +340,6 @@ export const FarmerContractsScreen: React.FC<FarmerContractsScreenProps> = ({
     marginTop: spacing.md,
   };
 
-  const stickyFooterStyles: React.CSSProperties = {
-    position: 'fixed',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.background.primary,
-    borderTop: `2px solid ${colors.background.secondary}`,
-    padding: spacing.md,
-    display: 'flex',
-    gap: spacing.md,
-    boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
-    zIndex: 1000,
-  };
-
   const modalOverlayStyles: React.CSSProperties = {
     position: 'fixed',
     top: 0,
@@ -439,51 +407,61 @@ export const FarmerContractsScreen: React.FC<FarmerContractsScreenProps> = ({
         {/* Content */}
         <div style={contentStyles}>
         {/* Summary */}
+        {!loading && !loadError && (
         <div style={{ marginBottom: spacing.lg }}>
           <Card>
-            <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
-              <div>
-                <Text.Title size="large" style={{ color: colors.primary.agriGreen, margin: 0 }}>
-                  {contracts.filter(c => c.status === 'active').length}
-                </Text.Title>
-                <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                  Đang thực hiện
-                </Text>
+              <div style={{ display: 'flex', justifyContent: 'space-around', textAlign: 'center' }}>
+                <div>
+                  <Text.Title size="large" style={{ color: colors.primary.agriGreen, margin: 0 }}>
+                    {summaryCounts.active}
+                  </Text.Title>
+                  <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                    Đang thực hiện
+                  </Text>
+                </div>
+                <div>
+                  <Text.Title size="large" style={{ color: colors.functional.warningYellow, margin: 0 }}>
+                    {summaryCounts.pending}
+                  </Text.Title>
+                  <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                    Yêu cầu thay đổi
+                  </Text>
+                </div>
+                <div>
+                  <Text.Title size="large" style={{ color: colors.primary.zaloBlue, margin: 0 }}>
+                    {summaryCounts.done}
+                  </Text.Title>
+                  <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                    Hoàn thành
+                  </Text>
+                </div>
               </div>
-              <div>
-                <Text.Title size="large" style={{ color: colors.functional.warningYellow, margin: 0 }}>
-                  {contracts.filter(c => c.status === 'pending_change').length}
-                </Text.Title>
-                <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                  Yêu cầu thay đổi
-                </Text>
-              </div>
-              <div>
-                <Text.Title size="large" style={{ color: colors.primary.zaloBlue, margin: 0 }}>
-                  {contracts.filter(c => c.status === 'completed').length}
-                </Text.Title>
-                <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                  Hoàn thành
-                </Text>
-              </div>
-            </div>
-          </Card>
+            </Card>
         </div>
+        )}
 
-        {/* Contracts List */}
+        {/* Danh sách: GET /contracts (JWT + role=farmer) */}
         <div>
           <Text.Title size="small" style={{ marginBottom: spacing.md }}>
-            Danh sách hợp đồng ({contracts.length})
+            Danh sách hợp đồng ({loading ? '…' : contracts.length})
           </Text.Title>
 
-          {contracts.length === 0 ? (
+          {loading && <ContractsSkeleton />}
+
+          {loadError && (
+            <div style={{ textAlign: 'center', padding: spacing.lg, color: colors.functional.alertRed }}>
+              <Text size="small">{loadError}</Text>
+            </div>
+          )}
+
+          {!loading && !loadError && contracts.length === 0 ? (
             <div style={{ textAlign: 'center', padding: spacing.xl, color: colors.text.secondary }}>
               <Icon name="farm" size="lg" color={colors.text.secondary} />
               <Text style={{ marginTop: spacing.md }}>
                 Chưa có hợp đồng nào
               </Text>
             </div>
-          ) : (
+          ) : !loading && !loadError ? (
             contracts.map(contract => (
               <div
                 key={contract.id}
@@ -600,7 +578,7 @@ export const FarmerContractsScreen: React.FC<FarmerContractsScreenProps> = ({
                 </div>
 
                 {/* Change Indicator */}
-                {contract.status === 'pending_change' && contract.changes && (
+                {contract.status === 'pending_change' && (
                   <div style={changeHighlightStyles}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }}>
                       <Icon name="alert-triangle" size="md" color={colors.functional.warningYellow} />
@@ -608,17 +586,17 @@ export const FarmerContractsScreen: React.FC<FarmerContractsScreenProps> = ({
                         size="small"
                         style={{ fontWeight: fontWeight.semibold, color: colors.functional.warningYellow, margin: 0 }}
                       >
-                        Có {contract.changes.length} thay đổi cần xác nhận
+                        Có yêu cầu thay đổi đang chờ xử lý
                       </Text>
                     </div>
                     <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                      Nhấn để xem chi tiết và phản hồi
+                      Nhấn để xem chi tiết, diff và phản hồi đối tác
                     </Text>
                   </div>
                 )}
               </div>
             ))
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -663,6 +641,60 @@ export const FarmerContractsScreen: React.FC<FarmerContractsScreenProps> = ({
                   {' '}
                   {getStatusLabel(selectedContract.status)}
                 </span>
+              </div>
+
+              {/* Nhật ký trạng thái (BE: GET .../audit-logs) */}
+              <div style={{ marginBottom: spacing.lg }}>
+                <Text.Title size="small" style={{ marginBottom: spacing.sm }}>
+                  Nhật ký thay đổi trạng thái
+                </Text.Title>
+                {auditLoading ? (
+                  <Text size="xSmall" style={{ color: colors.text.secondary }}>
+                    Đang tải...
+                  </Text>
+                ) : auditEntries.length === 0 ? (
+                  <Text size="xSmall" style={{ color: colors.text.secondary }}>
+                    Chưa có bản ghi (hoặc hợp đồng mới tạo).
+                  </Text>
+                ) : (
+                  <div
+                    style={{
+                      padding: spacing.sm,
+                      backgroundColor: colors.background.secondary,
+                      borderRadius: '8px',
+                      maxHeight: '160px',
+                      overflowY: 'auto',
+                    }}
+                  >
+                    {auditEntries.map((a) => {
+                      const when = new Date(a.occurredAt).toLocaleString('vi-VN');
+                      const from = a.previousStatus
+                        ? contractStatusLabelVi(a.previousStatus as ContractDto['status'])
+                        : '—';
+                      const to = contractStatusLabelVi(a.newStatus as ContractDto['status']);
+                      return (
+                        <div
+                          key={a.id}
+                          style={{
+                            paddingBottom: spacing.sm,
+                            marginBottom: spacing.sm,
+                            borderBottom: `1px solid ${colors.background.tertiary}`,
+                          }}
+                        >
+                          <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                            {when}
+                          </Text>
+                          <Text size="small" style={{ margin: 0 }}>
+                            {from} → {to}
+                          </Text>
+                          <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                            Người thao tác #{a.actorUserId.slice(0, 8)}
+                          </Text>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Trader Info */}
@@ -742,137 +774,17 @@ export const FarmerContractsScreen: React.FC<FarmerContractsScreenProps> = ({
                 )}
               </div>
 
-              {/* Changes Section */}
-              {selectedContract.changes && selectedContract.changes.length > 0 && (
-                <div style={{ marginBottom: spacing.lg }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md }}>
-                    <Icon name="alert-triangle" size="md" color={colors.functional.warningYellow} />
-                    <Text.Title size="small" style={{ color: colors.functional.warningYellow, margin: 0 }}>
-                      Yêu cầu thay đổi
-                    </Text.Title>
-                  </div>
-
-                  {selectedContract.changes.map((change, index) => {
-                    const isPending = change.status === 'pending';
-                    const isAccepted = change.status === 'accepted';
-                    const isRejected = change.status === 'rejected';
-                    
-                    return (
-                      <div
-                        key={change.id || index}
-                        style={{
-                          padding: spacing.md,
-                          backgroundColor: isAccepted 
-                            ? `${colors.primary.agriGreen}10` 
-                            : isRejected 
-                            ? `${colors.functional.alertRed}10`
-                            : `${colors.functional.warningYellow}10`,
-                          borderRadius: '8px',
-                          border: `1px solid ${
-                            isAccepted 
-                              ? colors.primary.agriGreen 
-                              : isRejected 
-                              ? colors.functional.alertRed
-                              : colors.functional.warningYellow
-                          }`,
-                          marginBottom: spacing.md,
-                        }}
-                      >
-                        {/* Status Badge */}
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-                          <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-                            {change.field}
-                          </Text>
-                          {isAccepted && (
-                            <span style={{ 
-                              color: colors.primary.agriGreen, 
-                              fontSize: fontSize.small,
-                              fontWeight: fontWeight.semibold,
-                            }}>
-                              ✓ Đã chấp nhận
-                            </span>
-                          )}
-                          {isRejected && (
-                            <span style={{ 
-                              color: colors.functional.alertRed, 
-                              fontSize: fontSize.small,
-                              fontWeight: fontWeight.semibold,
-                            }}>
-                              ✕ Đã từ chối
-                            </span>
-                          )}
-                        </div>
-
-                        <div style={{ marginTop: spacing.sm }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                            <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                              Cũ:
-                            </Text>
-                            <Text
-                              size="small"
-                              style={{
-                                textDecoration: 'line-through',
-                                color: colors.functional.alertRed,
-                                margin: 0,
-                              }}
-                            >
-                              {change.oldValue}
-                            </Text>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs }}>
-                            <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                              Mới:
-                            </Text>
-                            <Text
-                              size="small"
-                              style={{
-                                fontWeight: fontWeight.semibold,
-                                color: colors.primary.agriGreen,
-                                margin: 0,
-                              }}
-                            >
-                              {change.newValue}
-                            </Text>
-                          </div>
-                        </div>
-
-                        {change.reason && (
-                          <div style={{ marginTop: spacing.sm }}>
-                            <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                              Lý do:
-                            </Text>
-                            <Text size="small" style={{ color: colors.text.primary, marginTop: spacing.xs, margin: 0 }}>
-                              {change.reason}
-                            </Text>
-                          </div>
-                        )}
-
-                        {/* Action Buttons for each change */}
-                        {isPending && change.id && (
-                          <div style={{ marginTop: spacing.md, display: 'flex', gap: spacing.sm }}>
-                            <Button
-                              variant="primary"
-                              size="small"
-                              onClick={() => handleAcceptIndividualChange(selectedContract.id, change.id!)}
-                              style={{ flex: 1 }}
-                            >
-                              ✓ Chấp nhận
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="small"
-                              onClick={() => handleRejectIndividualChange(selectedContract.id, change.id!)}
-                              style={{ flex: 1 }}
-                            >
-                              ✕ Từ chối
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <ContractChangeRequestsPanel
+                contractId={selectedContract.id}
+                contract={{
+                  partyFarmerId: selectedContract.partyFarmerId,
+                  partyTraderId: selectedContract.partyTraderId,
+                  partyBuyerId: selectedContract.partyBuyerId,
+                  contractType: 'farmer_trader',
+                }}
+                viewerRole="farmer"
+                onMutationSuccess={refetchContracts}
+              />
 
               {/* Terms Section */}
               <div>

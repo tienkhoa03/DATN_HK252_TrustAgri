@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
-export type UserRole = 'farmer' | 'trader' | 'buyer' | 'guest';
+export type UserRole = 'farmer' | 'trader' | 'buyer' | 'guest' | 'admin';
 
 /**
  * Phản hồi đăng nhập (design.md §4.1)

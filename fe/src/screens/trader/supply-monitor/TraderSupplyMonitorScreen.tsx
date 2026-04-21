@@ -1,5 +1,5 @@
 /**
- * Trader Supply & Monitor Screen — Phase 6.2 Integration (FR-T07, FR-T08, FR-T11, US-T04)
+ * Trader Supply & Monitor Screen — Phase 6.2 + 14.2 (FR-T07, FR-T08, FR-T11, US-T04)
  *
  * Giám sát nguồn cung nông dân:
  * - Tab "Nông dân của tôi": chọn nông dân → mở panel giám sát cảm biến realtime
@@ -26,6 +26,22 @@ import { ApiError } from '@/api/errors';
 import type { SensorType } from '@/services/monitoringService';
 import { SensorLineChart } from '../../../design-system/components/SensorLineChart';
 import { useMonitoring } from '@/hooks/useMonitoring';
+import {
+  listConnections,
+  acceptConnection,
+  rejectConnection,
+  createConnection,
+  toConnectionViMessage,
+} from '@/services/connectionService';
+import type { ConnectionDto } from '@/services/connectionService';
+import {
+  listContracts,
+  getContractCompliance,
+  toContractViMessage,
+  contractStatusLabelVi,
+  type ContractDto,
+  type ComplianceDto,
+} from '@/services/contractService';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -60,6 +76,25 @@ function cropLabel(cropType: string): string {
   return CROP_TYPE_LABELS[cropType] ?? cropType;
 }
 
+function formatViDateTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function complianceContractOptionLabel(c: ContractDto): string {
+  const farm = c.farmId ? `Vườn …${c.farmId.slice(-6)}` : 'Chưa gắn vườn';
+  return `${contractStatusLabelVi(c.status)} · ${farm} · #${c.id.slice(0, 8)}`;
+}
+
 function areaDisplay(areaM2: number): string {
   if (areaM2 >= 10000) return `${(areaM2 / 10000).toFixed(2)} ha`;
   return `${areaM2.toLocaleString('vi-VN')} m²`;
@@ -67,7 +102,7 @@ function areaDisplay(areaM2: number): string {
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type TabType = 'my-farmers' | 'search-supply' | 'pending-requests';
+type TabType = 'my-farmers' | 'search-supply' | 'pending-requests' | 'compliance';
 
 interface MyFarmer {
   id: string;
@@ -434,28 +469,144 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
     },
   ];
 
-  const pendingRequests: PendingRequest[] = [
-    {
-      id: '1',
-      farmerName: 'Hoàng Nam',
-      farmName: 'Cam Sành Hà Giang',
-      cropType: 'orange',
-      area: '1 ha',
-      location: 'Hà Giang',
-      experience: '5 năm kinh nghiệm',
-      requestDate: '2 ngày trước',
+  // ── Pending connection requests (connectionService — Axios thật) ──────────
+  const [pendingConnections, setPendingConnections] = useState<ConnectionDto[]>([]);
+  const [isPendingLoading, setIsPendingLoading] = useState(false);
+  const pendingLoadedRef = useRef(false);
+  const [connActionPending, setConnActionPending] = useState<Record<string, boolean>>({});
+
+  // ── Tab Tuân thủ — GET /contracts + GET /contracts/:id/compliance (Phase 14.2) ─
+  const [complianceContracts, setComplianceContracts] = useState<ContractDto[]>([]);
+  const [complianceContractId, setComplianceContractId] = useState('');
+  const [complianceListLoading, setComplianceListLoading] = useState(false);
+  const [compliance, setCompliance] = useState<ComplianceDto | null>(null);
+  const [complianceLoading, setComplianceLoading] = useState(false);
+
+  const loadComplianceContractList = useCallback(async () => {
+    if (!session?.accessToken) {
+      setComplianceContracts([]);
+      setComplianceContractId('');
+      setCompliance(null);
+      openSnackbar({
+        type: 'error',
+        text: 'Phiên đăng nhập chưa sẵn sàng. Vui lòng đăng nhập lại.',
+        duration: 3500,
+        icon: true,
+      });
+      return;
+    }
+    setComplianceListLoading(true);
+    try {
+      const res = await listContracts({ role: 'trader', page: 1, limit: 100 });
+      setComplianceContracts(res.items);
+      setComplianceContractId((prev) => {
+        if (prev && res.items.some((c) => c.id === prev)) return prev;
+        return res.items[0]?.id ?? '';
+      });
+      if (res.items.length === 0) setCompliance(null);
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toContractViMessage(err, 'list'), duration: 4500, icon: true });
+      setComplianceContracts([]);
+      setComplianceContractId('');
+      setCompliance(null);
+    } finally {
+      setComplianceListLoading(false);
+    }
+  }, [session?.accessToken, openSnackbar]);
+
+  const loadCompliance = useCallback(
+    async (clearPrevious = false) => {
+      if (!complianceContractId) return;
+      if (clearPrevious) setCompliance(null);
+      setComplianceLoading(true);
+      try {
+        const data = await getContractCompliance(complianceContractId);
+        setCompliance(data);
+      } catch (err) {
+        openSnackbar({ type: 'error', text: toContractViMessage(err, 'compliance'), duration: 5000, icon: true });
+        setCompliance(null);
+      } finally {
+        setComplianceLoading(false);
+      }
     },
-    {
-      id: '2',
-      farmerName: 'Thị Lan',
-      farmName: 'Nhãn Lồng Hưng Yên',
-      cropType: 'longan',
-      area: '0.8 ha',
-      location: 'Hưng Yên',
-      experience: '8 năm kinh nghiệm',
-      requestDate: '5 ngày trước',
-    },
-  ];
+    [complianceContractId, openSnackbar],
+  );
+
+  const loadComplianceRef = useRef(loadCompliance);
+  loadComplianceRef.current = loadCompliance;
+
+  useEffect(() => {
+    if (activeTab === 'compliance') {
+      void loadComplianceContractList();
+    }
+  }, [activeTab, loadComplianceContractList]);
+
+  useEffect(() => {
+    if (activeTab !== 'compliance' || !complianceContractId) return;
+    void loadComplianceRef.current(true);
+  }, [activeTab, complianceContractId]);
+
+  const loadPendingConnections = useCallback(async () => {
+    if (pendingLoadedRef.current) return;
+    setIsPendingLoading(true);
+    try {
+      // GET /api/v1/connections?role=incoming&status=pending — token từ interceptor
+      const res = await listConnections({ role: 'incoming', status: 'pending' });
+      setPendingConnections(res.items);
+      pendingLoadedRef.current = true;
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'list'), duration: 3500, icon: true });
+    } finally {
+      setIsPendingLoading(false);
+    }
+  }, [openSnackbar]);
+
+  useEffect(() => {
+    if (activeTab === 'pending-requests') {
+      loadPendingConnections();
+    }
+  }, [activeTab, loadPendingConnections]);
+
+  const handleConnAccept = async (conn: ConnectionDto) => {
+    setConnActionPending((p) => ({ ...p, [conn.id]: true }));
+    try {
+      // POST /api/v1/connections/:id/accept
+      await acceptConnection(conn.id);
+      setPendingConnections((prev) => prev.filter((c) => c.id !== conn.id));
+      openSnackbar({ type: 'success', text: 'Đã chấp nhận yêu cầu kết nối thành công.', duration: 3000, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'respond'), duration: 3000, icon: true });
+    } finally {
+      setConnActionPending((p) => { const n = { ...p }; delete n[conn.id]; return n; });
+    }
+  };
+
+  const handleConnReject = async (conn: ConnectionDto) => {
+    setConnActionPending((p) => ({ ...p, [conn.id]: true }));
+    try {
+      // POST /api/v1/connections/:id/reject
+      await rejectConnection(conn.id);
+      setPendingConnections((prev) => prev.filter((c) => c.id !== conn.id));
+      openSnackbar({ type: 'success', text: 'Đã từ chối yêu cầu kết nối.', duration: 3000, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'respond'), duration: 3000, icon: true });
+    } finally {
+      setConnActionPending((p) => { const n = { ...p }; delete n[conn.id]; return n; });
+    }
+  };
+
+  const handleSendConnectionRequest = async (farmOwnerId: string, farmId: string) => {
+    try {
+      // POST /api/v1/connections — fromRole/fromUserId suy ra từ Bearer token phía server
+      await createConnection({ toUserId: farmOwnerId, farmId });
+      openSnackbar({ type: 'success', text: 'Đã gửi yêu cầu kết nối tới nông dân.', duration: 3000, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'create'), duration: 3000, icon: true });
+    }
+  };
+
+  // pendingRequests static đã thay bằng pendingConnections từ API
+  const pendingRequests: PendingRequest[] = [];
 
   const monitoringData: MonitoringData = {
     temperature: 32,
@@ -885,6 +1036,7 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
                   justifyContent: 'center',
                   gap: spacing.xs,
                 }}
+                onClick={() => handleSendConnectionRequest(farm.ownerId, farm.id)}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = colors.background.tertiary;
                 }}
@@ -902,66 +1054,309 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
     </div>
   );
 
-  // ── Tab: Pending Requests ──────────────────────────────────────────────────
+  // ── Tab: Pending Requests (mockConnectionService) ─────────────────────────
 
   const renderPendingRequestsTab = () => (
     <div>
-      <Text.Title size="small" style={{ marginBottom: spacing.md }}>
-        Yêu cầu kết nối ({pendingRequests.length})
-      </Text.Title>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
+        <Text.Title size="small" style={{ margin: 0 }}>
+          Yêu cầu kết nối đến {!isPendingLoading && `(${pendingConnections.length})`}
+        </Text.Title>
+      </div>
 
-      {pendingRequests.map((req) => (
-        <div key={req.id} style={requestCardStyles}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
-            <div style={{ flex: 1 }}>
-              <Text.Title size="small" style={{ margin: 0 }}>{req.farmerName}</Text.Title>
-              <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>{req.farmName}</Text>
+      {isPendingLoading ? (
+        <>
+          {[1, 2].map((k) => (
+            <div key={k} style={{ ...requestCardStyles, display: 'flex', gap: spacing.md }}>
+              <div className="skeleton-pulse" style={{ width: 48, height: 48, borderRadius: '50%', backgroundColor: colors.background.secondary, flexShrink: 0 }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: spacing.xs }}>
+                <div className="skeleton-pulse" style={{ width: '55%', height: 16, borderRadius: 4, backgroundColor: colors.background.secondary }} />
+                <div className="skeleton-pulse" style={{ width: '80%', height: 12, borderRadius: 4, backgroundColor: colors.background.secondary }} />
+                <div style={{ display: 'flex', gap: spacing.sm }}>
+                  <div className="skeleton-pulse" style={{ flex: 1, height: 34, borderRadius: 8, backgroundColor: colors.background.secondary }} />
+                  <div className="skeleton-pulse" style={{ flex: 1, height: 34, borderRadius: 8, backgroundColor: colors.background.secondary }} />
+                </div>
+              </div>
             </div>
-            <Text size="xSmall" style={{ color: colors.text.secondary }}>{req.requestDate}</Text>
-          </div>
-
-          <div
-            style={{
-              padding: spacing.sm,
-              backgroundColor: colors.background.secondary,
-              borderRadius: '8px',
-              marginBottom: spacing.sm,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs }}>
-              <Icon name="plant" size="sm" color={colors.primary.agriGreen} />
-              <Text size="small" style={{ fontWeight: fontWeight.medium }}>{cropLabel(req.cropType)}</Text>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs }}>
-              <Icon name="map-pin" size="sm" color={colors.text.secondary} />
-              <Text size="xSmall" style={{ color: colors.text.secondary }}>{req.location} • {req.area}</Text>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-              <Icon name="clock" size="sm" color={colors.text.secondary} />
-              <Text size="xSmall" style={{ color: colors.text.secondary }}>{req.experience}</Text>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: spacing.sm }}>
-            <button
-              style={actionBtnStyles(true)}
-              onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.88'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
-            >
-              Chấp nhận
-            </button>
-            <button
-              style={actionBtnStyles(false)}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = colors.background.tertiary; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = colors.background.secondary; }}
-            >
-              Từ chối
-            </button>
-          </div>
+          ))}
+        </>
+      ) : pendingConnections.length === 0 ? (
+        <div style={{ padding: spacing.xl, textAlign: 'center' }}>
+          <Icon name="users" size="lg" color={colors.text.secondary} />
+          <Text size="small" style={{ color: colors.text.secondary, marginTop: spacing.md }}>
+            Không có yêu cầu kết nối mới
+          </Text>
+          <Text size="xSmall" style={{ color: colors.text.secondary }}>
+            Khi nông dân gửi yêu cầu kết nối, chúng sẽ hiển thị ở đây
+          </Text>
         </div>
-      ))}
+      ) : (
+        pendingConnections.map((conn) => {
+          const isPending = !!connActionPending[conn.id];
+          return (
+            <div key={conn.id} style={{ ...requestCardStyles, borderLeft: `3px solid ${colors.functional.warningYellow}` }}>
+              <div style={{ display: 'flex', gap: spacing.md }}>
+                {/* Avatar */}
+                <div style={{ width: 48, height: 48, minWidth: 48, borderRadius: '50%', backgroundColor: colors.primary.agriGreen, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: fontWeight.semibold, fontSize: fontSize.h2 }}>
+                  N
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.xs }}>
+                    <Text.Title size="small" style={{ margin: 0 }}>
+                      {`Nông dân (...${conn.fromUserId.slice(-4)})`}
+                    </Text.Title>
+                    <Text size="xSmall" style={{ color: colors.text.secondary }}>
+                      {(() => {
+                        const diff = Date.now() - new Date(conn.createdAt).getTime();
+                        const days = Math.floor(diff / 86400000);
+                        return days === 0 ? 'Hôm nay' : `${days} ngày trước`;
+                      })()}
+                    </Text>
+                  </div>
+
+                  {conn.message && (
+                    <div style={{ padding: spacing.sm, backgroundColor: colors.background.secondary, borderRadius: 8, marginBottom: spacing.sm }}>
+                      <Text size="small" style={{ color: colors.text.secondary, fontStyle: 'italic', margin: 0 }}>
+                        "{conn.message}"
+                      </Text>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: spacing.sm }}>
+                    <button
+                      style={{ ...actionBtnStyles(true), opacity: isPending ? 0.6 : 1 }}
+                      onClick={() => !isPending && handleConnAccept(conn)}
+                      disabled={isPending}
+                    >
+                      ✓ Chấp nhận
+                    </button>
+                    <button
+                      style={{ ...actionBtnStyles(false), opacity: isPending ? 0.6 : 1 }}
+                      onClick={() => !isPending && handleConnReject(conn)}
+                      disabled={isPending}
+                    >
+                      ✕ Từ chối
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })
+      )}
     </div>
   );
+
+  // ── Tab: Tuân thủ (contractService — GET /contracts/:id/compliance) ────────
+
+  const renderComplianceTab = () => {
+    const pctSteps =
+      compliance && compliance.totalSteps > 0
+        ? Math.round((100 * compliance.completedSteps) / compliance.totalSteps)
+        : 0;
+    const scorePct = compliance ? Math.round(compliance.complianceScore * 1000) / 10 : 0;
+
+    return (
+      <div>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.md, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.xs }}>
+              Đối chiếu tuân thủ quy trình
+            </Text.Title>
+            <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+              Theo hợp đồng của thương lái — FR-T11 (API thật)
+            </Text>
+          </div>
+          <button
+            type="button"
+            style={{
+              ...actionBtnStyles(true),
+              flex: '0 0 auto',
+              opacity: complianceLoading || complianceListLoading || !complianceContractId ? 0.65 : 1,
+            }}
+            disabled={complianceLoading || complianceListLoading || !complianceContractId}
+            onClick={() => void loadCompliance(false)}
+          >
+            {complianceLoading ? 'Đang cập nhật…' : 'Cập nhật'}
+          </button>
+        </div>
+
+        {complianceContracts.length > 0 && (
+          <>
+            <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: spacing.xs }}>
+              Hợp đồng
+            </Text>
+            <select
+              value={complianceContractId}
+              onChange={(e) => setComplianceContractId(e.target.value)}
+              disabled={complianceListLoading}
+              style={{
+                width: '100%',
+                padding: `${spacing.sm} ${spacing.md}`,
+                marginBottom: spacing.md,
+                borderRadius: 8,
+                border: `1px solid ${colors.background.tertiary}`,
+                fontSize: fontSize.small,
+                backgroundColor: colors.background.primary,
+                color: colors.text.primary,
+                opacity: complianceListLoading ? 0.6 : 1,
+              }}
+            >
+              {complianceContracts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {complianceContractOptionLabel(c)}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+
+        {complianceListLoading && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: spacing.xl, gap: spacing.sm }}>
+            <Spinner />
+            <Text size="small" style={{ color: colors.text.secondary }}>
+              Đang tải danh sách hợp đồng…
+            </Text>
+          </div>
+        )}
+
+        {!complianceListLoading && complianceContracts.length === 0 && (
+          <div style={{ padding: spacing.xl, textAlign: 'center' }}>
+            <Icon name="package" size="lg" color={colors.text.secondary} />
+            <Text size="small" style={{ color: colors.text.secondary, marginTop: spacing.md }}>
+              Chưa có hợp đồng nào với vai trò thương lái
+            </Text>
+            <Text size="xSmall" style={{ color: colors.text.secondary }}>
+              Khi có hợp đồng gắn farm và tiêu chuẩn, bạn có thể đối chiếu tuân thủ tại đây.
+            </Text>
+          </div>
+        )}
+
+        {!complianceListLoading && complianceContracts.length > 0 && complianceLoading && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: spacing.xl, gap: spacing.sm }}>
+            <Spinner />
+            <Text size="small" style={{ color: colors.text.secondary }}>
+              Đang tính toán tuân thủ…
+            </Text>
+          </div>
+        )}
+
+        {!complianceListLoading && complianceContracts.length > 0 && !complianceLoading && !compliance && complianceContractId && (
+          <div style={{ padding: spacing.md, textAlign: 'center' }}>
+            <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+              Chưa có dữ liệu tuân thủ cho hợp đồng này hoặc tải thất bại. Nhấn «Cập nhật» để thử lại.
+            </Text>
+          </div>
+        )}
+
+        {!complianceListLoading && complianceContracts.length > 0 && !complianceLoading && compliance && (
+          <>
+            <div
+              style={{
+                padding: spacing.md,
+                backgroundColor: colors.background.primary,
+                borderRadius: 12,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                marginBottom: spacing.md,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm }}>
+                <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
+                  Tiến độ bước quy trình
+                </Text>
+                <Text size="small" style={{ color: colors.primary.zaloBlue, fontWeight: fontWeight.bold, margin: 0 }}>
+                  {compliance.completedSteps}/{compliance.totalSteps}
+                </Text>
+              </div>
+              <div style={{ ...complianceBarContainer(pctSteps), height: 8, marginTop: spacing.xs }}>
+                <div style={{ ...complianceBarFill(pctSteps), width: `${pctSteps}%` }} />
+              </div>
+              <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.sm, marginBottom: 0 }}>
+                Mã tiêu chuẩn:{' '}
+                <span style={{ color: colors.text.primary, fontWeight: fontWeight.medium }}>{compliance.standardCode}</span>
+              </Text>
+            </div>
+
+            <div
+              style={{
+                padding: spacing.md,
+                backgroundColor: colors.background.primary,
+                borderRadius: 12,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                marginBottom: spacing.md,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
+                  Điểm tuân thủ
+                </Text>
+                <Text
+                  size="normal"
+                  style={{
+                    fontWeight: fontWeight.bold,
+                    color: getComplianceColor(scorePct),
+                    margin: 0,
+                  }}
+                >
+                  {scorePct}%
+                </Text>
+              </div>
+              <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.xs, marginBottom: 0 }}>
+                (Giá trị 0–100%, tương ứng complianceScore 0–1 trên API)
+              </Text>
+            </div>
+
+            <div style={{ marginBottom: spacing.sm }}>
+              <Text size="small" style={{ fontWeight: fontWeight.semibold, marginBottom: spacing.xs }}>
+                Sai lệch ({compliance.deviations.length})
+              </Text>
+              {compliance.deviations.length === 0 ? (
+                <div
+                  style={{
+                    padding: spacing.md,
+                    backgroundColor: `${colors.primary.agriGreen}12`,
+                    borderRadius: 8,
+                    border: `1px solid ${colors.primary.agriGreen}`,
+                  }}
+                >
+                  <Text size="small" style={{ color: colors.primary.agriGreen, margin: 0 }}>
+                    Không phát hiện sai lệch so với quy trình chuẩn.
+                  </Text>
+                </div>
+              ) : (
+                compliance.deviations.map((d, idx) => (
+                  <div
+                    key={`${d.careLogId}-${d.stepId}-${idx}`}
+                    style={{
+                      padding: spacing.md,
+                      backgroundColor: colors.background.secondary,
+                      borderRadius: 10,
+                      marginBottom: spacing.sm,
+                      borderLeft: `3px solid ${colors.functional.warningYellow}`,
+                    }}
+                  >
+                    <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: spacing.xs }}>
+                      {formatViDateTime(d.detectedAt)} · {d.stepId}
+                    </Text>
+                    <Text size="small" style={{ margin: 0, marginBottom: spacing.xs }}>
+                      {d.reason}
+                    </Text>
+                    <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                      Nhật ký: {d.careLogId}
+                    </Text>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <Text size="xSmall" style={{ color: colors.text.secondary, textAlign: 'center', margin: 0 }}>
+              Cập nhật lần cuối: {formatViDateTime(compliance.lastComputedAt)}
+            </Text>
+          </>
+        )}
+      </div>
+    );
+  };
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -995,7 +1390,10 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
             Tìm kiếm
           </button>
           <button style={tabButtonStyles(activeTab === 'pending-requests')} onClick={() => setActiveTab('pending-requests')}>
-            Yêu cầu ({pendingRequests.length})
+            Yêu cầu {pendingConnections.length > 0 && `(${pendingConnections.length})`}
+          </button>
+          <button style={tabButtonStyles(activeTab === 'compliance')} onClick={() => setActiveTab('compliance')}>
+            Tuân thủ
           </button>
         </div>
 
@@ -1004,6 +1402,7 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
           {activeTab === 'my-farmers' && renderMyFarmersTab()}
           {activeTab === 'search-supply' && renderSearchSupplyTab()}
           {activeTab === 'pending-requests' && renderPendingRequestsTab()}
+          {activeTab === 'compliance' && renderComplianceTab()}
         </div>
       </Page>
     </>

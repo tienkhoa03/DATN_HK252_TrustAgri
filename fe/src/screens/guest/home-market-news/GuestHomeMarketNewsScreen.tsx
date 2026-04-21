@@ -12,16 +12,22 @@
  * - Thông báo quyền hạn: Dòng thông báo về chế độ Khách
  */
 
-import React, { useState } from 'react';
-import { Page, Box, Text } from 'zmp-ui';
+import React, { useState, useEffect } from 'react';
+import { Page, Box, Text, useSnackbar } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { Chart } from '../../../design-system/components/Chart';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import {
+  listProducts,
+  cropEmoji,
+  toMarketplaceViMessage,
+} from '../../../services/marketplaceService';
 
 export interface GuestHomeMarketNewsScreenProps {
   onLogin?: () => void;
+  onProductPress?: (productId: string) => void;
 }
 
 interface NewsItem {
@@ -32,13 +38,12 @@ interface NewsItem {
   date: string;
 }
 
-interface FeaturedProduct {
+interface FeaturedProductUi {
   id: string;
   name: string;
-  farmName: string;
   image: string;
   price: string;
-  deposits: number; // Số lượng đặt cọc
+  deposits: number;
 }
 
 interface PriceData {
@@ -54,10 +59,47 @@ interface PriceData {
  */
 export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps> = ({
   onLogin,
+  onProductPress,
 }) => {
+  const { openSnackbar } = useSnackbar();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
   const [selectedProduct, setSelectedProduct] = useState<string>('pomelo');
+  const [featuredProducts, setFeaturedProducts] = useState<FeaturedProductUi[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+
+  // Load featured products (public — không cần auth) on mount
+  useEffect(() => {
+    let cancelled = false;
+    setProductsLoading(true);
+    listProducts({ status: 'active', page: 1, limit: 4 })
+      .then((res) => {
+        if (!cancelled) {
+          const uiItems: FeaturedProductUi[] = res.items.map((p, i) => ({
+            id: p.id,
+            name: p.name,
+            image: p.images[0] ?? cropEmoji(p.cropType),
+            price: `${p.price.toLocaleString('vi-VN')} VNĐ/${p.unit}`,
+            deposits: [24, 18, 15, 12][i] ?? 10,
+          }));
+          setFeaturedProducts(uiItems);
+          setProductsLoading(false);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setProductsLoading(false);
+          openSnackbar({
+            type: 'error',
+            text: toMarketplaceViMessage(err, 'list'),
+            duration: 4000,
+            icon: true,
+          });
+        }
+      });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Mock news data - Tin tức nổi bật
   const newsItems: NewsItem[] = [
@@ -130,41 +172,6 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
     },
   };
 
-  // Mock featured products - Nông sản nổi bật
-  const featuredProducts: FeaturedProduct[] = [
-    {
-      id: '1',
-      name: 'Bưởi Da Xanh',
-      farmName: 'Vườn chú Bảy',
-      image: '🍊',
-      price: '45,000 VNĐ/kg',
-      deposits: 24,
-    },
-    {
-      id: '2',
-      name: 'Sầu riêng Monthong',
-      farmName: 'Farm Lab Tiến Khoa',
-      image: '🌳',
-      price: '120,000 VNĐ/kg',
-      deposits: 18,
-    },
-    {
-      id: '3',
-      name: 'Xoài Cát Chu',
-      farmName: 'Vườn cô Ba',
-      image: '🥭',
-      price: '35,000 VNĐ/kg',
-      deposits: 15,
-    },
-    {
-      id: '4',
-      name: 'Thanh Long Ruột Đỏ',
-      farmName: 'Vườn anh Tư',
-      image: '🐉',
-      price: '28,000 VNĐ/kg',
-      deposits: 12,
-    },
-  ];
 
   // Styles
   const headerStyles: React.CSSProperties = {
@@ -574,45 +581,76 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
             Sản phẩm đang được đặt cọc nhiều nhất
           </Text>
 
-          <div style={productGridStyles}>
-            {featuredProducts.map((product) => (
-              <div
-                key={product.id}
-                style={productCardStyles}
-                onClick={() => console.log('View product:', product)}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.15)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
-                }}
-              >
-                {/* Product Image */}
-                <div style={productImageStyles}>{product.image}</div>
-
-                {/* Product Info */}
-                <div style={productInfoStyles}>
-                  <Text.Title size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
-                    {product.name}
-                  </Text.Title>
-                  <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-                    {product.farmName}
-                  </Text>
-
-                  {/* Deposit Badge */}
-                  <div style={depositBadgeStyles}>
-                    <span>🔥</span>
-                    <span>{product.deposits} đặt cọc</span>
+          {productsLoading ? (
+            <div style={productGridStyles}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  style={{
+                    backgroundColor: colors.background.primary,
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '100px',
+                      backgroundColor: colors.background.secondary,
+                    }}
+                  />
+                  <div style={{ padding: spacing.sm }}>
+                    {[70, 50].map((w, j) => (
+                      <div
+                        key={j}
+                        style={{
+                          height: '12px',
+                          width: `${w}%`,
+                          backgroundColor: colors.background.secondary,
+                          borderRadius: '6px',
+                          marginBottom: spacing.xs,
+                        }}
+                      />
+                    ))}
                   </div>
-
-                  {/* Price */}
-                  <div style={priceStyles}>{product.price}</div>
                 </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div style={productGridStyles}>
+              {featuredProducts.map((product) => (
+                <div
+                  key={product.id}
+                  style={productCardStyles}
+                  onClick={() => onProductPress?.(product.id)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.15)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
+                  }}
+                >
+                  <div style={productImageStyles}>{product.image}</div>
+
+                  <div style={productInfoStyles}>
+                    <Text.Title size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
+                      {product.name}
+                    </Text.Title>
+
+                    <div style={depositBadgeStyles}>
+                      <span>🔥</span>
+                      <span>{product.deposits} đặt cọc</span>
+                    </div>
+
+                    <div style={priceStyles}>{product.price}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Permission Notice - Thông báo quyền hạn */}

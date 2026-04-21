@@ -7,6 +7,7 @@ import {
   Query,
   HttpCode,
   HttpStatus,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import {
   CareLogDto,
@@ -32,7 +33,7 @@ export class CareLogsController {
    */
   @Get()
   list(
-    @Param('farmId') farmId: string,
+    @Param('farmId', new ParseUUIDPipe({ version: '4' })) farmId: string,
     @Query() query: ListCareLogsQueryDto,
   ): Promise<ListResponse<CareLogDto>> {
     return this.careLogsService.listCareLogs(farmId, query);
@@ -45,7 +46,7 @@ export class CareLogsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   create(
-    @Param('farmId') farmId: string,
+    @Param('farmId', new ParseUUIDPipe({ version: '4' })) farmId: string,
     @Body() dto: CreateCareLogDto,
     @CurrentUser() user: JwtPayload,
   ): Promise<CareLogDto> {
@@ -59,7 +60,7 @@ export class CareLogsController {
   @Post('sync')
   @HttpCode(HttpStatus.OK)
   sync(
-    @Param('farmId') farmId: string,
+    @Param('farmId', new ParseUUIDPipe({ version: '4' })) farmId: string,
     @Body() dto: SyncCareLogsDto,
     @CurrentUser() user: JwtPayload,
   ): Promise<CareLogSyncResponse> {
@@ -78,7 +79,7 @@ export class EvidenceController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   create(
-    @Param('farmId') farmId: string,
+    @Param('farmId', new ParseUUIDPipe({ version: '4' })) farmId: string,
     @Body() dto: CreateEvidenceDto,
     @CurrentUser() user: JwtPayload,
   ): Promise<EvidenceDto> {

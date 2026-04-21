@@ -34,6 +34,8 @@ export const CustomContractsExample = () => {
       depositAmount: 0,
       depositPaid: false,
       createdDate: new Date('2024-02-15'),
+      partyTraderId: 'trader-demo-001',
+      partyFarmerId: 'farmer-demo-001',
     },
   ];
 

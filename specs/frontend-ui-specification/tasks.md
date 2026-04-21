@@ -82,65 +82,65 @@
 
 ## Phase 7: Cảnh báo ngưỡng và acknowledge (FR-F08)
 
-- [ ] **`[FE Task]` 7.1:** Dựng thẻ cảnh báo trên `FarmerDashboardScreen` + màn danh sách cảnh báo. Tạo `mockAlertService.listAlerts` / `acknowledge` trả `AlertDto` với `severity`, `suggestedAction`, `acknowledged`.
+- [x] **`[FE Task]` 7.1:** Dựng thẻ cảnh báo trên `FarmerDashboardScreen` + màn danh sách cảnh báo. Tạo `mockAlertService.listAlerts` / `acknowledge` trả `AlertDto` với `severity`, `suggestedAction`, `acknowledged`.
 
-- [ ] **`[Integration Task]` 7.2:** Gọi `GET /api/v1/monitoring/farms/:farmId/alerts` và `POST .../acknowledge`. Đồng bộ badge realtime qua WebSocket + cập nhật badge thông báo (Phase 15).
+- [x] **`[Integration Task]` 7.2:** Gọi `GET /api/v1/monitoring/farms/:farmId/alerts` và `POST .../acknowledge`. Đồng bộ badge realtime qua WebSocket + cập nhật badge thông báo (Phase 15).
 
 ---
 
 ## Phase 8: Kết nối nông dân — thương lái (FR-F02, FR-F03, FR-T07, FR-T08)
 
-- [ ] **`[FE Task]` 8.1:** Dựng `FarmerMarketConnectScreen` (tìm thương lái + gửi), `TraderSupplyMonitorScreen` (tìm nông dân), `ConnectionRequestsScreen` (danh sách incoming/outgoing, chấp nhận/từ chối). Tạo `mockConnectionService` (`searchTraders`, `searchFarmers`, `list`, `create`, `accept`, `reject`) trả `ConnectionDto`.
+- [x] **`[FE Task]` 8.1:** Dựng `FarmerMarketConnectScreen` (tìm thương lái + gửi), `TraderSupplyMonitorScreen` (tìm nông dân), `ConnectionRequestsScreen` (danh sách incoming/outgoing, chấp nhận/từ chối). Tạo `mockConnectionService` (`searchTraders`, `searchFarmers`, `list`, `create`, `accept`, `reject`) trả `ConnectionDto`.
 
-- [ ] **`[Integration Task]` 8.2:** Gọi `GET /api/v1/traders/search`, `/farmers/search`, `/connections*`. Hiển thị push notification khi có yêu cầu mới (liên kết Phase 15).
+- [x] **`[Integration Task]` 8.2:** Gọi `GET /api/v1/traders/search`, `/farmers/search`, `/connections*`. Hiển thị push notification khi có yêu cầu mới (liên kết Phase 15).
 
 ---
 
 ## Phase 9: Chợ nông sản (sản phẩm) (FR-T03, FR-U01, FR-G03)
 
-- [ ] **`[FE Task]` 9.1:** Dựng `BuyerMarketplaceScreen`, `BuyerProductDetailScreen`, `GuestHomeMarketNewsScreen` (danh sách sản phẩm public), `GuestProductDetailScreen`, `TraderTradingOrdersScreen` (CRUD thương lái). Tạo `mockMarketplaceService` trả `ProductDto`.
+- [x] **`[FE Task]` 9.1:** Dựng `BuyerMarketplaceScreen`, `BuyerProductDetailScreen`, `GuestHomeMarketNewsScreen` (danh sách sản phẩm public), `GuestProductDetailScreen`, `TraderTradingOrdersScreen` (CRUD thương lái). Tạo `mockMarketplaceService` trả `ProductDto`.
 
-- [ ] **`[Integration Task]` 9.2:** Gọi `/api/v1/products*` (khách public không cần auth). Lọc + phân trang + role-guard CRUD cho trader.
+- [x] **`[Integration Task]` 9.2:** Gọi `/api/v1/products*` (khách public không cần auth). Lọc + phân trang + role-guard CRUD cho trader.
 
 ---
 
 ## Phase 10: Nhu cầu mua hàng từ người mua (FR-U02, FR-T04)
 
-- [ ] **`[FE Task]` 10.1:** Dựng `BuyerPostBuyingRequestScreen` (tạo/sửa/hủy) và tab «Nhu cầu công khai» trên `TraderTradingOrdersScreen`. Tạo `mockBuyingRequestService` trả `BuyingRequestDto`.
+- [x] **`[FE Task]` 10.1:** Dựng `BuyerPostBuyingRequestScreen` (tạo/sửa/hủy) và tab «Nhu cầu công khai» trên `TraderTradingOrdersScreen`. Tạo `mockBuyingRequestService` trả `BuyingRequestDto`.
 
-- [ ] **`[Integration Task]` 10.2:** Gọi `/api/v1/buying-requests*`, tích hợp sang Phase 11 khi thương lái gửi proposal.
+- [x] **`[Integration Task]` 10.2:** Gọi `/api/v1/buying-requests*`, tích hợp sang Phase 11 khi thương lái gửi proposal.
 
 ---
 
 ## Phase 11: Đơn hàng và đề xuất (FR-U01, FR-U03, FR-T04, FR-T05)
 
-- [ ] **`[FE Task]` 11.1:** Dựng `BuyerOrdersProposalsScreen`, `TraderTradingOrdersScreen`, `FarmerContractsScreen` (mức tạo từ proposal). Tạo `mockOrderService` + `mockProposalService` trả `OrderDto`, `ProposalDto`, hỗ trợ accept/reject/cancel.
+- [x] **`[FE Task]` 11.1:** Dựng `BuyerOrdersProposalsScreen`, `TraderTradingOrdersScreen`, `FarmerContractsScreen` (mức tạo từ proposal). Tạo `mockOrderService` + `mockProposalService` trả `OrderDto`, `ProposalDto`, hỗ trợ accept/reject/cancel.
 
-- [ ] **`[Integration Task]` 11.2:** Gọi `/api/v1/orders*` và `/proposals*`. Đảm bảo state machine `pending → accepted|rejected → contracted|cancelled` phản ánh đúng UI; chuyển sang Phase 12 khi tạo hợp đồng.
+- [x] **`[Integration Task]` 11.2:** Gọi `/api/v1/orders*` và `/proposals*`. Đảm bảo state machine `pending → accepted|rejected → contracted|cancelled` phản ánh đúng UI; chuyển sang Phase 12 khi tạo hợp đồng.
 
 ---
 
 ## Phase 12: Hợp đồng (vòng đời contract) (FR-F04, FR-T06, FR-T09, FR-U06)
 
-- [ ] **`[FE Task]` 12.1:** Dựng `FarmerContractsScreen`, tab hợp đồng trên `TraderTradingOrdersScreen`, tab hợp đồng trên `BuyerOrdersProposalsScreen`. Tạo `mockContractService` (`list`, `get`, `create`) trả `ContractDto` kèm lọc `role`, `status`.
+- [x] **`[FE Task]` 12.1:** Dựng `FarmerContractsScreen`, tab hợp đồng trên `TraderTradingOrdersScreen`, tab hợp đồng trên `BuyerOrdersProposalsScreen`. Tạo `mockContractService` (`list`, `get`, `create`) trả `ContractDto` kèm lọc `role`, `status`.
 
-- [ ] **`[Integration Task]` 12.2:** Gọi `/api/v1/contracts*`. Hiển thị vòng đời + audit log minh bạch.
+- [x] **`[Integration Task]` 12.2:** Gọi `/api/v1/contracts*`. Hiển thị vòng đời + audit log minh bạch.
 
 ---
 
 ## Phase 13: Yêu cầu thay đổi hợp đồng (FR-F05, FR-T06, FR-T09, FR-U04)
 
-- [ ] **`[FE Task]` 13.1:** Dựng `ContractChangeRequestsPanel` nhúng trong màn hợp đồng (nông dân / thương lái / người mua). Tạo `mockContractChangeService` trả `ContractChangeRequestDto` với diff `{ oldValue, newValue }`.
+- [x] **`[FE Task]` 13.1:** Dựng `ContractChangeRequestsPanel` nhúng trong màn hợp đồng (nông dân / thương lái / người mua). Tạo `mockContractChangeService` trả `ContractChangeRequestDto` với diff `{ oldValue, newValue }`.
 
-- [ ] **`[Integration Task]` 13.2:** Gọi `/api/v1/contracts/:id/change-requests*`. Cập nhật `contract.status = pending_change` khi có yêu cầu và rollback khi từ chối.
+- [x] **`[Integration Task]` 13.2:** Gọi `/api/v1/contracts/:id/change-requests*`. Cập nhật `contract.status = pending_change` khi có yêu cầu và rollback khi từ chối.
 
 ---
 
 ## Phase 14: Đối chiếu tuân thủ quy trình (FR-T11)
 
-- [ ] **`[FE Task]` 14.1:** Dựng tab «Tuân thủ» trên `TraderSupplyMonitorScreen`: thanh tiến độ `completedSteps/totalSteps`, danh sách `deviations`, `complianceScore`. Tạo `mockComplianceService.getCompliance` trả `ComplianceDto`.
+- [x] **`[FE Task]` 14.1:** Dựng tab «Tuân thủ» trên `TraderSupplyMonitorScreen`: thanh tiến độ `completedSteps/totalSteps`, danh sách `deviations`, `complianceScore`. Tạo `mockComplianceService.getCompliance` trả `ComplianceDto`.
 
-- [ ] **`[Integration Task]` 14.2:** Gọi `GET /api/v1/contracts/:id/compliance`, làm mới theo nút «Cập nhật», hiển thị `lastComputedAt`.
+- [x] **`[Integration Task]` 14.2:** Gọi `GET /api/v1/contracts/:id/compliance`, làm mới theo nút «Cập nhật», hiển thị `lastComputedAt`.
 
 ---
 

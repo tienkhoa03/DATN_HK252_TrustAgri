@@ -5,7 +5,7 @@ import {
   CreateDateColumn,
 } from 'typeorm';
 
-export type UserRole = 'farmer' | 'trader' | 'buyer' | 'guest';
+export type UserRole = 'farmer' | 'trader' | 'buyer' | 'guest' | 'admin';
 
 @Entity('users')
 export class UserEntity {
@@ -17,7 +17,7 @@ export class UserEntity {
 
   @Column({
     type: 'enum',
-    enum: ['farmer', 'trader', 'buyer', 'guest'],
+    enum: ['farmer', 'trader', 'buyer', 'guest', 'admin'],
     default: 'guest',
   })
   role: UserRole;

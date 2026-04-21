@@ -18,7 +18,7 @@
 import { io, Socket } from 'socket.io-client';
 import { getDefaultStore } from 'jotai';
 import { accessTokenAtom } from '@/state/authAtoms';
-import type { SensorReadingDto } from '@/services/monitoringService';
+import type { SensorReadingDto, AlertDto } from '@/services/monitoringService';
 import { ENV } from '@/config/env';
 
 // ── Derive WebSocket origin từ VITE_API_BASE_URL ──────────────────────────────
@@ -26,12 +26,14 @@ import { ENV } from '@/config/env';
 const WS_ORIGIN = ENV.API_BASE_URL.replace(/\/api\/v1\/?$/, '');
 
 export type SensorUpdateCallback = (reading: SensorReadingDto) => void;
+export type AlertCreatedCallback = (alert: AlertDto) => void;
 
 // ── Internal state ────────────────────────────────────────────────────────────
 
 let socket: Socket | null = null;
 const subscribedFarms = new Set<string>();
 const callbacks = new Map<string, Set<SensorUpdateCallback>>();
+const alertCallbacks = new Map<string, Set<AlertCreatedCallback>>();
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -61,6 +63,14 @@ function getOrCreateSocket(): Socket {
     const cbs = callbacks.get(reading.farmId);
     if (cbs) {
       for (const cb of cbs) cb(reading);
+    }
+  });
+
+  // Server pushes sự kiện alert.created khi phát hiện giá trị vượt ngưỡng
+  socket.on('alert_created', (alert: AlertDto) => {
+    const cbs = alertCallbacks.get(alert.farmId);
+    if (cbs) {
+      for (const cb of cbs) cb(alert);
     }
   });
 
@@ -105,10 +115,35 @@ export function subscribeToFarm(
   };
 }
 
+/**
+ * Đăng ký nhận sự kiện alert_created cho một farm.
+ * Server push khi Monitoring Service phát hiện giá trị vượt ngưỡng.
+ * @returns cleanup function — gọi khi component unmount.
+ */
+export function subscribeToFarmAlerts(
+  farmId: string,
+  onAlert: AlertCreatedCallback,
+): () => void {
+  if (!alertCallbacks.has(farmId)) alertCallbacks.set(farmId, new Set());
+  alertCallbacks.get(farmId)!.add(onAlert);
+
+  // Đảm bảo socket đang kết nối (có thể không có sensor subscription trước đó)
+  getOrCreateSocket();
+
+  return () => {
+    const cbs = alertCallbacks.get(farmId);
+    if (cbs) {
+      cbs.delete(onAlert);
+      if (cbs.size === 0) alertCallbacks.delete(farmId);
+    }
+  };
+}
+
 /** Ngắt kết nối hoàn toàn (dùng khi logout). */
 export function disconnectMonitoringSocket(): void {
   socket?.disconnect();
   socket = null;
   subscribedFarms.clear();
   callbacks.clear();
+  alertCallbacks.clear();
 }

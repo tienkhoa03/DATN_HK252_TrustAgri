@@ -48,6 +48,9 @@ const FarmerMarketConnectScreen = lazy(() =>
 const FarmerContractsScreen = lazy(() =>
   import('@/screens/farmer/contracts').then((m) => ({ default: m.FarmerContractsScreen })),
 );
+const FarmerAlertListScreen = lazy(() =>
+  import('@/screens/farmer/alerts').then((m) => ({ default: m.FarmerAlertListScreen })),
+);
 
 const TraderDashboardScreen = lazy(() =>
   import('@/screens/trader/dashboard').then((m) => ({ default: m.TraderDashboardScreen })),
@@ -67,6 +70,10 @@ const TraderProfileNewsScreen = lazy(() =>
 
 const ProfileScreen = lazy(() =>
   import('@/screens/shared/profile').then((m) => ({ default: m.ProfileScreen })),
+);
+
+const ConnectionRequestsScreen = lazy(() =>
+  import('@/screens/shared/connections').then((m) => ({ default: m.ConnectionRequestsScreen })),
 );
 
 const AppInitScreen = lazy(() =>
@@ -126,6 +133,8 @@ export function AppRoutes() {
         <Route path="/farmer/process"          element={<FarmerProcessScreen />} />
         <Route path="/farmer/connect"          element={<FarmerMarketConnectScreen />} />
         <Route path="/farmer/contracts"        element={<FarmerContractsScreen />} />
+        <Route path="/farmer/connections"      element={<ConnectionRequestsScreen role="farmer" />} />
+        <Route path="/farmer/alerts"           element={<FarmerAlertListScreen />} />
         <Route path="/farmer/me"               element={<ProfileScreen />} />
 
         {/* ── Trader ────────────────────────────────────────── */}
@@ -134,6 +143,7 @@ export function AppRoutes() {
         <Route path="/trader/trading"          element={<TraderTradingOrdersScreen />} />
         <Route path="/trader/standards"        element={<TraderStandardLibraryScreen />} />
         <Route path="/trader/news"             element={<TraderProfileNewsScreen />} />
+        <Route path="/trader/connections"      element={<ConnectionRequestsScreen role="trader" />} />
         <Route path="/trader/me"               element={<ProfileScreen />} />
 
         {/* ── Dev / QA launcher (non-production) ────────────── */}

@@ -14,6 +14,52 @@
 import { atom } from 'jotai';
 import type { SensorReadingDto } from '@/services/monitoringService';
 
+// ── Alert badge atoms ─────────────────────────────────────────────────────────
+
+/**
+ * Map<farmId, number> — số cảnh báo chưa acknowledge per farm.
+ * Dùng cho badge thông báo cross-screen (Phase 7, Phase 15).
+ * Seed từ REST cold start; cập nhật realtime qua WebSocket alert_created.
+ */
+export const farmAlertBadgeAtom = atom<Map<string, number>>(new Map());
+
+/** Ghi đè toàn bộ số badge cho một farm (dùng sau REST cold start). */
+export const setFarmAlertBadgeAtom = atom(
+  null,
+  (_get, set, { farmId, count }: { farmId: string; count: number }) => {
+    set(farmAlertBadgeAtom, (prev) => {
+      const next = new Map(prev);
+      next.set(farmId, count);
+      return next;
+    });
+  },
+);
+
+/** Tăng badge +1 khi có alert_created mới từ WebSocket. */
+export const incrementFarmAlertBadgeAtom = atom(
+  null,
+  (_get, set, farmId: string) => {
+    set(farmAlertBadgeAtom, (prev) => {
+      const next = new Map(prev);
+      next.set(farmId, (next.get(farmId) ?? 0) + 1);
+      return next;
+    });
+  },
+);
+
+/** Giảm badge -1 khi acknowledge một alert. */
+export const decrementFarmAlertBadgeAtom = atom(
+  null,
+  (_get, set, farmId: string) => {
+    set(farmAlertBadgeAtom, (prev) => {
+      const next = new Map(prev);
+      const cur = next.get(farmId) ?? 0;
+      next.set(farmId, Math.max(0, cur - 1));
+      return next;
+    });
+  },
+);
+
 /** Map<farmId, SensorReadingDto[]> — snapshot mới nhất từng cảm biến per farm */
 export const latestSensorMapAtom = atom<Map<string, SensorReadingDto[]>>(new Map());
 

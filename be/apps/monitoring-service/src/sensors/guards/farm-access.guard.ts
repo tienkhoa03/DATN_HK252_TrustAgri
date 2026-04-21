@@ -38,12 +38,18 @@ export class FarmAccessGuard implements CanActivate {
       );
     }
 
-    if (await this.isFarmOwner(farmId, user.sub)) {
+    const authHeader = req.headers.authorization;
+
+    if (await this.isFarmOwner(farmId, user.sub, authHeader)) {
       return true;
     }
 
     if (user.role === 'trader') {
-      const hasContract = await this.traderHasContract(farmId, user.sub);
+      const hasContract = await this.traderHasContract(
+        farmId,
+        user.sub,
+        authHeader,
+      );
       if (hasContract) return true;
       throw new ForbiddenException(
         'Thương lái không có hợp đồng active với vườn này',
@@ -51,7 +57,11 @@ export class FarmAccessGuard implements CanActivate {
     }
 
     if (user.role === 'buyer') {
-      const hasAccess = await this.buyerHasAccess(farmId, user.sub);
+      const hasAccess = await this.buyerHasAccess(
+        farmId,
+        user.sub,
+        authHeader,
+      );
       if (hasAccess) return true;
       throw new ForbiddenException(
         'Người mua không có đơn hàng/hợp đồng với vườn này',
@@ -64,7 +74,11 @@ export class FarmAccessGuard implements CanActivate {
   }
 
   /** Kiểm tra chủ vườn qua farm-service */
-  private async isFarmOwner(farmId: string, userId: string): Promise<boolean> {
+  private async isFarmOwner(
+    farmId: string,
+    userId: string,
+    authorization?: string | string[],
+  ): Promise<boolean> {
     const baseUrl = this.config.get<string>(
       'FARM_SERVICE_URL',
       'http://farm-service:3003',
@@ -72,6 +86,7 @@ export class FarmAccessGuard implements CanActivate {
     try {
       const res = await fetch(`${baseUrl}/api/v1/farms/${farmId}`, {
         signal: AbortSignal.timeout(3000),
+        headers: this.forwardAuthHeader(authorization),
       });
       if (!res.ok) return false;
       const farm = (await res.json()) as { ownerId?: string };
@@ -88,6 +103,7 @@ export class FarmAccessGuard implements CanActivate {
   private async traderHasContract(
     farmId: string,
     traderId: string,
+    authorization?: string | string[],
   ): Promise<boolean> {
     const baseUrl = this.config.get<string>(
       'CONTRACT_SERVICE_URL',
@@ -95,7 +111,10 @@ export class FarmAccessGuard implements CanActivate {
     );
     try {
       const url = `${baseUrl}/api/v1/contracts?farmId=${farmId}&traderId=${traderId}&status=active&limit=1`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(3000),
+        headers: this.forwardAuthHeader(authorization),
+      });
       if (!res.ok) {
         this.logger.warn(
           `contract-service trả về ${res.status} khi kiểm tra hợp đồng trader`,
@@ -119,6 +138,7 @@ export class FarmAccessGuard implements CanActivate {
   private async buyerHasAccess(
     farmId: string,
     buyerId: string,
+    authorization?: string | string[],
   ): Promise<boolean> {
     const baseUrl = this.config.get<string>(
       'CONTRACT_SERVICE_URL',
@@ -129,6 +149,7 @@ export class FarmAccessGuard implements CanActivate {
       const contractUrl = `${baseUrl}/api/v1/contracts?farmId=${farmId}&buyerId=${buyerId}&status=active&limit=1`;
       const contractRes = await fetch(contractUrl, {
         signal: AbortSignal.timeout(3000),
+        headers: this.forwardAuthHeader(authorization),
       });
       if (!contractRes.ok) return true; // fail-open
       const contractBody = (await contractRes.json()) as {
@@ -143,6 +164,7 @@ export class FarmAccessGuard implements CanActivate {
       const orderUrl = `${baseUrl}/api/v1/orders?buyerId=${buyerId}&status=accepted&limit=1`;
       const orderRes = await fetch(orderUrl, {
         signal: AbortSignal.timeout(3000),
+        headers: this.forwardAuthHeader(authorization),
       });
       if (!orderRes.ok) return true; // fail-open
       const orderBody = (await orderRes.json()) as {
@@ -156,5 +178,16 @@ export class FarmAccessGuard implements CanActivate {
       );
       return true; // fail-open
     }
+  }
+
+  private forwardAuthHeader(
+    authorization?: string | string[],
+  ): Record<string, string> | undefined {
+    if (!authorization) return undefined;
+    return {
+      Authorization: Array.isArray(authorization)
+        ? authorization[0]
+        : authorization,
+    };
   }
 }

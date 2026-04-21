@@ -1,4 +1,11 @@
-import { IsString, IsOptional, IsNumber, IsArray, IsIn } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsNumber,
+  IsArray,
+  IsIn,
+  IsObject,
+} from 'class-validator';
 
 // ─── PRODUCT ───────────────────────────────────────────────────────────────────
 
@@ -261,8 +268,9 @@ export interface ContractChangeRequestDto {
 }
 
 export class CreateContractChangeRequestDto {
-  @IsOptional()
-  changes?: Record<string, { oldValue: unknown; newValue: unknown }>;
+  /** Khóa là tên trường hợp đồng (camelCase); mỗi mục phải khớp giá trị hiện tại ở oldValue. */
+  @IsObject()
+  changes: Record<string, { oldValue: unknown; newValue: unknown }>;
 
   @IsOptional()
   @IsString()

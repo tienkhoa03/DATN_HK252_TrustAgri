@@ -14,6 +14,7 @@ import {
 import { HealthController } from './health/health.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { SensorsModule } from './sensors/sensors.module';
+import { AlertsModule } from './alerts/alerts.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { SensorsModule } from './sensors/sensors.module';
 
     TerminusModule,
     SensorsModule,
+    AlertsModule,
   ],
   controllers: [HealthController],
   providers: [JwtStrategy],

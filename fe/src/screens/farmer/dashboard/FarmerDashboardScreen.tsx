@@ -10,8 +10,11 @@
  *   alert → acknowledge ≤ 2 bước từ màn này.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Page, Text, useSnackbar } from 'zmp-ui';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Page, Text, useSnackbar, useNavigate } from 'zmp-ui';
+import { useAtomValue } from 'jotai';
+import { authSessionAtom } from '@/state/authAtoms';
+import { listFarms } from '@/services/farmService';
 import { Icon } from '../../../design-system/components/Icon';
 import { SensorDisplay } from '../../../design-system/components/SensorDisplay';
 import { Alert } from '../../../design-system/components/Alert';
@@ -30,6 +33,7 @@ export interface FarmerDashboardScreenProps {
   farmerName?: string;
   farmName?: string;
   avatarUrl?: string;
+  /** @deprecated Bị thay thế bởi số lượng cảnh báo thực tế từ useMonitoring */
   notificationCount?: number;
 }
 
@@ -101,13 +105,21 @@ const SensorCardSkeleton: React.FC = () => (
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
-  farmId = 'farm-001',
+  farmId,
   farmerName = 'Nông dân',
   farmName = 'Farm Lab A',
   avatarUrl,
   notificationCount = 0,
 }) => {
+  const navigate = useNavigate();
   const { openSnackbar } = useSnackbar();
+  const session = useAtomValue(authSessionAtom);
+  const openSnackbarRef = useRef(openSnackbar);
+  const resolvedOwnerRef = useRef<string | null>(null);
+  const resolvingOwnerRef = useRef(false);
+
+  const [resolvedFarmId, setResolvedFarmId] = useState<string | null>(farmId ?? null);
+  const [resolvedFarmName, setResolvedFarmName] = useState<string>(farmName);
 
   const [activeTab, setActiveTab] = useState<'home' | 'process' | 'connect' | 'account'>('home');
   const [pumpActive, setPumpActive] = useState(false);
@@ -126,7 +138,71 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
     loadHistory,
     acknowledgeAlert,
     clearError,
-  } = useMonitoring(farmId);
+  } = useMonitoring(resolvedFarmId);
+
+  useEffect(() => {
+    openSnackbarRef.current = openSnackbar;
+  }, [openSnackbar]);
+
+  useEffect(() => {
+    if (farmId) {
+      resolvedOwnerRef.current = session?.userId ?? null;
+      resolvingOwnerRef.current = false;
+      setResolvedFarmId(farmId);
+      return;
+    }
+
+    if (!session?.userId) {
+      resolvedOwnerRef.current = null;
+      resolvingOwnerRef.current = false;
+      setResolvedFarmId(null);
+      return;
+    }
+
+    if (resolvedOwnerRef.current === session.userId || resolvingOwnerRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+    resolvingOwnerRef.current = true;
+
+    (async () => {
+      try {
+        const res = await listFarms({ ownerId: session.userId, page: 1, limit: 1 });
+        if (cancelled) return;
+
+        const firstFarm = res.items[0];
+        if (!firstFarm) {
+          resolvedOwnerRef.current = session.userId;
+          setResolvedFarmId(null);
+          openSnackbarRef.current({
+            type: 'error',
+            text: 'Bạn chưa có vườn nào. Vui lòng tạo hồ sơ vườn trước khi xem dashboard.',
+            duration: 4500,
+            icon: true,
+          });
+          return;
+        }
+
+        resolvedOwnerRef.current = session.userId;
+        setResolvedFarmId(firstFarm.id);
+        setResolvedFarmName(firstFarm.name);
+      } catch {
+        if (cancelled) return;
+        resolvedOwnerRef.current = null;
+        setResolvedFarmId(null);
+      } finally {
+        if (!cancelled) {
+          resolvingOwnerRef.current = false;
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+      resolvingOwnerRef.current = false;
+    };
+  }, [farmId, session?.userId]);
 
   // Show Snackbar khi có lỗi
   useEffect(() => {
@@ -138,8 +214,9 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
 
   // Load history khi chọn cảm biến
   useEffect(() => {
+    if (!resolvedFarmId) return;
     loadHistory(selectedSensor);
-  }, [selectedSensor, loadHistory]);
+  }, [selectedSensor, loadHistory, resolvedFarmId]);
 
   const handleAcknowledge = useCallback(
     async (alertId: string) => {
@@ -155,6 +232,8 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
   // ── Derived ───────────────────────────────────────────────────────────────
   const visibleAlerts = alerts.filter((a) => !dismissedAlerts.has(a.id));
   const hasActiveAlerts = visibleAlerts.length > 0;
+  // Badge count = số cảnh báo chưa acknowledge (kể cả đã dismiss trên UI)
+  const alertBadgeCount = alerts.filter((a) => !a.acknowledged).length;
 
   const latestMap: Partial<Record<SensorType, typeof latestReadings[0]>> = {};
   for (const r of latestReadings) latestMap[r.sensorType] = r;
@@ -209,18 +288,18 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
             <div>
               <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>Xin chào,</Text>
               <Text.Title size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>{farmerName}</Text.Title>
-              <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>{farmName}</Text>
+              <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>{resolvedFarmName}</Text>
             </div>
           </div>
           <button
             style={{ position: 'relative', width: 44, height: 44, borderRadius: '50%', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            onClick={() => {}}
-            aria-label={`Thông báo${notificationCount > 0 ? ` (${notificationCount} mới)` : ''}`}
+            onClick={() => navigate('/farmer/alerts')}
+            aria-label={`Cảnh báo${alertBadgeCount > 0 ? ` (${alertBadgeCount} chưa xử lý)` : ''}`}
           >
             <Icon name="notification" size="md" color={colors.text.primary} />
-            {notificationCount > 0 && (
+            {alertBadgeCount > 0 && (
               <div style={{ position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: '50%', backgroundColor: colors.functional.alertRed, color: colors.text.inverse, fontSize: fontSize.small, fontWeight: fontWeight.bold, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {notificationCount > 9 ? '9+' : notificationCount}
+                {alertBadgeCount > 9 ? '9+' : alertBadgeCount}
               </div>
             )}
           </button>
@@ -241,6 +320,23 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
                 />
               </div>
             ))}
+            <button
+              onClick={() => navigate('/farmer/alerts')}
+              style={{
+                width: '100%',
+                padding: `${spacing.xs} 0`,
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: colors.primary.zaloBlue,
+                fontSize: fontSize.small,
+                fontWeight: fontWeight.medium,
+                textAlign: 'center',
+                marginBottom: spacing.xs,
+              }}
+            >
+              Xem tất cả cảnh báo →
+            </button>
           </div>
         )}
 

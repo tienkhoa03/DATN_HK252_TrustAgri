@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import {
-  SensorReadingDto,
   LatestSensorResponse,
+  SensorReadingDto,
   SensorHistoryQueryDto,
 } from '@trustagri/shared';
 import { RedisSensorService } from './services/redis-sensor.service';
 import { InfluxSensorService } from './services/influx-sensor.service';
 import { MonitoringGateway } from '../gateway/monitoring.gateway';
+import { AlertsService } from '../alerts/alerts.service';
 
 @Injectable()
 export class SensorsService {
@@ -14,6 +15,7 @@ export class SensorsService {
     private readonly redis: RedisSensorService,
     private readonly influx: InfluxSensorService,
     private readonly gateway: MonitoringGateway,
+    private readonly alertsService: AlertsService,
   ) {}
 
   /**
@@ -50,11 +52,13 @@ export class SensorsService {
   }
 
   /**
-   * Ghi một reading mới vào Redis và push WebSocket sensor_update.
+   * Ghi một reading mới vào Redis, push WebSocket sensor_update,
+   * và kiểm tra ngưỡng để tạo alert nếu cần.
    * Dùng khi có data ingestion pipeline (MQTT, HTTP ingestion, v.v.)
    */
   async ingestReading(reading: SensorReadingDto): Promise<void> {
     await this.redis.setReading(reading);
     this.gateway.pushSensorUpdate(reading.farmId, reading);
+    await this.alertsService.checkAndCreateAlert(reading);
   }
 }

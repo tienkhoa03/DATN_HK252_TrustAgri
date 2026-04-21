@@ -1,8 +1,8 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import {
-  SensorReadingDto,
   LatestSensorResponse,
   SensorHistoryQueryDto,
+  SensorReadingDto,
 } from '@trustagri/shared';
 import { SensorsService } from './sensors.service';
 import { FarmAccessGuard } from './guards/farm-access.guard';
@@ -14,6 +14,7 @@ import { FarmAccessGuard } from './guards/farm-access.guard';
  * GET /api/v1/monitoring/farms/:farmId/history
  *
  * Phân quyền: chủ nông trại | thương lái có hợp đồng | người mua có order/hợp đồng
+ * Alert endpoints được chuyển sang AlertsModule (alerts.controller.ts)
  */
 @Controller('monitoring/farms/:farmId')
 @UseGuards(FarmAccessGuard)
@@ -34,7 +35,7 @@ export class SensorsController {
   /**
    * GET /api/v1/monitoring/farms/:farmId/history
    * Lịch sử cảm biến theo khoảng thời gian.
-   * Query params: from (required), to (required), interval (optional, mặc định 1h), sensorType (optional)
+   * Query params: from (required), to (required), interval (optional), sensorType (optional)
    */
   @Get('history')
   getHistory(

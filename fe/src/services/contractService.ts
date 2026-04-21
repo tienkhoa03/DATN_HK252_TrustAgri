@@ -1,0 +1,237 @@
+/**
+ * contractService — Contract Service qua API Gateway (design.md §4.4.5)
+ *
+ *   GET    /api/v1/contracts
+ *   GET    /api/v1/contracts/:id
+ *   GET    /api/v1/contracts/:id/audit-logs
+ *   GET    /api/v1/contracts/:id/compliance  (FR-T11)
+ *   POST   /api/v1/contracts   (trader | admin)
+ *
+ * JWT: Authorization Bearer từ interceptor; `role` trong query phải khớp vai trò tài khoản (BE).
+ */
+
+import apiClient from '@/api/client';
+import { ApiError } from '@/api/errors';
+
+export interface ContractDto {
+  id: string;
+  partyFarmerId?: string;
+  partyTraderId: string;
+  partyBuyerId?: string;
+  contractType: 'farmer_trader' | 'trader_buyer';
+  productId?: string;
+  standardId?: string;
+  farmId?: string;
+  quantity: number;
+  unit: string;
+  totalPrice: number;
+  deposit?: number;
+  startDate: string;
+  endDate: string;
+  status: 'active' | 'pending_change' | 'completed' | 'cancelled';
+  terms: string;
+  createdAt: string;
+}
+
+export interface ContractAuditLogDto {
+  id: string;
+  contractId: string;
+  previousStatus: string | null;
+  newStatus: string;
+  actorUserId: string;
+  occurredAt: string;
+}
+
+/** design.md §4.4.5 ComplianceDto */
+export interface ComplianceDeviationDto {
+  careLogId: string;
+  stepId: string;
+  reason: string;
+  detectedAt: string;
+}
+
+export interface ComplianceDto {
+  contractId: string;
+  standardCode: string;
+  totalSteps: number;
+  completedSteps: number;
+  deviations: ComplianceDeviationDto[];
+  /** 0..1 */
+  complianceScore: number;
+  lastComputedAt: string;
+}
+
+function normalizeComplianceDeviation(raw: unknown): ComplianceDeviationDto {
+  const r = raw as Record<string, unknown>;
+  return {
+    careLogId: String(r.careLogId ?? r.care_log_id ?? ''),
+    stepId: String(r.stepId ?? r.step_id ?? ''),
+    reason: String(r.reason ?? ''),
+    detectedAt: String(r.detectedAt ?? r.detected_at ?? ''),
+  };
+}
+
+/** Chuẩn hóa payload từ Nest (camelCase mặc định; phòng snake_case). */
+export function normalizeComplianceDto(raw: unknown): ComplianceDto {
+  const r = raw as Record<string, unknown>;
+  const deviationsRaw = r.deviations;
+  const deviations = Array.isArray(deviationsRaw)
+    ? deviationsRaw.map(normalizeComplianceDeviation)
+    : [];
+  return {
+    contractId: String(r.contractId ?? r.contract_id ?? ''),
+    standardCode: String(r.standardCode ?? r.standard_code ?? ''),
+    totalSteps: Number(r.totalSteps ?? r.total_steps ?? 0),
+    completedSteps: Number(r.completedSteps ?? r.completed_steps ?? 0),
+    deviations,
+    complianceScore: Number(r.complianceScore ?? r.compliance_score ?? 0),
+    lastComputedAt: String(r.lastComputedAt ?? r.last_computed_at ?? ''),
+  };
+}
+
+export interface ListResponse<T> {
+  items: T[];
+  page: number;
+  limit: number;
+  total: number;
+}
+
+export type ContractRoleFilter = 'farmer' | 'trader' | 'buyer';
+
+export interface ListContractsParams {
+  role?: ContractRoleFilter;
+  status?: ContractDto['status'] | 'all';
+  from?: string;
+  to?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface CreateContractDto {
+  partyFarmerId?: string;
+  partyTraderId: string;
+  partyBuyerId?: string;
+  contractType: 'farmer_trader' | 'trader_buyer';
+  productId?: string;
+  standardId?: string;
+  farmId?: string;
+  quantity: number;
+  unit: string;
+  totalPrice: number;
+  deposit?: number;
+  startDate: string;
+  endDate: string;
+  terms: string;
+}
+
+function normalizeContract(raw: ContractDto): ContractDto {
+  return {
+    ...raw,
+    quantity: Number(raw.quantity),
+    totalPrice: Number(raw.totalPrice),
+    deposit: raw.deposit != null ? Number(raw.deposit) : undefined,
+  };
+}
+
+export function contractStatusLabelVi(status: ContractDto['status']): string {
+  switch (status) {
+    case 'active':
+      return 'Đang thực hiện';
+    case 'pending_change':
+      return 'Chờ duyệt thay đổi';
+    case 'completed':
+      return 'Hoàn thành';
+    case 'cancelled':
+      return 'Đã hủy';
+    default:
+      return String(status);
+  }
+}
+
+export function contractTypeLabelVi(t: ContractDto['contractType']): string {
+  return t === 'farmer_trader' ? 'Nông dân — Thương lái' : 'Thương lái — Người mua';
+}
+
+/** Hiển thị khi DTO chỉ có partyFarmerId. */
+export function partyFarmerLabel(farmerId: string): string {
+  return `Nông dân #${farmerId.slice(0, 8)}`;
+}
+
+/** Hiển thị khi DTO chỉ có partyBuyerId. */
+export function partyBuyerLabel(buyerId: string): string {
+  return `Người mua #${buyerId.slice(0, 8)}`;
+}
+
+type ContractCtx = 'list' | 'get' | 'create' | 'audit' | 'compliance';
+
+export function toContractViMessage(err: unknown, context: ContractCtx = 'list'): string {
+  if (err instanceof ApiError) {
+    switch (err.code) {
+      case 'UNAUTHORIZED':
+        return 'Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.';
+      case 'FORBIDDEN':
+        return 'Bạn không có quyền thực hiện thao tác này với hợp đồng.';
+      case 'NOT_FOUND':
+        return 'Không tìm thấy hợp đồng.';
+      case 'CONFLICT':
+        return 'Trạng thái hợp đồng đã thay đổi. Vui lòng tải lại.';
+      case 'INVALID_INPUT':
+        return err.message?.trim() || 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.';
+      case 'NETWORK_ERROR':
+        return 'Không có phản hồi từ máy chủ. Vui lòng kiểm tra kết nối mạng.';
+      case 'SERVICE_UNAVAILABLE':
+        return 'Dịch vụ tạm thời không khả dụng. Vui lòng thử lại sau.';
+      case 'RATE_LIMIT_EXCEEDED':
+        return 'Quá nhiều yêu cầu. Vui lòng thử lại sau ít phút.';
+      case 'INTERNAL_ERROR':
+        return err.message?.trim() || 'Lỗi máy chủ. Vui lòng thử lại sau.';
+      default:
+        if (err.message) return err.message;
+    }
+  }
+  const fallback: Record<ContractCtx, string> = {
+    list: 'Không thể tải danh sách hợp đồng.',
+    get: 'Không thể tải chi tiết hợp đồng.',
+    create: 'Không thể tạo hợp đồng.',
+    audit: 'Không thể tải nhật ký hợp đồng.',
+    compliance: 'Không thể tải dữ liệu tuân thủ quy trình.',
+  };
+  return fallback[context];
+}
+
+export async function listContracts(params?: ListContractsParams): Promise<ListResponse<ContractDto>> {
+  const q: Record<string, unknown> = {};
+  if (params?.role) q.role = params.role;
+  if (params?.status && params.status !== 'all') q.status = params.status;
+  if (params?.from) q.from = params.from;
+  if (params?.to) q.to = params.to;
+  if (params?.page) q.page = params.page;
+  if (params?.limit) q.limit = params.limit;
+
+  const { data } = await apiClient.get<ListResponse<ContractDto>>('/contracts', { params: q });
+  return {
+    ...data,
+    items: data.items.map(normalizeContract),
+  };
+}
+
+export async function getContract(id: string): Promise<ContractDto> {
+  const { data } = await apiClient.get<ContractDto>(`/contracts/${id}`);
+  return normalizeContract(data);
+}
+
+export async function createContract(body: CreateContractDto): Promise<ContractDto> {
+  const { data } = await apiClient.post<ContractDto>('/contracts', body);
+  return normalizeContract(data);
+}
+
+export async function listContractAuditLogs(contractId: string): Promise<ContractAuditLogDto[]> {
+  const { data } = await apiClient.get<ContractAuditLogDto[]>(`/contracts/${contractId}/audit-logs`);
+  return Array.isArray(data) ? data : [];
+}
+
+/** GET /api/v1/contracts/:id/compliance — FR-T11 */
+export async function getContractCompliance(contractId: string): Promise<ComplianceDto> {
+  const { data } = await apiClient.get<unknown>(`/contracts/${contractId}/compliance`);
+  return normalizeComplianceDto(data);
+}

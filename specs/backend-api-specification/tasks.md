@@ -60,49 +60,49 @@
 
 ## Phase 7: Cảnh báo ngưỡng và acknowledge (FR-F08)
 
-- [ ] **Task 7.1 (BE):** Triển khai module `alerts` trong `monitoring-service`: `GET /api/v1/monitoring/farms/:farmId/alerts` (lọc `status`, `severity`), `POST /api/v1/monitoring/alerts/:id/acknowledge`. Khi cảm biến vượt ngưỡng → tạo alert và publish sự kiện `alert.created` lên message bus để Notification Service xử lý. Response theo `AlertDto`, kèm `suggestedAction` theo loại cảm biến.
+- [x] **Task 7.1 (BE):** Triển khai module `alerts` trong `monitoring-service`: `GET /api/v1/monitoring/farms/:farmId/alerts` (lọc `status`, `severity`), `POST /api/v1/monitoring/alerts/:id/acknowledge`. Khi cảm biến vượt ngưỡng → tạo alert và publish sự kiện `alert.created` lên message bus để Notification Service xử lý. Response theo `AlertDto`, kèm `suggestedAction` theo loại cảm biến.
 
 ---
 
 ## Phase 8: Kết nối nông dân — thương lái (FR-F02, FR-F03, FR-T07, FR-T08)
 
-- [ ] **Task 8.1 (BE):** Triển khai module `connections` trong `contract-service`: `GET /api/v1/traders/search` (lọc `region`, `cropType`, `trustScore`), `GET /api/v1/farmers/search`, `GET /api/v1/connections` (lọc `role=incoming|outgoing`, `status`), `POST /api/v1/connections`, `POST /api/v1/connections/:id/accept`, `POST /api/v1/connections/:id/reject`. Publish sự kiện `connection.requested` và `connection.updated` cho Notification Service.
+- [x] **Task 8.1 (BE):** Triển khai module `connections` trong `contract-service`: `GET /api/v1/traders/search` (lọc `region`, `cropType`, `trustScore`), `GET /api/v1/farmers/search`, `GET /api/v1/connections` (lọc `role=incoming|outgoing`, `status`), `POST /api/v1/connections`, `POST /api/v1/connections/:id/accept`, `POST /api/v1/connections/:id/reject`. Publish sự kiện `connection.requested` và `connection.updated` cho Notification Service.
 
 ---
 
 ## Phase 9: Chợ nông sản (sản phẩm marketplace) (FR-T03, FR-U01, FR-G03)
 
-- [ ] **Task 9.1 (BE):** Triển khai module `products` trong `contract-service`: `GET /api/v1/products` (public, lọc `cropType`, `region`, `priceMin`, `priceMax`, `traderId`), `GET /api/v1/products/:id` (public), `POST /api/v1/products` (trader), `PUT /api/v1/products/:id`, `DELETE /api/v1/products/:id` (soft delete). Response theo `ProductDto`.
+- [x] **Task 9.1 (BE):** Triển khai module `products` trong `contract-service`: `GET /api/v1/products` (public, lọc `cropType`, `region`, `priceMin`, `priceMax`, `traderId`), `GET /api/v1/products/:id` (public), `POST /api/v1/products` (trader), `PUT /api/v1/products/:id`, `DELETE /api/v1/products/:id` (soft delete). Response theo `ProductDto`.
 
 ---
 
 ## Phase 10: Nhu cầu mua hàng từ người mua (FR-U02, FR-T04)
 
-- [ ] **Task 10.1 (BE):** Triển khai module `buying-requests` trong `contract-service`: `GET /api/v1/buying-requests` (lọc `status`, `cropType`, `region`), `GET /api/v1/buying-requests/:id`, `POST /api/v1/buying-requests` (buyer), `PUT /api/v1/buying-requests/:id`, `DELETE /api/v1/buying-requests/:id` (**soft delete**). Response theo `BuyingRequestDto`.
+- [x] **Task 10.1 (BE):** Triển khai module `buying-requests` trong `contract-service`: `GET /api/v1/buying-requests` (lọc `status`, `cropType`, `region`), `GET /api/v1/buying-requests/:id`, `POST /api/v1/buying-requests` (buyer), `PUT /api/v1/buying-requests/:id`, `DELETE /api/v1/buying-requests/:id` (**soft delete**). Response theo `BuyingRequestDto`.
 
 ---
 
 ## Phase 11: Đơn hàng và đề xuất (FR-U01, FR-U03, FR-T04, FR-T05)
 
-- [ ] **Task 11.1 (BE):** Triển khai module `orders` và `proposals` trong `contract-service`. Endpoint: `GET/POST /api/v1/orders`, `/orders/:id/accept`, `/orders/:id/reject`, `/orders/:id/cancel`; `GET/POST /api/v1/proposals`, `/proposals/:id/accept`, `/proposals/:id/reject`. Quy tắc chuyển trạng thái `pending → accepted|rejected → contracted|cancelled`. Khi `proposal.accept` hoặc `order.accept` → tạo bản ghi hợp đồng tương ứng (liên kết Phase 12).
+- [x] **Task 11.1 (BE):** Triển khai module `orders` và `proposals` trong `contract-service`. Endpoint: `GET/POST /api/v1/orders`, `/orders/:id/accept`, `/orders/:id/reject`, `/orders/:id/cancel`; `GET/POST /api/v1/proposals`, `/proposals/:id/accept`, `/proposals/:id/reject`. Quy tắc chuyển trạng thái `pending → accepted|rejected → contracted|cancelled`. Khi `proposal.accept` hoặc `order.accept` → tạo bản ghi hợp đồng tương ứng (liên kết Phase 12).
 
 ---
 
 ## Phase 12: Hợp đồng (vòng đời contract) (FR-F04, FR-T06, FR-T09, FR-U06)
 
-- [ ] **Task 12.1 (BE):** Triển khai module `contracts` trong `contract-service`: `GET /api/v1/contracts` (lọc `role`, `status`, `from`, `to`, phân trang), `GET /api/v1/contracts/:id`, `POST /api/v1/contracts` (admin/trader thủ công). Phân biệt `contractType = farmer_trader` và `trader_buyer`. Response theo `ContractDto`. Audit log mọi thay đổi trạng thái.
+- [x] **Task 12.1 (BE):** Triển khai module `contracts` trong `contract-service`: `GET /api/v1/contracts` (lọc `role`, `status`, `from`, `to`, phân trang), `GET /api/v1/contracts/:id`, `POST /api/v1/contracts` (admin/trader thủ công). Phân biệt `contractType = farmer_trader` và `trader_buyer`. Response theo `ContractDto`. Audit log mọi thay đổi trạng thái.
 
 ---
 
 ## Phase 13: Yêu cầu thay đổi hợp đồng (FR-F05, FR-T06, FR-T09, FR-U04)
 
-- [ ] **Task 13.1 (BE):** Triển khai module `contract-change-requests` trong `contract-service`: `GET /api/v1/contracts/:id/change-requests`, `POST /api/v1/contracts/:id/change-requests`, `POST /.../change-requests/:changeId/accept`, `POST /.../change-requests/:changeId/reject`. Đặt `contract.status = pending_change` khi có yêu cầu, rollback về `active` khi `rejected`, áp dụng diff khi `accepted`. Publish sự kiện `contract.changed`.
+- [x] **Task 13.1 (BE):** Triển khai module `contract-change-requests` trong `contract-service`: `GET /api/v1/contracts/:id/change-requests`, `POST /api/v1/contracts/:id/change-requests`, `POST /.../change-requests/:changeId/accept`, `POST /.../change-requests/:changeId/reject`. Đặt `contract.status = pending_change` khi có yêu cầu, rollback về `active` khi `rejected`, áp dụng diff khi `accepted`. Publish sự kiện `contract.changed`.
 
 ---
 
 ## Phase 14: Đối chiếu tuân thủ quy trình (FR-T11)
 
-- [ ] **Task 14.1 (BE):** Triển khai `GET /api/v1/contracts/:id/compliance` trong `contract-service`, gọi cross-service tới `farm-service` (care logs + standard steps) và `monitoring-service` (lịch sử cảm biến). Tính `complianceScore`, liệt kê `deviations`. Cache Redis TTL 5 phút. Response theo `ComplianceDto`.
+- [x] **Task 14.1 (BE):** Triển khai `GET /api/v1/contracts/:id/compliance` trong `contract-service`, gọi cross-service tới `farm-service` (care logs + standard steps) và `monitoring-service` (lịch sử cảm biến). Tính `complianceScore`, liệt kê `deviations`. Cache Redis TTL 5 phút. Response theo `ComplianceDto`.
 
 ---
 

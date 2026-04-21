@@ -26,6 +26,12 @@ export interface SensorReadingDto {
   recordedAt: string; // ISO-8601
 }
 
+interface LatestSensorResponse {
+  farmId: string;
+  readings: SensorReadingDto[];
+  updatedAt: string;
+}
+
 export interface AlertDto {
   id: string;
   farmId: string;
@@ -68,10 +74,10 @@ export interface AlertsParams {
  * Trả snapshot mới nhất từ Redis cho từng loại cảm biến.
  */
 export async function getLatest(farmId: string): Promise<SensorReadingDto[]> {
-  const { data } = await apiClient.get<SensorReadingDto[]>(
-    `/api/v1/monitoring/farms/${farmId}/latest`,
+  const { data } = await apiClient.get<LatestSensorResponse>(
+    `/monitoring/farms/${farmId}/latest`,
   );
-  return data;
+  return data.readings;
 }
 
 /**
@@ -81,9 +87,9 @@ export async function getLatest(farmId: string): Promise<SensorReadingDto[]> {
 export async function getHistory(
   farmId: string,
   params?: HistoryParams,
-): Promise<{ items: SensorReadingDto[] }> {
-  const { data } = await apiClient.get<{ items: SensorReadingDto[] }>(
-    `/api/v1/monitoring/farms/${farmId}/history`,
+): Promise<SensorReadingDto[]> {
+  const { data } = await apiClient.get<SensorReadingDto[]>(
+    `/monitoring/farms/${farmId}/history`,
     { params },
   );
   return data;
@@ -97,7 +103,7 @@ export async function listAlerts(
   params?: AlertsParams,
 ): Promise<ListResponse<AlertDto>> {
   const { data } = await apiClient.get<ListResponse<AlertDto>>(
-    `/api/v1/monitoring/farms/${farmId}/alerts`,
+    `/monitoring/farms/${farmId}/alerts`,
     { params },
   );
   return data;
@@ -108,7 +114,7 @@ export async function listAlerts(
  */
 export async function acknowledgeAlert(alertId: string): Promise<{ success: true }> {
   const { data } = await apiClient.post<{ success: true }>(
-    `/api/v1/monitoring/alerts/${alertId}/acknowledge`,
+    `/monitoring/alerts/${alertId}/acknowledge`,
   );
   return data;
 }

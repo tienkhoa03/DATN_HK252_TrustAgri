@@ -27,11 +27,14 @@ import type {
   SensorType,
   HistoryParams,
 } from '@/services/monitoringService';
-import { subscribeToFarm } from '@/api/monitoringSocket';
+import { subscribeToFarm, subscribeToFarmAlerts } from '@/api/monitoringSocket';
 import {
   latestSensorMapAtom,
   mergeSensorReadingAtom,
   seedLatestForFarmAtom,
+  setFarmAlertBadgeAtom,
+  incrementFarmAlertBadgeAtom,
+  decrementFarmAlertBadgeAtom,
 } from '@/state/monitoringAtoms';
 import { ApiError } from '@/api/errors';
 
@@ -86,6 +89,9 @@ export function useMonitoring(farmId: string | null | undefined): UseMonitoringR
   const latestMap = useAtomValue(latestSensorMapAtom);
   const mergeSensor = useSetAtom(mergeSensorReadingAtom);
   const seedLatest = useSetAtom(seedLatestForFarmAtom);
+  const setAlertBadge = useSetAtom(setFarmAlertBadgeAtom);
+  const incrementAlertBadge = useSetAtom(incrementFarmAlertBadgeAtom);
+  const decrementAlertBadge = useSetAtom(decrementFarmAlertBadgeAtom);
 
   const [isLatestLoading, setIsLatestLoading] = useState(false);
   const [historyData, setHistoryData] = useState<SensorReadingDto[]>([]);
@@ -118,7 +124,10 @@ export function useMonitoring(farmId: string | null | undefined): UseMonitoringR
       .then(([readings, alertsRes]) => {
         if (cancelled) return;
         seedLatest({ farmId, readings });
-        setAlerts(alertsRes.items.filter((a) => !a.acknowledged));
+        const unacked = alertsRes.items.filter((a) => !a.acknowledged);
+        setAlerts(unacked);
+        // Seed badge atom với số cảnh báo chưa acknowledge từ REST
+        setAlertBadge({ farmId, count: unacked.length });
         loadedFarmRef.current = farmId;
       })
       .catch((err) => {
@@ -142,16 +151,31 @@ export function useMonitoring(farmId: string | null | undefined): UseMonitoringR
     loadedFarmRef.current = null;
   }, [farmId]);
 
-  // ── WebSocket subscription ─────────────────────────────────────────────────
+  // ── WebSocket: sensor_update + alert_created ───────────────────────────────
   useEffect(() => {
     if (!farmId) return;
 
-    const cleanup = subscribeToFarm(farmId, (reading) => {
+    const cleanupSensor = subscribeToFarm(farmId, (reading) => {
       mergeSensor(reading);
     });
 
-    return cleanup;
-  }, [farmId, mergeSensor]);
+    // Nhận alert_created từ server → thêm vào danh sách và tăng badge
+    const cleanupAlert = subscribeToFarmAlerts(farmId, (newAlert) => {
+      if (!newAlert.acknowledged) {
+        setAlerts((prev) => {
+          // Tránh duplicate nếu server push lại
+          if (prev.some((a) => a.id === newAlert.id)) return prev;
+          return [newAlert, ...prev];
+        });
+        incrementAlertBadge(farmId);
+      }
+    });
+
+    return () => {
+      cleanupSensor();
+      cleanupAlert();
+    };
+  }, [farmId, mergeSensor, incrementAlertBadge]);
 
   // ── Load history ───────────────────────────────────────────────────────────
   const loadHistory = useCallback(
@@ -161,11 +185,20 @@ export function useMonitoring(farmId: string | null | undefined): UseMonitoringR
       let cancelled = false;
       setIsHistoryLoading(true);
 
+      const now = new Date();
+      const from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
       monitoringService
-        .getHistory(farmId, { sensorType, ...extraParams })
-        .then((res) => {
+        .getHistory(farmId, {
+          from: from.toISOString(),
+          to: now.toISOString(),
+          interval: '1h',
+          sensorType,
+          ...extraParams,
+        })
+        .then((items) => {
           if (!cancelled) {
-            setHistoryData(res.items);
+            setHistoryData(items);
           }
         })
         .catch((err) => {
@@ -187,12 +220,18 @@ export function useMonitoring(farmId: string | null | undefined): UseMonitoringR
     async (alertId: string) => {
       try {
         await monitoringService.acknowledgeAlert(alertId);
-        setAlerts((prev) => prev.filter((a) => a.id !== alertId));
+        setAlerts((prev) => {
+          const target = prev.find((a) => a.id === alertId);
+          if (target && !target.acknowledged && farmId) {
+            decrementAlertBadge(farmId);
+          }
+          return prev.filter((a) => a.id !== alertId);
+        });
       } catch (err) {
         setError(toViMessage(err));
       }
     },
-    [],
+    [farmId, decrementAlertBadge],
   );
 
   const clearError = useCallback(() => setError(null), []);
