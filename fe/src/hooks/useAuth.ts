@@ -25,6 +25,8 @@ import { ApiError } from '@/api/errors';
 import { ENV } from '@/config/env';
 import { mockLogout } from '@/services/mockService';
 import { bootstrapMockAuthSession, isMockOnlyJwt } from '@/services/mockAuthBootstrap';
+import { disconnectMonitoringSocket } from '@/api/monitoringSocket';
+import { resetAllStateOnLogout } from '@/state/resetOnLogout';
 
 // ── Public interface ──────────────────────────────────────────────────────────
 
@@ -103,6 +105,9 @@ export function useAuth(): UseAuthReturn {
       const userProfile = await authService.getMe();
       setProfile(userProfile);
     } catch (err) {
+      // Roll back any partial session so the app doesn't enter a half-authenticated state
+      setSession(null);
+      setProfile(null);
       const message = toVietnameseError(err);
       setError(message);
     } finally {
@@ -125,6 +130,8 @@ export function useAuth(): UseAuthReturn {
     } finally {
       setSession(null);
       setProfile(null);
+      disconnectMonitoringSocket();
+      resetAllStateOnLogout();
       setIsLoading(false);
     }
   }, [setSession, session]);

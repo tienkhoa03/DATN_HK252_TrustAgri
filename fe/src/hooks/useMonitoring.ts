@@ -107,15 +107,13 @@ export function useMonitoring(farmId: string | null | undefined): UseMonitoringR
   const latestReadings: SensorReadingDto[] =
     farmId ? (latestMap.get(farmId) ?? []) : [];
 
-  // Reset loaded guard when farmId changes (chạy trước effect cold-start bên dưới)
-  useEffect(() => {
-    loadedFarmRef.current = null;
-  }, [farmId]);
-
   // ── Cold start: load latest + alerts ───────────────────────────────────────
+  // M23: loadedFarmRef is only reset inside this effect, after the farmId guard,
+  // so transitioning through undefined/null no longer causes spurious re-fetches.
   useEffect(() => {
     if (!farmId) return;
     if (loadedFarmRef.current === farmId) return;
+    loadedFarmRef.current = farmId;
 
     const seq = ++latestFetchSeqRef.current;
     let cancelled = false;
@@ -133,10 +131,11 @@ export function useMonitoring(farmId: string | null | undefined): UseMonitoringR
         setAlerts(unacked);
         // Seed badge atom với số cảnh báo chưa acknowledge từ REST
         setAlertBadge({ farmId, count: unacked.length });
-        loadedFarmRef.current = farmId;
       })
       .catch((err) => {
         if (cancelled || seq !== latestFetchSeqRef.current) return;
+        // Reset so a retry (new farmId) will re-fetch
+        loadedFarmRef.current = null;
         setError(toViMessage(err));
       })
       .finally(() => {

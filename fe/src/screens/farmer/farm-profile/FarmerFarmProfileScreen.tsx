@@ -15,8 +15,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Text, Spinner } from 'zmp-ui';
-import { RoleAppShell } from '@/navigation/RoleAppShell';
+import { Page, Text, Spinner } from 'zmp-ui';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
 import { Icon } from '../../../design-system/components/Icon';
@@ -413,7 +412,7 @@ export const FarmerFarmProfileScreen: React.FC = () => {
       <Text size="small" style={{ color: colors.text.secondary, marginBottom: spacing.lg }}>
         Hãy tạo Farm Lab đầu tiên để bắt đầu quản lý vườn và chăm sóc cây trồng.
       </Text>
-      <Button variant="primary" size="medium" onClick={openCreate}>
+      <Button variant="primary" size="medium" onClick={openCreate} icon="add">
         Tạo vườn mới
       </Button>
     </div>
@@ -847,7 +846,7 @@ export const FarmerFarmProfileScreen: React.FC = () => {
           ))}
 
           <div style={{ width: '100%', marginTop: spacing.sm }}>
-            <Button variant="outline" size="medium">
+            <Button variant="outline" size="medium" icon="add">
               Thêm thiết bị mới
             </Button>
           </div>
@@ -982,7 +981,7 @@ export const FarmerFarmProfileScreen: React.FC = () => {
         </div>
 
         <div style={fieldGroupStyles}>
-          <label style={labelStyles}>Xã</label>
+          <label style={labelStyles}>Huyện / Quận</label>
           <input
             style={inputStyles}
             value={formData.location.district}
@@ -1199,7 +1198,7 @@ export const FarmerFarmProfileScreen: React.FC = () => {
         }
       `}</style>
 
-      <RoleAppShell role="farmer" className="farmer-farm-profile-screen">
+      <Page className="farmer-farm-profile-screen">
         <div style={headerStyles}>
           {showBackButton && (
             <button
@@ -1246,7 +1245,7 @@ export const FarmerFarmProfileScreen: React.FC = () => {
         {viewMode === 'edit' && renderForm('edit')}
 
         {renderDeleteDialog()}
-      </RoleAppShell>
+      </Page>
     </>
   );
 };

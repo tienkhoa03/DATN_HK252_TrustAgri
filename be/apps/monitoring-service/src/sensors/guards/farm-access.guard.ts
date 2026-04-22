@@ -4,6 +4,7 @@ import {
   ForbiddenException,
   Injectable,
   Logger,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
@@ -15,9 +16,9 @@ import { JwtPayload } from '@trustagri/shared';
  * Cho phép truy cập nếu user là:
  *   1. Chủ nông trại (farm.ownerId === user.sub)
  *   2. Thương lái có hợp đồng active với vườn đó
- *   3. Người mua có order/hợp đồng active với vườn đó
+ *   3. Người mua có hợp đồng active hoặc order contracted với vườn đó
  *
- * Chiến lược fail-open khi service phụ thuộc không phản hồi được.
+ * Chiến lược fail-closed: nếu contract-service không phản hồi, từ chối và phụ thuộc vào cache Redis.
  */
 @Injectable()
 export class FarmAccessGuard implements CanActivate {
@@ -119,7 +120,7 @@ export class FarmAccessGuard implements CanActivate {
         this.logger.warn(
           `contract-service trả về ${res.status} khi kiểm tra hợp đồng trader`,
         );
-        return true; // fail-open
+        throw new ServiceUnavailableException('contract-service không khả dụng');
       }
       const body = (await res.json()) as {
         total?: number;
@@ -127,14 +128,15 @@ export class FarmAccessGuard implements CanActivate {
       };
       return (body.total ?? body.items?.length ?? 0) > 0;
     } catch (err) {
+      if (err instanceof ServiceUnavailableException) throw err;
       this.logger.warn(
-        `contract-service không phản hồi: ${(err as Error).message}. Fail-open.`,
+        `contract-service không phản hồi: ${(err as Error).message}. Fail-closed.`,
       );
-      return true; // fail-open
+      throw new ServiceUnavailableException('contract-service không phản hồi');
     }
   }
 
-  /** Kiểm tra người mua có order hoặc hợp đồng active với vườn qua contract-service */
+  /** Kiểm tra người mua có hợp đồng active hoặc order contracted với vườn qua contract-service */
   private async buyerHasAccess(
     farmId: string,
     buyerId: string,
@@ -145,13 +147,15 @@ export class FarmAccessGuard implements CanActivate {
       'http://contract-service:3004',
     );
     try {
-      // Kiểm tra hợp đồng
+      // Kiểm tra hợp đồng active
       const contractUrl = `${baseUrl}/api/v1/contracts?farmId=${farmId}&buyerId=${buyerId}&status=active&limit=1`;
       const contractRes = await fetch(contractUrl, {
         signal: AbortSignal.timeout(3000),
         headers: this.forwardAuthHeader(authorization),
       });
-      if (!contractRes.ok) return true; // fail-open
+      if (!contractRes.ok) {
+        throw new ServiceUnavailableException('contract-service không khả dụng');
+      }
       const contractBody = (await contractRes.json()) as {
         total?: number;
         items?: unknown[];
@@ -160,23 +164,26 @@ export class FarmAccessGuard implements CanActivate {
         return true;
       }
 
-      // Kiểm tra order (accepted hoặc contracted)
-      const orderUrl = `${baseUrl}/api/v1/orders?buyerId=${buyerId}&status=accepted&limit=1`;
+      // Kiểm tra order contracted — chú ý: status phải là 'contracted', không phải 'accepted'
+      const orderUrl = `${baseUrl}/api/v1/orders?buyerId=${buyerId}&farmId=${farmId}&status=contracted&limit=1`;
       const orderRes = await fetch(orderUrl, {
         signal: AbortSignal.timeout(3000),
         headers: this.forwardAuthHeader(authorization),
       });
-      if (!orderRes.ok) return true; // fail-open
+      if (!orderRes.ok) {
+        throw new ServiceUnavailableException('contract-service không khả dụng');
+      }
       const orderBody = (await orderRes.json()) as {
         total?: number;
         items?: unknown[];
       };
       return (orderBody.total ?? orderBody.items?.length ?? 0) > 0;
     } catch (err) {
+      if (err instanceof ServiceUnavailableException) throw err;
       this.logger.warn(
-        `contract-service không phản hồi: ${(err as Error).message}. Fail-open.`,
+        `contract-service không phản hồi: ${(err as Error).message}. Fail-closed.`,
       );
-      return true; // fail-open
+      throw new ServiceUnavailableException('contract-service không phản hồi');
     }
   }
 

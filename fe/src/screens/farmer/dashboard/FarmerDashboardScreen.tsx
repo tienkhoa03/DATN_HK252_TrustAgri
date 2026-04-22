@@ -11,8 +11,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Text, useNavigate } from 'zmp-ui';
-import { RoleAppShell } from '@/navigation/RoleAppShell';
+import { Page, Text, useNavigate } from 'zmp-ui';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
@@ -128,6 +127,7 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
   const [resolvedFarmId, setResolvedFarmId] = useState<string | null>(farmId ?? null);
   const [resolvedFarmName, setResolvedFarmName] = useState<string>(farmName);
 
+  const [activeTab, setActiveTab] = useState<'home' | 'process' | 'connect' | 'account'>('home');
   const [pumpActive, setPumpActive] = useState(false);
   const [lightActive, setLightActive] = useState(false);
   const [fanActive, setFanActive] = useState(false);
@@ -283,6 +283,19 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
     borderBottom: `1px solid ${colors.background.secondary}`,
   };
 
+  const bottomNavStyles: React.CSSProperties = {
+    position: 'fixed', bottom: 0, left: 0, right: 0, height: '64px',
+    backgroundColor: colors.background.primary,
+    borderTop: `1px solid ${colors.background.secondary}`,
+    display: 'flex', justifyContent: 'space-around', alignItems: 'center', zIndex: 1000,
+  };
+
+  const navItemStyles = (isActive: boolean): React.CSSProperties => ({
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: spacing.xs,
+    padding: spacing.sm, backgroundColor: 'transparent', border: 'none', cursor: 'pointer',
+    color: isActive ? colors.primary.zaloBlue : colors.text.secondary, minWidth: '64px',
+  });
+
   const actionIconContainerStyles = (isActive: boolean): React.CSSProperties => ({
     width: '44px', height: '44px', borderRadius: '50%',
     backgroundColor: isActive ? colors.primary.zaloBlue : colors.functional.neutralGray,
@@ -290,13 +303,13 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
   });
 
   return (
-    <RoleAppShell role="farmer" className="farmer-dashboard-screen">
+    <Page className="farmer-dashboard-screen">
       <style>{`
         @keyframes skeleton-pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
         .skeleton-pulse { animation: skeleton-pulse 1.4s ease-in-out infinite; }
       `}</style>
 
-      <div>
+      <div style={{ paddingBottom: '80px' }}>
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div style={headerStyles}>
           <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
@@ -570,7 +583,28 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
           </Card>
         </div>
       </div>
-    </RoleAppShell>
+
+      {/* ── Bottom Navigation ─────────────────────────────────────────────── */}
+      <div style={bottomNavStyles}>
+        {[
+          { key: 'home', label: 'Trang chủ', icon: 'home' },
+          { key: 'process', label: 'Quy trình', icon: 'plant' },
+          { key: 'connect', label: 'Kết nối', icon: 'farm' },
+          { key: 'account', label: 'Tài khoản', icon: 'user' },
+        ].map(({ key, label, icon }) => (
+          <button
+            key={key}
+            style={navItemStyles(activeTab === key)}
+            onClick={() => setActiveTab(key as typeof activeTab)}
+            aria-label={label}
+            aria-current={activeTab === key ? 'page' : undefined}
+          >
+            <Icon name={icon as any} size="md" color={activeTab === key ? colors.primary.zaloBlue : colors.text.secondary} />
+            <Text size="xSmall" style={{ margin: 0 }}>{label}</Text>
+          </button>
+        ))}
+      </div>
+    </Page>
   );
 };
 

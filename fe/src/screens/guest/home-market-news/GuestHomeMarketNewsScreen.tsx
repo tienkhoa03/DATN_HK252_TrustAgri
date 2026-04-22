@@ -13,8 +13,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Text, useNavigate } from 'zmp-ui';
-import { RoleAppShell } from '@/navigation/RoleAppShell';
+import { Page, Text } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { Chart } from '../../../design-system/components/Chart';
 import { colors } from '../../../design-system/tokens/colors';
@@ -169,8 +168,6 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
   onLogin,
   onProductPress,
 }) => {
-  const navigate = useNavigate();
-  const openProduct = onProductPress ?? ((id: string) => navigate(`/guest/products/${id}`));
   const openSnackbar = useStableOpenSnackbar();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
@@ -497,7 +494,7 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
     newsItems.length > 0 ? newsItems[Math.min(currentNewsIndex, newsItems.length - 1)] : null;
 
   return (
-    <RoleAppShell role="guest" className="guest-home-market-news-screen">
+    <Page className="guest-home-market-news-screen">
       <div style={contentStyles}>
         {/* Header - Logo và Nút Đăng nhập */}
         <div style={headerStyles}>
@@ -735,7 +732,7 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
                 <div
                   key={product.id}
                   style={productCardStyles}
-                  onClick={() => openProduct(product.id)}
+                  onClick={() => onProductPress?.(product.id)}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-4px)';
                     e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.15)';
@@ -775,7 +772,7 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
           </Text>
         </div>
       </div>
-    </RoleAppShell>
+    </Page>
   );
 };
 

@@ -1,0 +1,18 @@
+version: '3.9'
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # VITE_* vars are baked into the bundle at build time.
+        # Point at the backend gateway; override via .env or shell env before build.
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:3006/api/v1}
+        VITE_USE_MOCK: ${VITE_USE_MOCK:-false}
+        VITE_DEV_LOGIN_SECRET: ${VITE_DEV_LOGIN_SECRET:-}
+        VITE_DEV_LOGIN_ZALO_ID: ${VITE_DEV_LOGIN_ZALO_ID:-}
+    container_name: trustagri-frontend
+    restart: unless-stopped
+    ports:
+      - '${FRONTEND_PORT:-3000}:80'

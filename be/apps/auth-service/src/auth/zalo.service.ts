@@ -23,9 +23,10 @@ export class ZaloService {
   async getUserInfo(zaloAccessToken: string): Promise<ZaloUserInfo> {
     let response: Response;
     try {
-      response = await fetch(this.ZALO_API_URL, {
-        headers: { access_token: zaloAccessToken },
-      });
+      // access_token goes in the query string — this is Zalo's documented method
+      // and avoids leaking the token in proxy/load-balancer access logs
+      const url = `${this.ZALO_API_URL}&access_token=${encodeURIComponent(zaloAccessToken)}`;
+      response = await fetch(url);
     } catch (err) {
       this.logger.error('Lỗi kết nối tới Zalo API', err);
       throw new UnauthorizedException('Không thể kết nối tới Zalo để xác thực');

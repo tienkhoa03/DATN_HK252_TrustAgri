@@ -30,6 +30,7 @@ export class ProductsService {
 
     const qb = this.productRepo
       .createQueryBuilder('p')
+      .where('p.deletedAt IS NULL')
       .orderBy('p.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);

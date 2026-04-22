@@ -11,8 +11,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Text, Input } from 'zmp-ui';
-import { RoleAppShell } from '@/navigation/RoleAppShell';
+import { Page, Text, Input } from 'zmp-ui';
 import { useNavigate } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { Button } from '../../../design-system/components/Button';
@@ -291,7 +290,7 @@ export const FarmerMarketConnectScreen: React.FC = () => {
   };
 
   return (
-    <RoleAppShell role="farmer" className="farmer-market-connect-screen">
+    <Page className="farmer-market-connect-screen">
       <style>{`
         @keyframes skeleton-pulse {
           0%, 100% { opacity: 1; }
@@ -595,7 +594,7 @@ export const FarmerMarketConnectScreen: React.FC = () => {
           </>
         )}
       </div>
-    </RoleAppShell>
+    </Page>
   );
 };
 

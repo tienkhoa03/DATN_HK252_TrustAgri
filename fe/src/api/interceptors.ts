@@ -4,6 +4,8 @@ import { getDefaultStore } from 'jotai';
 import { ENV } from '@/config/env';
 import { accessTokenAtom, authSessionAtom } from '@/state/authAtoms';
 import { parseAxiosError, isUnauthorized, type ErrorBody } from './errors';
+import { disconnectMonitoringSocket } from '@/api/monitoringSocket';
+import { resetAllStateOnLogout } from '@/state/resetOnLogout';
 
 /**
  * Attaches JWT bearer token to every outgoing request.
@@ -34,6 +36,8 @@ async function responseErrorInterceptor(error: AxiosError<ErrorBody>): Promise<n
   if (isUnauthorized(apiError)) {
     const store = getDefaultStore();
     store.set(authSessionAtom, null);
+    disconnectMonitoringSocket();
+    resetAllStateOnLogout();
   }
 
   return Promise.reject(apiError);

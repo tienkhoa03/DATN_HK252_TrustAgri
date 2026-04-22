@@ -10,8 +10,7 @@ const REGRESSION_ROUTES: readonly string[] = [
   '/',
   '/login',
   '/guest',
-  // param :productId phải là UUID v4 (ParseUUIDPipe) — dùng mẫu hợp lệ, có thể 404 nhưng không 400
-  '/guest/products/f47ac10b-58cc-4372-a567-0e02b2c3d479',
+  '/guest/products/preview',
   '/guest/trace/demo',
   '/buyer',
   '/buyer/history',

@@ -60,12 +60,6 @@ export const ENV = {
   /** Tùy chọn: ép zalo_id cho dev-login (không infer từ VITE_ZALO_API_KEY). */
   DEV_LOGIN_ZALO_ID: ((import.meta.env.VITE_DEV_LOGIN_ZALO_ID as string | undefined) ?? '').trim(),
 
-  /**
-   * UUID v4 sản phẩm tĩnh cho dev: dùng khi mở màn chi tiết không có :productId trên URL (demo).
-   * Phải trùng một bản ghi thật trên DB nếu gọi API thật.
-   */
-  PUBLIC_DEMO_PRODUCT_ID: ((import.meta.env.VITE_PUBLIC_DEMO_PRODUCT_ID as string | undefined) ?? '').trim(),
-
   /** Default request timeout in milliseconds */
   REQUEST_TIMEOUT_MS: 15_000,
 

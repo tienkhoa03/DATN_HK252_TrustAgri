@@ -7,8 +7,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Text, Spinner, useNavigate } from 'zmp-ui';
-import { RoleAppShell } from '@/navigation/RoleAppShell';
+import { Page, Text, Spinner, useNavigate } from 'zmp-ui';
 import { Icon } from '@/design-system/components/Icon';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
@@ -219,7 +218,7 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
   };
 
   return (
-    <RoleAppShell role="buyer" className="buyer-transaction-history-screen">
+    <Page className="buyer-transaction-history-screen">
       <div
         style={{
           padding: spacing.md,
@@ -666,7 +665,7 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
           </>
         )}
       </div>
-    </RoleAppShell>
+    </Page>
   );
 };
 

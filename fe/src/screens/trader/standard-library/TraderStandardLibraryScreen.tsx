@@ -19,8 +19,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Text } from 'zmp-ui';
-import { RoleAppShell } from '@/navigation/RoleAppShell';
+import { Page, Text } from 'zmp-ui';
 import { useAtomValue } from 'jotai';
 import { currentRoleAtom } from '@/state/authAtoms';
 import { Icon } from '../../../design-system/components/Icon';
@@ -775,11 +774,11 @@ export const TraderStandardLibraryScreen: React.FC = () => {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <RoleAppShell role="trader" className="trader-standard-library-screen">
+    <Page className="trader-standard-library-screen">
       {view === 'list' && renderList()}
       {view === 'detail' && renderDetail()}
       {view === 'form' && renderForm()}
-    </RoleAppShell>
+    </Page>
   );
 };
 

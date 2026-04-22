@@ -181,15 +181,35 @@ export class NotificationsService {
     });
     const saved = await this.repo.save(row);
 
-    void this.zns
-      .sendNotification({
-        userId,
-        title: data.title,
-        body: data.body,
-      })
-      .catch((err) =>
-        this.logger.error(`ZNS lỗi sau khi lưu ${saved.id}: ${(err as Error).message}`),
-      );
+    // Retry ZNS delivery up to 3 times with exponential backoff before giving up.
+    // A failed delivery is logged as an error so alerting can surface it.
+    void this.sendZnsWithRetry(saved.id, userId, data.title, data.body);
+  }
+
+  private async sendZnsWithRetry(
+    notificationId: string,
+    userId: string,
+    title: string,
+    body: string,
+    attempt = 1,
+    maxAttempts = 3,
+  ): Promise<void> {
+    try {
+      await this.zns.sendNotification({ userId, title, body });
+    } catch (err) {
+      if (attempt < maxAttempts) {
+        const delay = 1000 * 2 ** attempt;
+        this.logger.warn(
+          `ZNS gửi thất bại (lần ${attempt}/${maxAttempts}) cho notification ${notificationId} — thử lại sau ${delay}ms`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        await this.sendZnsWithRetry(notificationId, userId, title, body, attempt + 1, maxAttempts);
+      } else {
+        this.logger.error(
+          `ZNS gửi thất bại sau ${maxAttempts} lần cho notification ${notificationId}: ${(err as Error).message}`,
+        );
+      }
+    }
   }
 
   private toDto(e: NotificationEntity): NotificationDto {

@@ -4,6 +4,7 @@ import { Box, Spinner } from 'zmp-ui';
 
 import { RequireRole } from '@/router/RequireRole';
 import type { UserRole } from '@/state/authAtoms';
+import { ChunkErrorBoundary } from '@/components/ErrorBoundary/ChunkErrorBoundary';
 
 function RoleRoute({ role, children }: { role: UserRole; children: React.ReactNode }) {
   return <RequireRole allowedRoles={[role]}>{children}</RequireRole>;
@@ -116,8 +117,9 @@ const RouteLoadingFallback = () => (
  */
 export function AppRoutes() {
   return (
-    <Suspense fallback={<RouteLoadingFallback />}>
-      <AnimationRoutes>
+    <ChunkErrorBoundary>
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <AnimationRoutes>
         {/* ── App init / mock status screen ─────────────────── */}
         <Route path="/"                        element={<AppInitScreen />} />
 
@@ -159,7 +161,8 @@ export function AppRoutes() {
 
         {/* ── Dev / QA launcher (non-production) ────────────── */}
         <Route path="/dev/screens"             element={<DevScreenLauncher />} />
-      </AnimationRoutes>
-    </Suspense>
+        </AnimationRoutes>
+      </Suspense>
+    </ChunkErrorBoundary>
   );
 }

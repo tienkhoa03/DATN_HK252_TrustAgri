@@ -164,8 +164,10 @@ export class ContractsService {
       .setParameter('done', 'completed')
       .getRawOne();
 
+    // TypeORM returns numeric columns as strings — keep as string to avoid
+    // precision loss for VND amounts that can exceed Number.MAX_SAFE_INTEGER.
     return {
-      totalSpent: Number(raw?.totalSpent ?? 0),
+      totalSpent: String(raw?.totalSpent ?? '0'),
       completedCount: Number(raw?.completedCount ?? 0),
     };
   }

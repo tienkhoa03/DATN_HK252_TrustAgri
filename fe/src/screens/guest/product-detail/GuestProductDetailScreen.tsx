@@ -13,11 +13,8 @@
  * - Thanh tác vụ giới hạn: Nút "Đăng ký để mua ngay" thay vì "Đặt cọc"
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Text, useParams } from 'zmp-ui';
-import { RoleAppShell } from '@/navigation/RoleAppShell';
-import { ENV } from '@/config/env';
-import { isUuidV4 } from '@/utils/uuid';
+import React, { useState, useEffect } from 'react';
+import { Page, Text } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
@@ -91,18 +88,10 @@ const SkeletonBlock: React.FC<{ height?: number | string; width?: string }> = ({
  * Requirements: FR-G03
  */
 export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> = ({
-  productId: productIdProp,
+  productId = 'prod-001',
   onBack,
   onLogin,
 }) => {
-  const params = useParams<{ productId?: string }>();
-  const resolvedId = useMemo(() => {
-    const fromRoute = params.productId?.trim();
-    const fromProp = productIdProp?.trim();
-    const fromEnv = ENV.PUBLIC_DEMO_PRODUCT_ID;
-    return (fromRoute || fromProp || fromEnv || '').trim();
-  }, [params.productId, productIdProp]);
-
   const openSnackbar = useStableOpenSnackbar();
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [product, setProduct] = useState<ProductDto | null>(null);
@@ -111,26 +100,9 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
 
   useEffect(() => {
     let cancelled = false;
-    setError(null);
-    if (!resolvedId) {
-      const msg =
-        'Thiếu mã sản phẩm. Mở từ trang chủ hoặc cấu hình VITE_PUBLIC_DEMO_PRODUCT_ID (UUID v4) trong .env.';
-      setError(msg);
-      setProduct(null);
-      setLoading(false);
-      return;
-    }
-    if (!isUuidV4(resolvedId)) {
-      const msg =
-        'Mã sản phẩm trên URL không hợp lệ. API yêu cầu định dạng UUID v4 — hãy chọn sản phẩm từ trang chủ (danh sách từ server).';
-      setError(msg);
-      setProduct(null);
-      setLoading(false);
-      openSnackbar({ type: 'error', text: msg, duration: 5000, icon: true });
-      return;
-    }
     setLoading(true);
-    getProduct(resolvedId)
+    setError(null);
+    getProduct(productId)
       .then((data) => {
         if (!cancelled) {
           setProduct(data);
@@ -147,7 +119,7 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
       });
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedId]);
+  }, [productId]);
 
   // ── Styles ──────────────────────────────────────────────────────────────────
 
@@ -572,7 +544,7 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
   };
 
   return (
-    <RoleAppShell role="guest" className="guest-product-detail-screen">
+    <Page className="guest-product-detail-screen">
       {/* Header */}
       <div style={headerStyles}>
         {onBack && (
@@ -601,7 +573,7 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
       </div>
 
       {renderBody()}
-    </RoleAppShell>
+    </Page>
   );
 };
 

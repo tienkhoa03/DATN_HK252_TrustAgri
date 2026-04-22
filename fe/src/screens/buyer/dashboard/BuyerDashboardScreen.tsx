@@ -18,6 +18,11 @@ import {
   type DashboardBuyerDto,
 } from '@/services/dashboardService';
 
+function formatDateSafe(iso: string, fallback = '—'): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? fallback : d.toLocaleDateString('vi-VN');
+}
+
 const LazyChart = lazy(() =>
   import('../../../design-system/components/Chart').then((m) => ({ default: m.Chart })),
 );
@@ -114,8 +119,8 @@ export const BuyerDashboardScreen: React.FC = () => {
         Tóm tắt của bạn
       </Text.Title>
       <Text size="xSmall" style={{ color: colors.text.secondary, margin: `0 0 ${spacing.sm}` }}>
-        {new Date(data.periodFrom).toLocaleDateString('vi-VN')} —{' '}
-        {new Date(data.periodTo).toLocaleDateString('vi-VN')}
+        {formatDateSafe(data.periodFrom)} —{' '}
+        {formatDateSafe(data.periodTo)}
       </Text>
 
       <div

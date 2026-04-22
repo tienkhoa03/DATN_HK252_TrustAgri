@@ -12,8 +12,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Box, Text } from 'zmp-ui';
-import { RoleAppShell } from '@/navigation/RoleAppShell';
+import { Page, Box, Text } from 'zmp-ui';
 import { DigitalTwinViewer, GrowthStage, HealthStatus } from '../../../design-system/components/DigitalTwinViewer';
 import { Icon } from '../../../design-system/components/Icon';
 import { SensorLineChart } from '../../../design-system/components/SensorLineChart';
@@ -405,7 +404,7 @@ export const BuyerDigitalTwinMonitorScreen: React.FC<BuyerDigitalTwinMonitorScre
   };
 
   return (
-    <RoleAppShell role="buyer" className="buyer-digital-twin-monitor-screen">
+    <Page className="buyer-digital-twin-monitor-screen">
       {/* Header */}
       <div style={headerStyles}>
         {onBack && (
@@ -655,7 +654,7 @@ export const BuyerDigitalTwinMonitorScreen: React.FC<BuyerDigitalTwinMonitorScre
           </div>
         </div>
       )}
-    </RoleAppShell>
+    </Page>
   );
 };
 

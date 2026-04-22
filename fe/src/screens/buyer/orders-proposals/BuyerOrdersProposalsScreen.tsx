@@ -13,8 +13,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Text } from 'zmp-ui';
-import { RoleAppShell } from '@/navigation/RoleAppShell';
+import { Page, Text } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
@@ -826,7 +825,7 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
   ];
 
   return (
-    <RoleAppShell role="buyer" className="buyer-orders-proposals-screen">
+    <Page className="buyer-orders-proposals-screen">
       {/* Header */}
       <div
         style={{
@@ -913,7 +912,7 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
         {activeTab === 'history'    && renderHistoryTab()}
         {activeTab === 'contracts' && renderContractsTab()}
       </div>
-    </RoleAppShell>
+    </Page>
   );
 };
 

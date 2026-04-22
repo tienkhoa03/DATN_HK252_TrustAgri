@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import {
   CareLogDto,
   CareLogSyncResponse,
@@ -20,6 +20,9 @@ import { FarmEntity } from '../farms/entities/farm.entity';
 import { StandardStepEntity } from '../standards/entities/standard-step.entity';
 import { ListCareLogsQueryDto } from './dto/list-care-logs-query.dto';
 import { SyncCareLogsDto } from './dto/sync-care-logs.dto';
+
+const CONFLICT_WINDOW_MS =
+  parseInt(process.env.CARE_LOG_CONFLICT_WINDOW_SECONDS ?? '60', 10) * 1000;
 
 @Injectable()
 export class CareLogsService {
@@ -118,8 +121,15 @@ export class CareLogsService {
 
       const performedAt = new Date(item.performedAt);
 
+      // Check for duplicate within ±CONFLICT_WINDOW_MS for the same farm + action
+      const windowStart = new Date(performedAt.getTime() - CONFLICT_WINDOW_MS);
+      const windowEnd = new Date(performedAt.getTime() + CONFLICT_WINDOW_MS);
       const timeConflict = await this.careLogRepo.findOne({
-        where: { farmId, performedAt },
+        where: {
+          farmId,
+          action: item.action,
+          performedAt: Between(windowStart, windowEnd),
+        },
       });
 
       if (timeConflict) {
@@ -127,7 +137,7 @@ export class CareLogsService {
           clientRecordId,
           status: 'conflicted',
           serverId: timeConflict.id,
-          reason: `Xung đột thời gian: đã có nhật ký lúc ${item.performedAt}`,
+          reason: `Xung đột thời gian: đã có nhật ký cùng loại trong vòng ${CONFLICT_WINDOW_MS / 1000}s`,
         });
         continue;
       }
@@ -190,7 +200,7 @@ export class CareLogsService {
   }
 
   /**
-   * Phát hiện deviation: standardStepId không khớp thứ tự bước kế tiếp.
+   * Phát hiện deviation dựa trên progression — bước kế tiếp chưa hoàn thành trong sequence.
    * Nếu farm không có standard hoặc không truyền standardStepId → false.
    */
   private async detectDeviation(
@@ -208,14 +218,20 @@ export class CareLogsService {
 
     if (steps.length === 0) return false;
 
-    const completedCount = await this.careLogRepo.count({
+    // Fetch completed step IDs ordered by performedAt to determine progression
+    const pastLogs = await this.careLogRepo.find({
       where: { farmId: farm.id },
+      order: { performedAt: 'ASC' },
+      select: ['standardStepId'],
     });
 
-    const expectedStepIndex = completedCount % steps.length;
-    const expectedStep = steps[expectedStepIndex];
+    const completedStepIds = new Set(
+      pastLogs
+        .map((l) => l.standardStepId)
+        .filter((id): id is string => id !== null && id !== undefined),
+    );
 
-    return expectedStep?.id !== standardStepId;
+    return isDeviation(steps, completedStepIds, standardStepId);
   }
 
   private async requireFarm(farmId: string): Promise<FarmEntity> {
@@ -259,4 +275,26 @@ export class CareLogsService {
       capturedAt: entity.capturedAt.toISOString(),
     };
   }
+}
+
+/**
+ * Pure function: detect whether newStepId deviates from the expected next step.
+ * The expected next step is the lowest-order step not yet present in completedStepIds.
+ * Re-doing a previously completed step is permitted (no deviation).
+ */
+export function isDeviation(
+  steps: { id: string; order: number }[],
+  completedStepIds: Set<string>,
+  newStepId: string,
+): boolean {
+  // If this step was already done, it's a permissible re-work
+  if (completedStepIds.has(newStepId)) return false;
+
+  const ordered = [...steps].sort((a, b) => a.order - b.order);
+
+  // Find the first step not yet completed
+  const nextExpected = ordered.find((s) => !completedStepIds.has(s.id));
+  if (!nextExpected) return false; // All steps done — new work is fine
+
+  return nextExpected.id !== newStepId;
 }

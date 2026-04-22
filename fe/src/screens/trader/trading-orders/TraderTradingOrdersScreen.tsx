@@ -11,8 +11,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Text } from 'zmp-ui';
-import { RoleAppShell } from '@/navigation/RoleAppShell';
+import { Page, Text } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
@@ -1424,7 +1423,7 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
   // ── Main render ────────────────────────────────────────────────────────────────
 
   return (
-    <RoleAppShell role="trader" className="trader-trading-orders-screen">
+    <Page className="trader-trading-orders-screen">
       <div style={headerStyles}>
         <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
           Sàn giao dịch
@@ -1621,7 +1620,7 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
           saving={formSaving}
         />
       )}
-    </RoleAppShell>
+    </Page>
   );
 };
 

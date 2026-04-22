@@ -5,8 +5,7 @@
  */
 
 import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
-import { Box, Text } from 'zmp-ui';
-import { RoleAppShell } from '@/navigation/RoleAppShell';
+import { Page, Box, Text } from 'zmp-ui';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { Icon } from '../../../design-system/components/Icon';
 import type { ChartDataPoint } from '../../../design-system/components/Chart';
@@ -199,7 +198,7 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
   };
 
   return (
-    <RoleAppShell role="trader" className="trader-dashboard-screen">
+    <Page className="trader-dashboard-screen">
       <style>{`
         @keyframes trader-dash-pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
       `}</style>
@@ -566,7 +565,7 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
           </>
         )}
       </div>
-    </RoleAppShell>
+    </Page>
   );
 };
 

@@ -26,7 +26,7 @@ import { TraceabilityModule } from './traceability/traceability.module';
         host: config.get<string>('POSTGRES_HOST', 'localhost'),
         port: config.get<number>('POSTGRES_PORT', 5432),
         username: config.get<string>('POSTGRES_USER', 'trustagri'),
-        password: config.get<string>('POSTGRES_PASSWORD', 'trustagri_secret'),
+        password: config.get<string>('POSTGRES_PASSWORD'),
         database: config.get<string>('POSTGRES_DB', 'trustagri'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: config.get<string>('NODE_ENV') !== 'production',
@@ -39,7 +39,7 @@ import { TraceabilityModule } from './traceability/traceability.module';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
-        secret: config.get<string>('JWT_SECRET', 'change_me'),
+        secret: config.getOrThrow<string>('JWT_SECRET'),
         signOptions: { expiresIn: config.get<string>('JWT_EXPIRES_IN', '15m') },
       }),
       inject: [ConfigService],

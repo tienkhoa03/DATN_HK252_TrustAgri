@@ -18,7 +18,8 @@ export interface ErrorResponse {
  * Tổng hợp lịch sử giao dịch người mua (FR-U06, `includeSummary=true`)
  */
 export interface BuyerTransactionSummaryDto {
-  totalSpent: number;
+  /** Decimal string to avoid precision loss for large VND values */
+  totalSpent: string;
   completedCount: number;
 }
 

@@ -24,6 +24,7 @@ export class RedisEventConsumerService
 {
   private readonly logger = new Logger(RedisEventConsumerService.name);
   private subscriber?: Redis;
+  private subscribed = false;
 
   constructor(
     private readonly config: ConfigService,
@@ -43,30 +44,44 @@ export class RedisEventConsumerService
     this.subscriber.on('connect', () =>
       this.logger.log('Redis subscriber connected'),
     );
+    this.subscriber.on('end', () => {
+      this.subscribed = false;
+      this.logger.warn('Redis subscriber disconnected — scheduling reconnect');
+      void this.subscribeWithRetry();
+    });
+    this.subscriber.on('close', () => {
+      this.subscribed = false;
+    });
 
-    void this.subscribeChannels();
+    void this.subscribeWithRetry();
   }
 
   async onModuleDestroy(): Promise<void> {
     await this.subscriber?.quit();
   }
 
+  private async subscribeWithRetry(attempt = 1): Promise<void> {
+    try {
+      await this.subscribeChannels();
+      this.subscribed = true;
+    } catch (err) {
+      const delay = Math.min(30_000, 1000 * 2 ** attempt);
+      this.logger.warn(
+        `Redis subscribe failed (attempt ${attempt}), retrying in ${delay}ms: ${(err as Error).message}`,
+      );
+      setTimeout(() => void this.subscribeWithRetry(attempt + 1), delay);
+    }
+  }
+
   private async subscribeChannels(): Promise<void> {
     const sub = this.subscriber;
     if (!sub) return;
 
-    try {
-      await sub.subscribe(
-        REDIS_CHANNEL_ALERT_CREATED,
-        REDIS_CHANNEL_CONTRACT_CHANGED,
-        REDIS_CHANNEL_CONNECTION_REQUESTED,
-      );
-    } catch (err) {
-      this.logger.error(
-        `Redis subscribe failed: ${(err as Error).message}`,
-      );
-      return;
-    }
+    await sub.subscribe(
+      REDIS_CHANNEL_ALERT_CREATED,
+      REDIS_CHANNEL_CONTRACT_CHANGED,
+      REDIS_CHANNEL_CONNECTION_REQUESTED,
+    );
 
     sub.on('message', (channel, message) => {
       void this.dispatch(channel, message).catch((e) =>

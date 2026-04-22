@@ -12,8 +12,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Text, Spinner } from 'zmp-ui';
-import { RoleAppShell } from '@/navigation/RoleAppShell';
+import { Page, Text, Spinner } from 'zmp-ui';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
 import { Icon } from '../../../design-system/components/Icon';
@@ -1374,7 +1373,7 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
         }
       `}</style>
 
-      <RoleAppShell role="trader" className="trader-supply-monitor-screen">
+      <Page className="trader-supply-monitor-screen">
         {/* Header */}
         <div style={headerStyles}>
           <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>Quản lý Nguồn cung</Text>
@@ -1406,7 +1405,7 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
           {activeTab === 'pending-requests' && renderPendingRequestsTab()}
           {activeTab === 'compliance' && renderComplianceTab()}
         </div>
-      </RoleAppShell>
+      </Page>
     </>
   );
 };

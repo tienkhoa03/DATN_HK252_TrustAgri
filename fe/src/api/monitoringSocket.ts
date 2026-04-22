@@ -35,6 +35,12 @@ const subscribedFarms = new Set<string>();
 const callbacks = new Map<string, Set<SensorUpdateCallback>>();
 const alertCallbacks = new Map<string, Set<AlertCreatedCallback>>();
 
+// Disconnect and clear socket whenever the access token changes (logout / re-login)
+getDefaultStore().sub(accessTokenAtom, () => {
+  socket?.disconnect();
+  socket = null;
+});
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getOrCreateSocket(): Socket {
@@ -49,7 +55,7 @@ function getOrCreateSocket(): Socket {
     autoConnect: true,
     reconnection: true,
     reconnectionDelay: 2000,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: Infinity,
   });
 
   socket.on('connect', () => {

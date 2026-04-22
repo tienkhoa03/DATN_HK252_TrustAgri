@@ -129,8 +129,15 @@ export class LocalStorageCache<T = any> {
         return null;
       }
 
-      const entry: CacheEntry<T> = JSON.parse(item);
-      
+      let entry: CacheEntry<T>;
+      try {
+        entry = JSON.parse(item) as CacheEntry<T>;
+      } catch {
+        // Corrupted entry — self-heal by removing it
+        this.delete(key);
+        return null;
+      }
+
       // Check if expired
       const now = Date.now();
       if (now - entry.timestamp > this.config.maxAge) {
@@ -139,8 +146,7 @@ export class LocalStorageCache<T = any> {
       }
 
       return entry.data;
-    } catch (error) {
-      console.error('LocalStorageCache get error:', error);
+    } catch {
       return null;
     }
   }

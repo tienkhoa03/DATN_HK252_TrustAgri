@@ -17,13 +17,9 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
-import { Box, Text, Spinner } from 'zmp-ui';
-import { RoleAppShell } from '@/navigation/RoleAppShell';
-import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { Page, Box, Text, Spinner } from 'zmp-ui';
 import { useProfile } from '@/hooks/useProfile';
 import type { UserProfileDto, UserProfileUpdateDto } from '@/hooks/useProfile';
-import type { UserRole } from '@/state/authAtoms';
 import { primaryColors, functionalColors } from '@/design-system/tokens/colors';
 
 // ── Role metadata ─────────────────────────────────────────────────────────────
@@ -40,8 +36,6 @@ const ROLE_META: Record<Role, { label: string; emoji: string; color: string; bg:
 // ── ProfileScreen ─────────────────────────────────────────────────────────────
 
 export function ProfileScreen() {
-  const location = useLocation();
-  const shellRole: UserRole = location.pathname.startsWith('/trader') ? 'trader' : 'farmer';
   const openSnackbar = useStableOpenSnackbar();
   const { profile, isLoading, isSaving, error, updateProfile } = useProfile();
   const [isEditing, setIsEditing] = useState(false);
@@ -137,33 +131,24 @@ export function ProfileScreen() {
 
   if (isLoading) {
     return (
-      <RoleAppShell
-        role={shellRole}
-        pageStyle={{ background: functionalColors.neutralGray, minHeight: '100vh' }}
-      >
+      <Page style={{ background: functionalColors.neutralGray, minHeight: '100vh' }}>
         <LoadingSkeleton />
-      </RoleAppShell>
+      </Page>
     );
   }
 
   if (!profile) {
     return (
-      <RoleAppShell
-        role={shellRole}
-        pageStyle={{ background: functionalColors.neutralGray, minHeight: '100vh' }}
-      >
+      <Page style={{ background: functionalColors.neutralGray, minHeight: '100vh' }}>
         <EmptyState />
-      </RoleAppShell>
+      </Page>
     );
   }
 
   const meta = ROLE_META[profile.role as Role] ?? ROLE_META.guest;
 
   return (
-    <RoleAppShell
-      role={shellRole}
-      pageStyle={{ background: functionalColors.neutralGray, minHeight: '100vh' }}
-    >
+    <Page style={{ background: functionalColors.neutralGray, minHeight: '100vh' }}>
 
       {/* ── Hero header ─────────────────────────────────────────────────── */}
       <ProfileHero profile={profile} meta={meta} />
@@ -317,7 +302,7 @@ export function ProfileScreen() {
         </SectionCard>
 
       </Box>
-    </RoleAppShell>
+    </Page>
   );
 }
 

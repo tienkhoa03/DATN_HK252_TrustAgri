@@ -15,8 +15,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Text, useNavigate } from 'zmp-ui';
-import { RoleAppShell } from '@/navigation/RoleAppShell';
+import { Page, Text, useNavigate } from 'zmp-ui';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { Icon } from '@/design-system/components/Icon';
@@ -438,7 +437,7 @@ export const FarmerAlertListScreen: React.FC<FarmerAlertListScreenProps> = ({
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <RoleAppShell role="farmer" className="farmer-alert-list-screen">
+    <Page className="farmer-alert-list-screen">
       <style>{`
         @keyframes skeleton-pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
         .skeleton-pulse { animation: skeleton-pulse 1.4s ease-in-out infinite; }
@@ -645,7 +644,7 @@ export const FarmerAlertListScreen: React.FC<FarmerAlertListScreenProps> = ({
           </div>
         )}
       </div>
-    </RoleAppShell>
+    </Page>
   );
 };
 

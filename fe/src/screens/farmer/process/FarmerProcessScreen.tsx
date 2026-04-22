@@ -14,8 +14,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Text, Modal } from 'zmp-ui';
-import { RoleAppShell } from '@/navigation/RoleAppShell';
+import { Page, Text, Modal } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
@@ -146,6 +145,8 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
   const [showCareLogForm, setShowCareLogForm] = useState(false);
   const [form, setForm] = useState<CareLogFormState>(defaultForm());
   const [formSubmitting, setFormSubmitting] = useState(false);
+  // Synchronous guard against double-submission (ref updates before re-render)
+  const formSubmittingRef = useRef(false);
 
   // Offline / sync state
   const [pendingCount, setPendingCount] = useState(0);
@@ -208,6 +209,8 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
   // ── Auto-sync khi mạng được phục hồi ─────────────────────────────────────────
   useEffect(() => {
     const handleOnline = async () => {
+      // H15: guard against stale farmId captured before it resolves
+      if (!farmId) return;
       const queue = await listQueue().catch(() => []);
       if (queue.length === 0) return;
       openSnackbar({ text: 'Đã có mạng — bắt đầu đồng bộ nhật ký offline…', type: 'info', duration: 3000 });
@@ -222,6 +225,7 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
         })));
         let accepted = 0;
         let conflicts = 0;
+        let rejected = 0;
         for (const result of response.results) {
           if (result.status === 'accepted') {
             accepted++;
@@ -242,14 +246,29 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
                   : c,
               ),
             );
+          } else if (result.status === 'rejected') {
+            // H12: dequeue rejected items so they don't accumulate indefinitely
+            rejected++;
+            await dequeue(result.clientRecordId);
+            setCareLogs((prev) =>
+              prev.map((c) =>
+                c.clientRecordId === result.clientRecordId
+                  ? { ...c, syncStatus: 'conflict' }
+                  : c,
+              ),
+            );
           }
         }
         await refreshPendingCount();
+        const parts: string[] = [];
+        if (accepted > 0) parts.push(`${accepted} thành công`);
+        if (conflicts > 0) parts.push(`${conflicts} xung đột`);
+        if (rejected > 0) parts.push(`${rejected} bị từ chối`);
         const msg =
-          conflicts > 0
-            ? `Đồng bộ tự động: ${accepted} thành công, ${conflicts} xung đột cần xử lý.`
+          conflicts > 0 || rejected > 0
+            ? `Đồng bộ tự động: ${parts.join(', ')}.`
             : `Đã đồng bộ tự động ${accepted} nhật ký!`;
-        openSnackbar({ text: msg, type: conflicts > 0 ? 'warning' : 'success', duration: 4000 });
+        openSnackbar({ text: msg, type: conflicts > 0 || rejected > 0 ? 'warning' : 'success', duration: 4000 });
       } catch {
         // Sẽ thử lại lần tiếp theo khi mạng ổn định
       }
@@ -257,11 +276,16 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
 
     window.addEventListener('online', handleOnline);
     return () => window.removeEventListener('online', handleOnline);
-  }, [farmId, openSnackbar, refreshPendingCount]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [farmId, openSnackbar, refreshPendingCount]);
 
   // ── Create care log ───────────────────────────────────────────────────────────
   const handleSubmitCareLog = async () => {
+    // H14: synchronous guard prevents double-submission between click and re-render
+    if (formSubmittingRef.current) return;
+    formSubmittingRef.current = true;
+
     if (!form.action) {
+      formSubmittingRef.current = false;
       openSnackbar({ text: 'Vui lòng chọn loại hoạt động.', type: 'error', duration: 3000 });
       return;
     }
@@ -325,15 +349,20 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
         clientRecordId,
       });
 
-      // Upload metadata minh chứng — POST /api/v1/farms/:farmId/evidence
-      for (const url of form.evidenceUrls) {
-        await uploadEvidence(farmId, {
-          careLogId: saved.id,
-          fileUrl: url,
-          mimeType: 'image/jpeg',
-          capturedAt: new Date().toISOString(),
-        });
-      }
+      // H13: Upload evidence with partial-failure handling
+      const evidenceResults = await Promise.allSettled(
+        form.evidenceUrls.map((url) =>
+          uploadEvidence(farmId, {
+            careLogId: saved.id,
+            fileUrl: url,
+            mimeType: 'image/jpeg',
+            capturedAt: new Date().toISOString(),
+          }),
+        ),
+      );
+      const failedEvidence = evidenceResults
+        .map((r, i) => (r.status === 'rejected' ? form.evidenceUrls[i] : null))
+        .filter((url): url is string => url !== null);
 
       // Cập nhật bản ghi optimistic thành synced
       setCareLogs((prev) =>
@@ -348,7 +377,15 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
       await dequeue(clientRecordId);
       await refreshPendingCount();
 
-      openSnackbar({ text: 'Đã lưu nhật ký thành công!', type: 'success', duration: 3000 });
+      if (failedEvidence.length > 0) {
+        openSnackbar({
+          text: `Đã lưu nhật ký nhưng ${failedEvidence.length} ảnh chưa được tải lên. Sẽ thử lại khi có mạng.`,
+          type: 'warning',
+          duration: 5000,
+        });
+      } else {
+        openSnackbar({ text: 'Đã lưu nhật ký thành công!', type: 'success', duration: 3000 });
+      }
     } catch (err) {
       // Giữ ở pending — sẽ đồng bộ khi có mạng
       openSnackbar({
@@ -357,6 +394,7 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
         duration: 4000,
       });
     } finally {
+      formSubmittingRef.current = false;
       setFormSubmitting(false);
     }
   };
@@ -385,6 +423,7 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
 
       let accepted = 0;
       let conflicts = 0;
+      let rejected = 0;
 
       for (const result of response.results) {
         if (result.status === 'accepted') {
@@ -406,16 +445,31 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
                 : c,
             ),
           );
+        } else if (result.status === 'rejected') {
+          // H12: dequeue rejected items so they don't re-send on every reconnect
+          rejected++;
+          await dequeue(result.clientRecordId);
+          setCareLogs((prev) =>
+            prev.map((c) =>
+              c.clientRecordId === result.clientRecordId
+                ? { ...c, syncStatus: 'conflict' }
+                : c,
+            ),
+          );
         }
       }
 
       await refreshPendingCount();
 
+      const parts: string[] = [];
+      if (accepted > 0) parts.push(`${accepted} thành công`);
+      if (conflicts > 0) parts.push(`${conflicts} xung đột`);
+      if (rejected > 0) parts.push(`${rejected} bị từ chối`);
       const msg =
-        conflicts > 0
-          ? `Đồng bộ xong: ${accepted} thành công, ${conflicts} xung đột cần xử lý.`
+        conflicts > 0 || rejected > 0
+          ? `Đồng bộ xong: ${parts.join(', ')}.`
           : `Đã đồng bộ ${accepted} nhật ký thành công!`;
-      openSnackbar({ text: msg, type: conflicts > 0 ? 'warning' : 'success', duration: 4000 });
+      openSnackbar({ text: msg, type: conflicts > 0 || rejected > 0 ? 'warning' : 'success', duration: 4000 });
     } catch (err) {
       openSnackbar({ text: `Đồng bộ thất bại: ${toApiError(err)}`, type: 'error', duration: 4000 });
     } finally {
@@ -589,7 +643,7 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <RoleAppShell role="farmer" className="farmer-process-screen">
+    <Page className="farmer-process-screen">
       {/* ── Header ── */}
       <div style={headerStyles}>
         <div>
@@ -1256,7 +1310,7 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
           )}
         </div>
       </Modal>
-    </RoleAppShell>
+    </Page>
   );
 };
 

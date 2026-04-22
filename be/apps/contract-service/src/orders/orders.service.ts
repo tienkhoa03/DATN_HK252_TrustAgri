@@ -122,7 +122,7 @@ export class OrdersService {
       .getRawOne();
 
     return {
-      totalSpent: Number(raw?.totalSpent ?? 0),
+      totalSpent: String(raw?.totalSpent ?? '0'),
       completedCount: Number(raw?.completedCount ?? 0),
     };
   }
