@@ -4,7 +4,8 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Page, Box, Text, Spinner, useNavigate, useParams } from 'zmp-ui';
+import { Box, Text, Spinner, useNavigate, useParams } from 'zmp-ui';
+import { RoleAppShell } from '@/navigation/RoleAppShell';
 import { Icon } from '@/design-system/components/Icon';
 import { Chart } from '@/design-system/components/Chart';
 import { colors } from '@/design-system/tokens/colors';
@@ -380,20 +381,20 @@ export const GuestTraceabilityScanResultScreen: React.FC<GuestTraceabilityScanRe
 
   if (loading) {
     return (
-      <Page className="guest-traceability-scan-result-screen">
+      <RoleAppShell role="guest" className="guest-traceability-scan-result-screen">
         <Box className="flex flex-col items-center justify-center" style={{ minHeight: '60vh' }}>
           <Spinner />
           <Text size="small" className="mt-3" style={{ color: colors.text.secondary }}>
             Đang tải thông tin truy xuất…
           </Text>
         </Box>
-      </Page>
+      </RoleAppShell>
     );
   }
 
   if (loadError) {
     return (
-      <Page className="guest-traceability-scan-result-screen">
+      <RoleAppShell role="guest" className="guest-traceability-scan-result-screen">
         <Box
           className="flex flex-col items-center justify-center"
           style={{ minHeight: '70vh', padding: spacing.lg, textAlign: 'center' }}
@@ -428,13 +429,13 @@ export const GuestTraceabilityScanResultScreen: React.FC<GuestTraceabilityScanRe
             </button>
           </Box>
         </Box>
-      </Page>
+      </RoleAppShell>
     );
   }
 
   if (notFound || !data) {
     return (
-      <Page className="guest-traceability-scan-result-screen">
+      <RoleAppShell role="guest" className="guest-traceability-scan-result-screen">
         <Box
           className="flex flex-col items-center justify-center"
           style={{ minHeight: '70vh', padding: spacing.lg, textAlign: 'center' }}
@@ -461,7 +462,7 @@ export const GuestTraceabilityScanResultScreen: React.FC<GuestTraceabilityScanRe
             Về trang chủ khách
           </button>
         </Box>
-      </Page>
+      </RoleAppShell>
     );
   }
 
@@ -469,7 +470,7 @@ export const GuestTraceabilityScanResultScreen: React.FC<GuestTraceabilityScanRe
   const cropTitle = cropLabel(data.farm.cropType);
 
   return (
-    <Page className="guest-traceability-scan-result-screen">
+    <RoleAppShell role="guest" className="guest-traceability-scan-result-screen">
       <div style={containerStyles}>
         <div style={heroSectionStyles}>
           <div style={productImageStyles}>{cropIcon}</div>
@@ -592,7 +593,7 @@ export const GuestTraceabilityScanResultScreen: React.FC<GuestTraceabilityScanRe
           </button>
         </div>
       </div>
-    </Page>
+    </RoleAppShell>
   );
 };
 

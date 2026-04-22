@@ -12,7 +12,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Page, Text } from 'zmp-ui';
+import { Text } from 'zmp-ui';
+import { RoleAppShell } from '@/navigation/RoleAppShell';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
@@ -478,7 +479,7 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
     const otherRequests = requests.filter((r) => r.status !== 'open');
 
     return (
-      <Page className="buyer-post-buying-request-screen">
+      <RoleAppShell role="buyer" className="buyer-post-buying-request-screen">
         {/* Header */}
         <div style={headerStyle}>
           <div style={{ flex: 1 }}>
@@ -580,7 +581,7 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
             </div>
           )}
         </div>
-      </Page>
+      </RoleAppShell>
     );
   };
 
@@ -750,7 +751,7 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
   // ── Form view ───────────────────────────────────────────────────────────────
 
   const renderForm = () => (
-    <Page className="buyer-post-buying-request-form">
+    <RoleAppShell role="buyer" className="buyer-post-buying-request-form">
       {/* Header */}
       <div style={headerStyle}>
         <button
@@ -850,7 +851,7 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
           </button>
         )}
       </div>
-    </Page>
+    </RoleAppShell>
   );
 
   // ── Main render ─────────────────────────────────────────────────────────────

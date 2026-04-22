@@ -12,7 +12,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Page, Text } from 'zmp-ui';
+import { Text } from 'zmp-ui';
+import { RoleAppShell } from '@/navigation/RoleAppShell';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
@@ -397,7 +398,7 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
   };
 
   return (
-    <Page className="buyer-marketplace-screen">
+    <RoleAppShell role="buyer" className="buyer-marketplace-screen">
       <div style={contentStyles}>
         {/* Header */}
         <div style={{ ...headerStyles, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm }}>
@@ -489,7 +490,7 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
           <Icon name="plus-circle" size="lg" color={colors.text.inverse} />
         </button>
       </div>
-    </Page>
+    </RoleAppShell>
   );
 };
 

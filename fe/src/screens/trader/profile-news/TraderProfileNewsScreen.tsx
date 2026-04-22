@@ -6,7 +6,8 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { Page, Text, Spinner } from 'zmp-ui';
+import { Text, Spinner } from 'zmp-ui';
+import { RoleAppShell } from '@/navigation/RoleAppShell';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
@@ -432,7 +433,7 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
   };
 
   return (
-    <Page className="trader-profile-news-screen">
+    <RoleAppShell role="trader" className="trader-profile-news-screen">
       <div style={headerStyles}>
         <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
           Quản lý
@@ -883,7 +884,7 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
           </div>
         )}
       </div>
-    </Page>
+    </RoleAppShell>
   );
 };
 

@@ -15,6 +15,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Text } from 'zmp-ui';
+import { RoleAppShell } from '@/navigation/RoleAppShell';
 import { Icon } from '../../../design-system/components/Icon';
 import { Card } from '../../../design-system/components/Card';
 import { colors } from '../../../design-system/tokens/colors';
@@ -378,7 +379,12 @@ export const FarmerContractsScreen: React.FC<FarmerContractsScreenProps> = ({
   };
 
   return (
-    <div className="farmer-contracts-screen" style={{ minHeight: '100vh', backgroundColor: colors.background.secondary }}>
+    <RoleAppShell
+      role="farmer"
+      className="farmer-contracts-screen"
+      pageStyle={{ backgroundColor: colors.background.secondary }}
+    >
+    <div style={{ minHeight: '100%', backgroundColor: colors.background.secondary }}>
       {/* Header */}
       <div style={headerStyles}>
           <div>
@@ -830,6 +836,7 @@ export const FarmerContractsScreen: React.FC<FarmerContractsScreenProps> = ({
         </div>
       )}
     </div>
+    </RoleAppShell>
   );
 };
 

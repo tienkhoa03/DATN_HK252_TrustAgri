@@ -14,7 +14,8 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Page, Text, Modal } from 'zmp-ui';
+import { Text, Modal } from 'zmp-ui';
+import { RoleAppShell } from '@/navigation/RoleAppShell';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
@@ -588,7 +589,7 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <Page className="farmer-process-screen">
+    <RoleAppShell role="farmer" className="farmer-process-screen">
       {/* ── Header ── */}
       <div style={headerStyles}>
         <div>
@@ -1255,7 +1256,7 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
           )}
         </div>
       </Modal>
-    </Page>
+    </RoleAppShell>
   );
 };
 

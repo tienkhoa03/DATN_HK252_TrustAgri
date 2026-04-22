@@ -6,7 +6,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Page, Text, Spinner, useNavigate } from 'zmp-ui';
+import { Text, Spinner, useNavigate } from 'zmp-ui';
+import { RoleAppShell } from '@/navigation/RoleAppShell';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { Icon, IconName } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
@@ -799,7 +800,7 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
   };
 
   return (
-    <Page className="buyer-profile-notification-screen">
+    <RoleAppShell role="buyer" className="buyer-profile-notification-screen">
       {/* Header */}
       <div style={headerStyles}>
         <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
@@ -843,7 +844,7 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
         {activeTab === 'notifications' && renderNotifications()}
         {activeTab === 'qr' && renderQRCode()}
       </div>
-    </Page>
+    </RoleAppShell>
   );
 };
 

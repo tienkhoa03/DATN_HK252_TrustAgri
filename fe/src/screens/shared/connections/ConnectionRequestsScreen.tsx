@@ -13,7 +13,8 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Page, Text } from 'zmp-ui';
+import { Text } from 'zmp-ui';
+import { RoleAppShell } from '@/navigation/RoleAppShell';
 import { useNavigate } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { Button } from '../../../design-system/components/Button';
@@ -230,7 +231,7 @@ export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> =
   const backPath = role === 'trader' ? '/trader/supply' : '/farmer/connect';
 
   return (
-    <Page className="connection-requests-screen">
+    <RoleAppShell role={role} className="connection-requests-screen">
       <style>{`
         @keyframes skeleton-pulse {
           0%, 100% { opacity: 1; }
@@ -414,7 +415,7 @@ export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> =
           </>
         )}
       </div>
-    </Page>
+    </RoleAppShell>
   );
 };
 
