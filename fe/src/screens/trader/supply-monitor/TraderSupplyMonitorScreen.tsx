@@ -20,7 +20,7 @@ import { SensorDisplay } from '../../../design-system/components/SensorDisplay';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
-import { listFarms } from '@/services/farmService';
+import { getFarm, listFarms } from '@/services/farmService';
 import type { FarmDto } from '@/services/farmService';
 import { ApiError } from '@/api/errors';
 import type { SensorType } from '@/services/monitoringService';
@@ -33,8 +33,9 @@ import {
   rejectConnection,
   createConnection,
   toConnectionViMessage,
+  searchFarmers,
 } from '@/services/connectionService';
-import type { ConnectionDto } from '@/services/connectionService';
+import type { ConnectionDto, FarmerSearchResultDto } from '@/services/connectionService';
 import {
   listContracts,
   getContractCompliance,
@@ -43,6 +44,8 @@ import {
   type ContractDto,
   type ComplianceDto,
 } from '@/services/contractService';
+import { listCareLogs, type CareLogDto } from '@/services/careLogService';
+import { listStandards, type StandardDto } from '@/services/standardService';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -105,15 +108,11 @@ function areaDisplay(areaM2: number): string {
 
 type TabType = 'my-farmers' | 'search-supply' | 'pending-requests' | 'compliance';
 
-interface MyFarmer {
-  id: string;
-  name: string;
-  farmName: string;
-  cropType: string;
-  seasonStatus: string;
-  complianceScore: number;
-  location: string;
-  area: string;
+interface ManagedFarmItem {
+  farm: FarmDto;
+  farmerName: string;
+  statusTitle: string;
+  latestPerformedAt?: string;
 }
 
 interface PendingRequest {
@@ -350,20 +349,25 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
 }) => {
   const session = useAtomValue(authSessionAtom);
   const [activeTab, setActiveTab] = useState<TabType>('my-farmers');
-  const [selectedFarmer, setSelectedFarmer] = useState<MyFarmer | null>(null);
+  const [selectedManagedFarm, setSelectedManagedFarm] = useState<ManagedFarmItem | null>(null);
 
   // ── Snackbar ──────────────────────────────────────────────────────────────
   const openSnackbar = useStableOpenSnackbar();
 
   // ── Search tab state ──────────────────────────────────────────────────────
   const [searchFilter, setSearchFilter] = useState({ cropType: 'all', region: 'all' });
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchSuggestions, setSearchSuggestions] = useState<FarmDto[]>([]);
+  const [isSuggestLoading, setIsSuggestLoading] = useState(false);
   const [searchFarms, setSearchFarms] = useState<FarmDto[]>([]);
   const [searchTotal, setSearchTotal] = useState(0);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [selectedFarm, setSelectedFarm] = useState<FarmDto | null>(null);
+  const [farmerNameByUserId, setFarmerNameByUserId] = useState<Record<string, string>>({});
   const inFlightSearchRef = useRef(false);
   const loadedSearchKeyRef = useRef<string | null>(null);
   const warnedNoSessionRef = useRef(false);
+  const suggestTimerRef = useRef<number | null>(null);
 
   // ── Load farms for search tab (GET /api/v1/farms) ─────────────────────────
 
@@ -384,7 +388,7 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
     }
 
     warnedNoSessionRef.current = false;
-    const searchKey = [session.userId, searchFilter.cropType, searchFilter.region].join('|');
+    const searchKey = [session.userId, searchFilter.cropType, searchFilter.region, searchKeyword.trim()].join('|');
     if (loadedSearchKeyRef.current === searchKey) return;
     if (inFlightSearchRef.current) return;
 
@@ -393,6 +397,7 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
     setSelectedFarm(null);
     try {
       const res = await listFarms({
+        keyword: searchKeyword.trim() || undefined,
         cropType: searchFilter.cropType,
         region: searchFilter.region,
         page: 1,
@@ -412,7 +417,49 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
       setIsSearchLoading(false);
       inFlightSearchRef.current = false;
     }
-  }, [searchFilter.cropType, searchFilter.region, session?.accessToken, session?.userId, openSnackbar]);
+  }, [searchFilter.cropType, searchFilter.region, searchKeyword, session?.accessToken, session?.userId, openSnackbar]);
+
+  const loadSearchSuggestions = useCallback(async (kw: string) => {
+    if (!session?.accessToken) return;
+    const keyword = kw.trim();
+    if (!keyword) {
+      setSearchSuggestions([]);
+      return;
+    }
+    setIsSuggestLoading(true);
+    try {
+      const res = await listFarms(
+        {
+          keyword,
+          cropType: searchFilter.cropType,
+          region: searchFilter.region,
+          page: 1,
+          limit: 5,
+        },
+        { accessToken: session.accessToken },
+      );
+      setSearchSuggestions(res.items);
+    } catch {
+      setSearchSuggestions([]);
+    } finally {
+      setIsSuggestLoading(false);
+    }
+  }, [searchFilter.cropType, searchFilter.region, session?.accessToken]);
+
+  const loadFarmerLookupMap = useCallback(async () => {
+    if (!session?.accessToken) return;
+    try {
+      // Best-effort: dùng searchFarmers để map ownerId -> displayName (API thật)
+      const res = await searchFarmers({ page: 1, limit: 200 });
+      const map: Record<string, string> = {};
+      res.items.forEach((f: FarmerSearchResultDto) => {
+        map[f.userId] = f.displayName;
+      });
+      setFarmerNameByUserId(map);
+    } catch {
+      // ignore
+    }
+  }, [session?.accessToken]);
 
   // Trigger on tab activation or filter change
   useEffect(() => {
@@ -425,50 +472,136 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
     loadedSearchKeyRef.current = null;
   }, [session?.userId]);
 
-  // ── Static mock data (My Farmers, Pending Requests, Monitoring) ───────────
+  useEffect(() => {
+    if (activeTab !== 'search-supply') return;
+    void loadFarmerLookupMap();
+  }, [activeTab, loadFarmerLookupMap]);
 
-  const myFarmers: MyFarmer[] = [
-    {
-      id: '1',
-      name: 'Tiến Khoa',
-      farmName: 'Farm Lab Đông A',
-      cropType: 'dragon_fruit',
-      seasonStatus: 'Đang ra hoa',
-      complianceScore: 95,
-      location: 'Tiền Giang',
-      area: '2.5 ha',
+  useEffect(() => {
+    if (activeTab !== 'search-supply') return;
+    if (suggestTimerRef.current) window.clearTimeout(suggestTimerRef.current);
+    suggestTimerRef.current = window.setTimeout(() => {
+      void loadSearchSuggestions(searchKeyword);
+    }, 320);
+    return () => {
+      if (suggestTimerRef.current) window.clearTimeout(suggestTimerRef.current);
+    };
+  }, [activeTab, loadSearchSuggestions, searchKeyword]);
+
+  // ── Tab "Quản lý vườn" (thay "Nông dân của tôi") — API thật ────────────────
+  const [managedFarms, setManagedFarms] = useState<ManagedFarmItem[]>([]);
+  const [isManagedFarmsLoading, setIsManagedFarmsLoading] = useState(false);
+  const managedLoadedRef = useRef(false);
+  const standardStepTitleMapRef = useRef<Map<string, string>>(new Map());
+
+  const loadStandardStepTitleMap = useCallback(async (): Promise<Map<string, string>> => {
+    if (standardStepTitleMapRef.current.size > 0) return standardStepTitleMapRef.current;
+    const res = await listStandards({ page: 1, limit: 200 });
+    const m = new Map<string, string>();
+    res.items.forEach((std: StandardDto) => {
+      std.steps.forEach((s) => m.set(s.id, s.title));
+    });
+    standardStepTitleMapRef.current = m;
+    return m;
+  }, []);
+
+  const resolveFarmStatusTitle = useCallback(
+    async (farmId: string): Promise<{ title: string; latestPerformedAt?: string }> => {
+      try {
+        const stepTitleMap = await loadStandardStepTitleMap();
+        const res = await listCareLogs(farmId, { page: 1, limit: 50 });
+        if (!res.items || res.items.length === 0) return { title: 'Chưa có nhật ký' };
+        const latest = res.items.reduce<CareLogDto>((acc, cur) => {
+          const at = new Date(acc.performedAt).getTime();
+          const ct = new Date(cur.performedAt).getTime();
+          return ct > at ? cur : acc;
+        }, res.items[0]);
+        const title = latest.standardStepId
+          ? (stepTitleMap.get(latest.standardStepId) ?? 'Đang chăm sóc')
+          : 'Đang chăm sóc';
+        return { title, latestPerformedAt: latest.performedAt };
+      } catch {
+        return { title: 'Không tải được trạng thái' };
+      }
     },
-    {
-      id: '2',
-      name: 'Văn Minh',
-      farmName: 'Vườn Bưởi Da Xanh',
-      cropType: 'pomelo',
-      seasonStatus: 'Đang phát triển',
-      complianceScore: 88,
-      location: 'Bến Tre',
-      area: '1.5 ha',
-    },
-    {
-      id: '3',
-      name: 'Thanh Tùng',
-      farmName: 'Vườn Xoài Cát Chu',
-      cropType: 'mango',
-      seasonStatus: 'Sắp thu hoạch',
-      complianceScore: 72,
-      location: 'Đồng Tháp',
-      area: '3 ha',
-    },
-    {
-      id: '4',
-      name: 'Minh Tuấn',
-      farmName: 'Thanh Long Ruột Đỏ Long An',
-      cropType: 'dragon_fruit',
-      seasonStatus: 'Đang ra hoa',
-      complianceScore: 91,
-      location: 'Long An',
-      area: '2 ha',
-    },
-  ];
+    [loadStandardStepTitleMap],
+  );
+
+  const loadManagedFarms = useCallback(async () => {
+    if (isManagedFarmsLoading) return;
+    if (!session?.accessToken) {
+      setManagedFarms([]);
+      openSnackbar({
+        type: 'error',
+        text: 'Phiên đăng nhập chưa sẵn sàng. Vui lòng đăng nhập lại.',
+        duration: 3500,
+        icon: true,
+      });
+      return;
+    }
+
+    setIsManagedFarmsLoading(true);
+    setSelectedManagedFarm(null);
+    try {
+      // 1) Lấy danh sách nông dân (kèm farms) và lọc các quan hệ đã kết nối
+      const farmerRes = await searchFarmers({ page: 1, limit: 200 });
+      const connectedFarmers = farmerRes.items.filter((f) => f.connectionStatus === 'accepted');
+
+      // 2) Gọi API thật GET /farms/:id để lấy FarmDto đầy đủ
+      const farmPairs: Array<{ farmId: string; farmerName: string }> = [];
+      connectedFarmers.forEach((f) => {
+        f.farms.forEach((fs) => {
+          farmPairs.push({ farmId: fs.id, farmerName: f.displayName });
+        });
+      });
+
+      const uniqueFarmIds = Array.from(new Set(farmPairs.map((p) => p.farmId)));
+      const farmById = new Map<string, FarmDto>();
+      const farmResults = await Promise.all(
+        uniqueFarmIds.map(async (id) => {
+          try {
+            const farm = await getFarm(id);
+            return { id, farm };
+          } catch {
+            return { id, farm: null as FarmDto | null };
+          }
+        }),
+      );
+      farmResults.forEach((r) => {
+        if (r.farm) farmById.set(r.id, r.farm);
+      });
+
+      const items = await Promise.all(
+        farmPairs.map(async (p) => {
+          const farm = farmById.get(p.farmId);
+          if (!farm) return null;
+          const status = await resolveFarmStatusTitle(farm.id);
+          return {
+            farm,
+            farmerName: p.farmerName,
+            statusTitle: status.title,
+            latestPerformedAt: status.latestPerformedAt,
+          } as ManagedFarmItem;
+        }),
+      );
+
+      const filtered = items.filter((x): x is ManagedFarmItem => x !== null);
+      filtered.sort((a, b) => {
+        const at = a.latestPerformedAt ? new Date(a.latestPerformedAt).getTime() : 0;
+        const bt = b.latestPerformedAt ? new Date(b.latestPerformedAt).getTime() : 0;
+        if (bt !== at) return bt - at;
+        return a.farm.name.localeCompare(b.farm.name, 'vi');
+      });
+      setManagedFarms(filtered);
+      managedLoadedRef.current = true;
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'search'), duration: 4500, icon: true });
+      setManagedFarms([]);
+      managedLoadedRef.current = false;
+    } finally {
+      setIsManagedFarmsLoading(false);
+    }
+  }, [isManagedFarmsLoading, openSnackbar, resolveFarmStatusTitle, session?.accessToken]);
 
   // ── Pending connection requests (connectionService — Axios thật) ──────────
   const [pendingConnections, setPendingConnections] = useState<ConnectionDto[]>([]);
@@ -568,6 +701,12 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
     }
   }, [activeTab, loadPendingConnections]);
 
+  useEffect(() => {
+    if (activeTab !== 'my-farmers') return;
+    if (managedLoadedRef.current) return;
+    void loadManagedFarms();
+  }, [activeTab, loadManagedFarms]);
+
   const handleConnAccept = async (conn: ConnectionDto) => {
     setConnActionPending((p) => ({ ...p, [conn.id]: true }));
     try {
@@ -609,22 +748,7 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
   // pendingRequests static đã thay bằng pendingConnections từ API
   const pendingRequests: PendingRequest[] = [];
 
-  const monitoringData: MonitoringData = {
-    temperature: 32,
-    humidity: 65,
-    light: 850,
-    standardTemp: { min: 25, max: 30 },
-    standardHumidity: { min: 70, max: 85 },
-    standardLight: { min: 800, max: 1200 },
-  };
-
-  const isOutOfRange = (value: number, min: number, max: number) => value < min || value > max;
-
-  const getComplianceColor = (score: number) => {
-    if (score >= 90) return colors.primary.agriGreen;
-    if (score >= 75) return colors.functional.warningYellow;
-    return colors.functional.alertRed;
-  };
+  // (removed) monitoringData + compliance helpers (mock/compliance index removed from "Quản lý vườn")
 
   // ── Styles ─────────────────────────────────────────────────────────────────
 
@@ -670,6 +794,13 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
     transition: 'all 0.2s',
   };
 
+  // ── Compliance helpers (used in tab "Tuân thủ") ────────────────────────────
+  const getComplianceColor = (score: number) => {
+    if (score >= 90) return colors.primary.agriGreen;
+    if (score >= 75) return colors.functional.warningYellow;
+    return colors.functional.alertRed;
+  };
+
   const complianceBarContainer = (score: number): React.CSSProperties => ({
     width: '100%',
     height: '6px',
@@ -693,20 +824,7 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
     marginBottom: spacing.md,
   };
 
-  const filterChipStyles = (isActive: boolean): React.CSSProperties => ({
-    padding: `${spacing.xs} ${spacing.sm}`,
-    backgroundColor: isActive ? colors.primary.zaloBlue : colors.background.primary,
-    color: isActive ? '#fff' : colors.text.primary,
-    border: `1px solid ${isActive ? colors.primary.zaloBlue : colors.background.tertiary}`,
-    borderRadius: '99px',
-    cursor: 'pointer',
-    fontSize: fontSize.caption,
-    fontWeight: fontWeight.medium,
-    marginRight: spacing.xs,
-    marginBottom: spacing.xs,
-    transition: 'all 0.2s',
-    whiteSpace: 'nowrap',
-  });
+  // filterChipStyles removed (search tab uses selects for mobile best-practice)
 
   const requestCardStyles: React.CSSProperties = {
     padding: spacing.md,
@@ -750,83 +868,87 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
   const renderMyFarmersTab = () => (
     <div>
       <Text.Title size="small" style={{ marginBottom: spacing.md }}>
-        Danh sách nông dân ({myFarmers.length})
+        Danh sách vườn ({managedFarms.length})
       </Text.Title>
 
-      {myFarmers.map((farmer) => (
-        <div
-          key={farmer.id}
-          style={farmerCardStyles}
-          onClick={() => setSelectedFarmer(farmer)}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.13)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div style={{ flex: 1 }}>
-              <Text.Title size="small" style={{ margin: 0 }}>{farmer.name}</Text.Title>
-              <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>{farmer.farmName}</Text>
-            </div>
-            <span
-              style={{
-                padding: `2px ${spacing.sm}`,
-                backgroundColor: `${colors.primary.agriGreen}18`,
-                borderRadius: '99px',
-                fontSize: fontSize.caption,
-                fontWeight: fontWeight.semibold,
-                color: colors.primary.agriGreen,
-              }}
-            >
-              {cropLabel(farmer.cropType)}
-            </span>
-          </div>
-
-          <div style={{ marginTop: spacing.sm, display: 'flex', gap: spacing.md, flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs }}>
-              <Icon name="map-pin" size="sm" color={colors.text.secondary} />
-              <Text size="xSmall" style={{ color: colors.text.secondary }}>{farmer.location}</Text>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs }}>
-              <Icon name="crop" size="sm" color={colors.text.secondary} />
-              <Text size="xSmall" style={{ color: colors.text.secondary }}>{farmer.area}</Text>
-            </div>
-          </div>
-
-          <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.sm }}>
-            Trạng thái:{' '}
-            <span style={{ color: colors.text.primary, fontWeight: fontWeight.medium }}>
-              {farmer.seasonStatus}
-            </span>
-          </Text>
-
-          <div style={{ marginTop: spacing.sm }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Text size="xSmall" style={{ color: colors.text.secondary }}>Chỉ số tuân thủ</Text>
-              <Text
-                size="xSmall"
-                style={{ color: getComplianceColor(farmer.complianceScore), fontWeight: fontWeight.bold }}
-              >
-                {farmer.complianceScore}%
-              </Text>
-            </div>
-            <div style={complianceBarContainer(farmer.complianceScore)}>
-              <div style={complianceBarFill(farmer.complianceScore)} />
-            </div>
-          </div>
+      {isManagedFarmsLoading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: spacing.xl, gap: spacing.sm }}>
+          <Spinner />
+          <Text size="small" style={{ color: colors.text.secondary }}>Đang tải danh sách vườn…</Text>
         </div>
-      ))}
+      ) : managedFarms.length === 0 ? (
+        <div style={{ padding: spacing.xl, textAlign: 'center' }}>
+          <Icon name="farm" size="lg" color={colors.text.secondary} />
+          <Text size="small" style={{ color: colors.text.secondary, marginTop: spacing.md }}>
+            Chưa có vườn nào trong danh sách quản lý
+          </Text>
+          <Text size="xSmall" style={{ color: colors.text.secondary }}>
+            Hãy kết nối với nông dân để theo dõi vườn
+          </Text>
+        </div>
+      ) : (
+        managedFarms.map((item) => (
+          <div
+            key={item.farm.id}
+            style={farmerCardStyles}
+            onClick={() => setSelectedManagedFarm(item)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(0,0,0,0.13)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)';
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ flex: 1 }}>
+                <Text.Title size="small" style={{ margin: 0 }}>{item.farm.name}</Text.Title>
+                <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>{item.farmerName}</Text>
+              </div>
+              <span
+                style={{
+                  padding: `2px ${spacing.sm}`,
+                  backgroundColor: `${colors.primary.agriGreen}18`,
+                  borderRadius: '99px',
+                  fontSize: fontSize.caption,
+                  fontWeight: fontWeight.semibold,
+                  color: colors.primary.agriGreen,
+                }}
+              >
+                {cropLabel(item.farm.cropType)}
+              </span>
+            </div>
+
+            <div style={{ marginTop: spacing.sm, display: 'flex', gap: spacing.md, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs }}>
+                <Icon name="map-pin" size="sm" color={colors.text.secondary} />
+                <Text size="xSmall" style={{ color: colors.text.secondary }}>
+                  {item.farm.location?.province ? item.farm.location.province : '—'}
+                </Text>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs }}>
+                <Icon name="crop" size="sm" color={colors.text.secondary} />
+                <Text size="xSmall" style={{ color: colors.text.secondary }}>{areaDisplay(item.farm.area)}</Text>
+              </div>
+            </div>
+
+            <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.sm }}>
+              Trạng thái:{' '}
+              <span style={{ color: colors.text.primary, fontWeight: fontWeight.medium }}>
+                {item.statusTitle}
+              </span>
+            </Text>
+          </div>
+        ))
+      )}
 
       {/* Monitoring panel — Phase 6.2 Integration: gọi API thật qua useMonitoring */}
-      {selectedFarmer && (
+      {selectedManagedFarm && (
         <FarmerMonitoringPanel
-          farmId={`farm-00${selectedFarmer.id}`}
-          farmName={selectedFarmer.farmName}
-          onClose={() => setSelectedFarmer(null)}
+          farmId={selectedManagedFarm.farm.id}
+          farmName={selectedManagedFarm.farm.name}
+          onClose={() => setSelectedManagedFarm(null)}
           monitoringSectionStyles={monitoringSectionStyles}
           deviationBoxStyles={deviationBoxStyles}
         />
@@ -838,41 +960,131 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
 
   const renderSearchSupplyTab = () => (
     <div>
-      {/* Filters */}
+      {/* Search + filters (mobile-first) */}
       <div style={filterSectionStyles}>
-        <Text size="small" style={{ fontWeight: fontWeight.semibold, marginBottom: spacing.sm }}>
-          Bộ lọc
-        </Text>
+        <Text size="small" style={{ fontWeight: fontWeight.semibold, marginBottom: spacing.sm }}>Tìm kiếm vườn</Text>
+
+        <div style={{ position: 'relative', marginBottom: spacing.md }}>
+          <input
+            value={searchKeyword}
+            onChange={(e) => setSearchKeyword(e.target.value)}
+            placeholder="Nhập tên vườn…"
+            style={{
+              width: '100%',
+              padding: `${spacing.sm} ${spacing.md}`,
+              borderRadius: 10,
+              border: `1px solid ${colors.background.tertiary}`,
+              fontSize: fontSize.body,
+              boxSizing: 'border-box',
+            }}
+          />
+
+          {(isSuggestLoading || searchSuggestions.length > 0) && searchKeyword.trim() && (
+            <div
+              style={{
+                position: 'absolute',
+                top: 'calc(100% + 6px)',
+                left: 0,
+                right: 0,
+                backgroundColor: colors.background.primary,
+                border: `1px solid ${colors.background.tertiary}`,
+                borderRadius: 10,
+                boxShadow: '0 8px 20px rgba(0,0,0,0.12)',
+                zIndex: 10,
+                overflow: 'hidden',
+              }}
+            >
+              {isSuggestLoading ? (
+                <div style={{ padding: spacing.md, display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+                  <Spinner />
+                  <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>Đang gợi ý…</Text>
+                </div>
+              ) : (
+                searchSuggestions.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => {
+                      setSearchKeyword(f.name);
+                      setSearchSuggestions([]);
+                      loadedSearchKeyRef.current = null;
+                      void loadSearchFarms();
+                    }}
+                    style={{
+                      width: '100%',
+                      textAlign: 'left',
+                      padding: `${spacing.sm} ${spacing.md}`,
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>{f.name}</Text>
+                    <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>
+                      {f.location?.province ? `${f.location.province} • ${cropLabel(f.cropType)}` : cropLabel(f.cropType)}
+                    </Text>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
 
         <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: spacing.xs }}>
           Loại nông sản:
         </Text>
-        <div style={{ display: 'flex', flexWrap: 'wrap', marginBottom: spacing.md }}>
-          {CROP_FILTER_OPTIONS.slice(0, 7).map((opt) => (
-            <button
-              key={opt.value}
-              style={filterChipStyles(searchFilter.cropType === opt.value)}
-              onClick={() => setSearchFilter((prev) => ({ ...prev, cropType: opt.value }))}
-            >
-              {opt.label}
-            </button>
+        <select
+          value={searchFilter.cropType}
+          onChange={(e) => setSearchFilter((prev) => ({ ...prev, cropType: e.target.value }))}
+          style={{
+            width: '100%',
+            padding: `${spacing.sm} ${spacing.md}`,
+            borderRadius: 10,
+            border: `1px solid ${colors.background.tertiary}`,
+            fontSize: fontSize.body,
+            backgroundColor: colors.background.primary,
+            marginBottom: spacing.md,
+          }}
+        >
+          {CROP_FILTER_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
-        </div>
+        </select>
 
         <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: spacing.xs }}>
           Tỉnh / Thành phố:
         </Text>
-        <div style={{ display: 'flex', flexWrap: 'wrap' }}>
+        <select
+          value={searchFilter.region}
+          onChange={(e) => setSearchFilter((prev) => ({ ...prev, region: e.target.value }))}
+          style={{
+            width: '100%',
+            padding: `${spacing.sm} ${spacing.md}`,
+            borderRadius: 10,
+            border: `1px solid ${colors.background.tertiary}`,
+            fontSize: fontSize.body,
+            backgroundColor: colors.background.primary,
+          }}
+        >
           {REGION_OPTIONS.map((region) => (
-            <button
-              key={region}
-              style={filterChipStyles(searchFilter.region === region)}
-              onClick={() => setSearchFilter((prev) => ({ ...prev, region }))}
-            >
-              {region === 'all' ? 'Tất cả' : region}
-            </button>
+            <option key={region} value={region}>{region === 'all' ? 'Tất cả' : region}</option>
           ))}
-        </div>
+        </select>
+
+        <button
+          type="button"
+          style={{
+            ...actionBtnStyles(true),
+            width: '100%',
+            marginTop: spacing.md,
+          }}
+          onClick={() => {
+            loadedSearchKeyRef.current = null;
+            void loadSearchFarms();
+          }}
+        >
+          Tìm kiếm
+        </button>
       </div>
 
       {/* Map placeholder */}
@@ -993,6 +1205,15 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
                   </Text.Title>
 
                   <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: spacing.sm }}>
+                      <Icon name="users" size="sm" color={colors.text.secondary} />
+                      <div>
+                        <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Nông dân</Text>
+                        <Text size="small" style={{ margin: 0 }}>
+                          {farmerNameByUserId[farm.ownerId] ?? `…${farm.ownerId.slice(-6)}`}
+                        </Text>
+                      </div>
+                    </div>
                     <div style={{ display: 'flex', alignItems: 'flex-start', gap: spacing.sm }}>
                       <Icon name="map-pin" size="sm" color={colors.primary.zaloBlue} />
                       <div>
@@ -1385,10 +1606,10 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
         {/* Tab Bar */}
         <div style={tabBarStyles}>
           <button style={tabButtonStyles(activeTab === 'my-farmers')} onClick={() => setActiveTab('my-farmers')}>
-            Nông dân của tôi
+            Quản lý vườn
           </button>
           <button style={tabButtonStyles(activeTab === 'search-supply')} onClick={() => setActiveTab('search-supply')}>
-            Tìm kiếm
+            Tìm kiếm vườn
           </button>
           <button style={tabButtonStyles(activeTab === 'pending-requests')} onClick={() => setActiveTab('pending-requests')}>
             Yêu cầu {pendingConnections.length > 0 && `(${pendingConnections.length})`}

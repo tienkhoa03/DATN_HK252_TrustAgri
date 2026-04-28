@@ -13,4 +13,8 @@ export class ListFarmsQueryDto extends PaginationQueryDto {
   @IsOptional()
   @IsString()
   ownerId?: string;
+
+  @IsOptional()
+  @IsString()
+  keyword?: string;
 }

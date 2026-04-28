@@ -51,6 +51,9 @@ export class FarmsService {
 
     const qb = this.farmRepo.createQueryBuilder('farm');
 
+    if (query.keyword) {
+      qb.andWhere('farm.name ILIKE :kw', { kw: `%${query.keyword}%` });
+    }
     if (query.region) {
       qb.andWhere("farm.location->>'province' = :region", {
         region: query.region,

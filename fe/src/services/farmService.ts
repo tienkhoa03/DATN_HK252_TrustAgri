@@ -50,6 +50,7 @@ export interface ListFarmsParams {
   region?: string;
   cropType?: string;
   ownerId?: string;
+  keyword?: string;
   page?: number;
   limit?: number;
 }
@@ -75,6 +76,7 @@ export async function listFarms(
   // Lọc bỏ giá trị 'all' — chỉ có ý nghĩa với UI, không phải API
   const cleanParams: Record<string, unknown> = {};
   if (params.ownerId) cleanParams.ownerId = params.ownerId;
+  if (params.keyword && params.keyword.trim()) cleanParams.keyword = params.keyword.trim();
   if (params.cropType && params.cropType !== 'all') cleanParams.cropType = params.cropType;
   if (params.region && params.region !== 'all') cleanParams.region = params.region;
   if (params.page) cleanParams.page = params.page;

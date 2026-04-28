@@ -211,7 +211,7 @@ Phân bổ FR: FR-F01, FR-F05, FR-F06, FR-F09, FR-T07, FR-T10, FR-G01.
 | Endpoint | FR | Mô tả ngắn |
 |---|---|---|
 | `POST /api/v1/farms` | FR-F01 | Tạo Farm Lab (nông dân) |
-| `GET /api/v1/farms` | FR-F01, FR-T07 | Danh sách + lọc `?region&cropType&ownerId&page&limit` |
+| `GET /api/v1/farms` | FR-F01, FR-T07 | Danh sách + lọc `?region&cropType&ownerId&keyword&page&limit` |
 | `GET /api/v1/farms/:id` | FR-F01 | Chi tiết vườn |
 | `PUT /api/v1/farms/:id` | FR-F01 | Cập nhật vườn (chỉ chủ sở hữu) |
 | `DELETE /api/v1/farms/:id` | FR-F01 | Xóa (nếu không có hợp đồng `active`) |
