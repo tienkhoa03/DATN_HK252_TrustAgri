@@ -1,15 +1,23 @@
 #!/usr/bin/env node
 
 /**
- * Bundle Size Checker
- * Verifies that the bundle size is under the 20MB limit
+ * Bundle Size Checker (NFR-C01)
+ *
+ * Hard limit ZMP: 20MB. Project budget: 18MB (buffer 2MB cho assets late-add).
+ * Override qua env: BUNDLE_LIMIT_MB=20 để check sát ZMP limit.
+ *
+ * Exit codes:
+ *   0 — within budget
+ *   1 — exceeds budget OR build dir missing
  */
 
 const fs = require('fs');
 const path = require('path');
 
-const BUNDLE_SIZE_LIMIT_MB = 20;
+const BUNDLE_SIZE_LIMIT_MB = parseInt(process.env.BUNDLE_LIMIT_MB || '18', 10);
+const BUNDLE_HARD_LIMIT_MB = 20; // ZMP platform limit
 const BUNDLE_SIZE_LIMIT_BYTES = BUNDLE_SIZE_LIMIT_MB * 1024 * 1024;
+const BUNDLE_HARD_LIMIT_BYTES = BUNDLE_HARD_LIMIT_MB * 1024 * 1024;
 const BUILD_DIR = path.join(__dirname, '../www');
 
 /**
@@ -99,7 +107,7 @@ function main() {
   console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
   
   console.log(`Total Size: ${formatBytes(totalSize)}`);
-  console.log(`Limit: ${formatBytes(BUNDLE_SIZE_LIMIT_BYTES)}`);
+  console.log(`Project Budget: ${formatBytes(BUNDLE_SIZE_LIMIT_BYTES)} (buffer dưới ZMP ${BUNDLE_HARD_LIMIT_MB}MB)`);
   console.log(`Usage: ${percentage.toFixed(2)}%\n`);
   
   // Get largest files
@@ -114,16 +122,21 @@ function main() {
     console.log(`   ${formatBytes(file.size)}\n`);
   });
   
-  // Check if within limit
+  // Check against project budget (hard fail)
   if (totalSize > BUNDLE_SIZE_LIMIT_BYTES) {
-    console.error(`❌ Bundle size exceeds ${BUNDLE_SIZE_LIMIT_MB}MB limit!`);
-    console.error(`   Please optimize your bundle to reduce size.\n`);
+    console.error(`❌ Bundle size vượt budget ${BUNDLE_SIZE_LIMIT_MB}MB!`);
+    if (totalSize > BUNDLE_HARD_LIMIT_BYTES) {
+      console.error(`   ⚠️  CŨNG VƯỢT ZMP hard limit ${BUNDLE_HARD_LIMIT_MB}MB — KHÔNG deploy được.`);
+    } else {
+      console.error(`   (vẫn dưới ZMP hard limit ${BUNDLE_HARD_LIMIT_MB}MB nhưng đã hết buffer.)`);
+    }
+    console.error(`   Tối ưu bundle: code-split heavy screen, lazy-load lib lớn, kiểm tra duplicate deps.\n`);
     process.exit(1);
   } else if (percentage > 90) {
-    console.warn(`⚠️  Bundle size is at ${percentage.toFixed(2)}% of limit.`);
-    console.warn(`   Consider optimizing to stay well under the limit.\n`);
+    console.warn(`⚠️  Bundle size at ${percentage.toFixed(2)}% of budget.`);
+    console.warn(`   Cân nhắc tối ưu để giữ buffer cho assets thêm sau.\n`);
   } else {
-    console.log(`✅ Bundle size is within ${BUNDLE_SIZE_LIMIT_MB}MB limit.\n`);
+    console.log(`✅ Bundle size within ${BUNDLE_SIZE_LIMIT_MB}MB budget (ZMP hard limit ${BUNDLE_HARD_LIMIT_MB}MB).\n`);
   }
   
   // Group by file type

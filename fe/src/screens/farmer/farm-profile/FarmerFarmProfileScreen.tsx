@@ -140,6 +140,8 @@ export const FarmerFarmProfileScreen: React.FC = () => {
     isLoading,
     isMutating,
     error,
+    fromCache,
+    cachedAt,
     clearError,
     loadFarms,
     createFarm,
@@ -1364,6 +1366,32 @@ export const FarmerFarmProfileScreen: React.FC = () => {
             </button>
           )}
         </div>
+
+        {/* NFR-A02 banner: dữ liệu từ cache khi offline. */}
+        {fromCache && viewMode === 'list' && (
+          <div
+            style={{
+              padding: `${spacing.sm} ${spacing.md}`,
+              backgroundColor: '#FFFBEB',
+              borderBottom: '1px solid #FFCC00',
+              display: 'flex',
+              alignItems: 'center',
+              gap: spacing.sm,
+            }}
+          >
+            <span style={{ fontSize: 16 }}>📡</span>
+            <div style={{ flex: 1 }}>
+              <Text size="small" style={{ color: '#B8960C', fontWeight: fontWeight.semibold, margin: 0 }}>
+                Đang offline — hiển thị dữ liệu lưu cục bộ
+              </Text>
+              {cachedAt && (
+                <Text size="xSmall" style={{ color: '#B8960C', margin: 0 }}>
+                  Cập nhật lần cuối: {cachedAt.toLocaleString('vi-VN')}
+                </Text>
+              )}
+            </div>
+          </div>
+        )}
 
         {viewMode === 'list' && renderList()}
         {viewMode === 'detail' && renderDetail()}

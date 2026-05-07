@@ -25,6 +25,7 @@ import { useState, useCallback } from 'react';
 import * as farmService from '@/services/farmService';
 import type { FarmDto, ListFarmsParams, CreateFarmDto, UpdateFarmDto, ListResponse } from '@/services/farmService';
 import { ApiError } from '@/api/errors';
+import { saveFarmsCache, readFarmsCache } from '@/services/farmsCache';
 
 export type { FarmDto, ListFarmsParams, CreateFarmDto, UpdateFarmDto };
 
@@ -76,6 +77,13 @@ export interface UseFarmsReturn {
   isMutating: boolean;
   /** Thông báo lỗi tiếng Việt; null khi không có lỗi. */
   error: string | null;
+  /**
+   * NFR-A02: true khi `farms` đến từ localStorage cache (mất mạng hoặc backend lỗi).
+   * UI nên hiển thị banner "đang offline".
+   */
+  fromCache: boolean;
+  /** Thời điểm cache được tạo (chỉ có khi fromCache=true). */
+  cachedAt: Date | null;
   /** Xóa error để tránh hiện lại snackbar cũ. */
   clearError: () => void;
   /** Tải danh sách vườn theo params. */
@@ -105,19 +113,42 @@ export function useFarms(): UseFarmsReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [isMutating, setIsMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fromCache, setFromCache] = useState(false);
+  const [cachedAt, setCachedAt] = useState<Date | null>(null);
 
   const clearError = useCallback(() => setError(null), []);
 
-  // ── GET /api/v1/farms ────────────────────────────────────────────────────
+  // ── GET /api/v1/farms (offline-first NFR-A02) ────────────────────────────
 
   const loadFarms = useCallback(async (params?: ListFarmsParams) => {
     setIsLoading(true);
     setError(null);
+    setFromCache(false);
+    setCachedAt(null);
     try {
       const res: ListResponse<FarmDto> = await farmService.listFarms(params);
       setFarms(res.items);
       setTotal(res.total);
+      // Cache theo ownerId nếu có (per-user cache). Không cache filter khác để đơn giản.
+      if (params?.ownerId) {
+        saveFarmsCache(params.ownerId, res.items, res.total);
+      }
     } catch (err) {
+      // NFR-A02: nếu mất mạng hoặc service không khả dụng, fallback cache.
+      const isOfflineLike =
+        err instanceof ApiError &&
+        (err.code === 'NETWORK_ERROR' || err.code === 'SERVICE_UNAVAILABLE');
+      if (isOfflineLike && params?.ownerId) {
+        const cached = readFarmsCache(params.ownerId);
+        if (cached) {
+          setFarms(cached.items);
+          setTotal(cached.total);
+          setFromCache(true);
+          setCachedAt(cached.cachedAt);
+          // Không set error — user sẽ thấy banner offline thay vì error toast.
+          return;
+        }
+      }
       setError(toVietnameseError(err, 'load'));
     } finally {
       setIsLoading(false);
@@ -183,6 +214,8 @@ export function useFarms(): UseFarmsReturn {
     isLoading,
     isMutating,
     error,
+    fromCache,
+    cachedAt,
     clearError,
     loadFarms,
     createFarm,

@@ -27,6 +27,8 @@ const WS_ORIGIN = ENV.API_BASE_URL.replace(/\/api\/v1\/?$/, '');
 
 export type SensorUpdateCallback = (reading: SensorReadingDto) => void;
 export type AlertCreatedCallback = (alert: AlertDto) => void;
+export type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected';
+export type ConnectionStatusCallback = (status: ConnectionStatus, info?: { downtimeMs: number }) => void;
 
 // ── Internal state ────────────────────────────────────────────────────────────
 
@@ -34,6 +36,21 @@ let socket: Socket | null = null;
 const subscribedFarms = new Set<string>();
 const callbacks = new Map<string, Set<SensorUpdateCallback>>();
 const alertCallbacks = new Map<string, Set<AlertCreatedCallback>>();
+const connectionCallbacks = new Set<ConnectionStatusCallback>();
+
+// Track disconnect duration để hiện toast khi mất WS > 30s rồi reconnect.
+let disconnectedAt: number | null = null;
+const DOWNTIME_TOAST_THRESHOLD_MS = 30_000;
+
+function notifyStatus(status: ConnectionStatus, downtimeMs?: number) {
+  for (const cb of connectionCallbacks) {
+    try {
+      cb(status, downtimeMs != null ? { downtimeMs } : undefined);
+    } catch {
+      /* ignore subscriber errors */
+    }
+  }
+}
 
 // Disconnect and clear socket whenever the access token changes (logout / re-login)
 getDefaultStore().sub(accessTokenAtom, () => {
@@ -54,8 +71,14 @@ function getOrCreateSocket(): Socket {
     auth: token ? { token: `Bearer ${token}` } : undefined,
     autoConnect: true,
     reconnection: true,
-    reconnectionDelay: 2000,
+    // Exponential backoff: 1s → 2s → 4s → … → 30s max (NFR-A01, NFR-X01)
+    reconnectionDelay: 1000,
+    reconnectionDelayMax: 30_000,
+    randomizationFactor: 0.5,
     reconnectionAttempts: Infinity,
+    // Engine.IO heartbeat — server gửi ping mỗi 25s mặc định, client phản hồi pong;
+    // timeout cho server pong (cấu hình client-side detection if server unresponsive).
+    timeout: 20_000,
   });
 
   socket.on('connect', () => {
@@ -63,6 +86,29 @@ function getOrCreateSocket(): Socket {
     for (const farmId of subscribedFarms) {
       socket!.emit('subscribe_farm', { farmId });
     }
+    if (disconnectedAt != null) {
+      const downtime = Date.now() - disconnectedAt;
+      disconnectedAt = null;
+      // Chỉ thông báo nếu downtime đáng kể (> 30s) để tránh spam toast khi blip mạng.
+      if (downtime > DOWNTIME_TOAST_THRESHOLD_MS) {
+        notifyStatus('connected', downtime);
+      } else {
+        notifyStatus('connected');
+      }
+    } else {
+      notifyStatus('connected');
+    }
+  });
+
+  socket.on('disconnect', (reason) => {
+    if (disconnectedAt == null) disconnectedAt = Date.now();
+    notifyStatus('disconnected');
+    // eslint-disable-next-line no-console
+    console.warn('[monitoringSocket] disconnect:', reason);
+  });
+
+  socket.io.on('reconnect_attempt', () => {
+    notifyStatus('reconnecting');
   });
 
   socket.on('sensor_update', (reading: SensorReadingDto) => {
@@ -152,4 +198,18 @@ export function disconnectMonitoringSocket(): void {
   subscribedFarms.clear();
   callbacks.clear();
   alertCallbacks.clear();
+  connectionCallbacks.clear();
+  disconnectedAt = null;
+}
+
+/**
+ * Đăng ký callback nhận trạng thái kết nối WS (NFR-A01).
+ * UI dùng để hiển thị toast/banner khi mất kết nối kéo dài và reconnect thành công.
+ * @returns cleanup function.
+ */
+export function subscribeConnectionStatus(cb: ConnectionStatusCallback): () => void {
+  connectionCallbacks.add(cb);
+  return () => {
+    connectionCallbacks.delete(cb);
+  };
 }
