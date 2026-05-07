@@ -36,6 +36,7 @@ export interface FarmDto {
   cropType: string;         // ví dụ: "dragon_fruit"
   standardId?: string;      // liên kết tiêu chuẩn (FR-F06)
   traceabilityCode?: string; // FR-G01: mã QR truy xuất công khai (TR-<12chars>)
+  plantingDate?: string;    // FR-F09: ngày trồng (ISO date 'YYYY-MM-DD'), input cho care-plan
   createdAt: string;        // ISO-8601
   updatedAt: string;        // ISO-8601
 }
@@ -60,7 +61,7 @@ export interface ListFarmsRequestOptions {
   accessToken?: string;
 }
 
-export type CreateFarmDto = Pick<FarmDto, 'name' | 'location' | 'area' | 'cropType' | 'standardId'>;
+export type CreateFarmDto = Pick<FarmDto, 'name' | 'location' | 'area' | 'cropType' | 'standardId' | 'plantingDate'>;
 export type UpdateFarmDto = Partial<CreateFarmDto>;
 
 // ── Service functions ─────────────────────────────────────────────────────────

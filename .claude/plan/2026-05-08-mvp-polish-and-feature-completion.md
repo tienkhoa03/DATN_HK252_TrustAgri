@@ -1,7 +1,7 @@
 # Plan: MVP Polish & Feature Completion
 
 **Created:** 2026-05-08
-**Status:** in-progress (Phase A done; B3/B4/B5 done; B1/B2/Phase C pending)
+**Status:** in-progress (Phase A + B done; Phase C pending)
 **Owner:** tienkhoa03@gmail.com
 **Related:** US-F01..F05, US-T01..T04, US-U01..U06, US-G01..G02, FR-F01/F03/F06/F07/F08/F09, FR-T01/T05/T06/T08/T11/T12, FR-U06, FR-G01, FR-S01, NFR-A01, NFR-A02, NFR-C01, NFR-P01, NFR-P02, NFR-R02, NFR-R03, NFR-S02, NFR-U01, NFR-U02, NFR-U03
 
@@ -318,12 +318,12 @@ NODE_ENV=development                      # mode 3, 4 chỉ chạy khi !=product
    - `GuestProductDetailScreen`: xóa `MOCK_REVIEWS` + block đánh giá.
 8. **A3** ✅ `TraderProfileNewsScreen` — load `getMe()` khi mở tab Hồ sơ; `handleSaveProfile()` gọi `updateMe({ phone, email, traderProfile })`. Hỗ trợ trustScore read-only.
 
-### Phase B — Feature gaps (2 sprint) — partial
+### Phase B — Feature gaps (2 sprint) — ✅ DONE
 
-4. **B1** ⏸ BE: tạo migration `iot_devices` + module `devices`. **DEFERRED** — cần BE entity mới + module + shared DTO; nên có session riêng để test kỹ.
-5. **B1** ⏸ FE: `deviceService.ts` + `useDevices` hook + tab Devices. **DEFERRED** — phụ thuộc B1 BE. Hiện FarmerFarmProfileScreen show placeholder "sắp ra mắt".
-6. **B2** ⏸ BE: module `care-plans` + endpoint `today`/`complete`. **DEFERRED** — cần thêm cột `farms.planting_date` trước (DB migration); phụ thuộc B1 entity pattern.
-7. **B2** ⏸ FE: `carePlanService.ts` + `useCarePlan` + tab "Công việc". **DEFERRED** — phụ thuộc B2 BE. Hiện FarmerProcessScreen show empty state.
+4. **B1** ✅ BE: `IotDeviceEntity` (table `iot_devices` với soft delete, sensor_types text[]); module `devices` trong monitoring-service với 4 endpoint (`GET /monitoring/farms/:farmId/devices`, `POST`, `PATCH /monitoring/devices/:id`, `DELETE`). DTO `IotDeviceDto/CreateIotDeviceDto/UpdateIotDeviceDto` trong shared lib. Auth qua global `JwtAuthGuard`. Build pass.
+5. **B1** ✅ FE: `deviceService.ts` (4 functions + viMessage); hook `useDevices(farmId)`; UI block trong FarmerFarmProfileScreen (list + add form với chọn sensor types + xóa). TS typecheck pass.
+6. **B2** ✅ BE: thêm cột `farms.planting_date date NULL`; module `care-plans` trong farm-service với 2 endpoint (`GET /farms/:farmId/care-plan/today`, `POST /farms/:farmId/care-plan/tasks/:standardStepId/complete`). Logic: compute cycleDay từ plantingDate, filter standard.steps theo expectedDay ≤ cycleDay, mark completed dựa trên care_logs. DTO `DailyTaskDto/CarePlanResponseDto/CompleteTaskResponseDto`. Permission check farm owner. Build pass.
+7. **B2** ✅ FE: `carePlanService.ts` (getTodayPlan/completeCareTask + viMessage); hook `useCarePlan(farmId)`; FarmerProcessScreen tab "Công việc" wire vào hook (skeleton loading, empty state khi chưa có plantingDate, optimistic toggle với rollback). FarmDto thêm `plantingDate?` + `CreateFarmDto` cho phép set khi tạo/update farm.
 8. **B3** ✅ FE: cài `qrcode.react@^4.2.0`; component `fe/src/design-system/components/QRCode/QRCode.tsx`; replace icon QR trong `FarmerFarmProfileScreen` bằng QR thật từ `traceabilityCode` (fallback compute từ `farm.id`). Thêm field `traceabilityCode?: string` vào `FarmDto`.
 9. **B4** ✅ BE: KHÔNG cần endpoint riêng — dùng existing `PUT /auth/me { avatarUrl }` với data URL. Đơn giản hóa cho MVP (avatar lưu base64 trong DB). Production cần migrate sang multipart + S3 (R3 trong plan).
 10. **B4** ✅ FE: `uploadAvatar(blob)` trong `authService.ts` (max 200KB, convert base64 → updateMe); nút "📷" trong `ProfileScreen` ProfileHero (ZMP `chooseImage` + browser fallback file input).
@@ -345,14 +345,16 @@ NODE_ENV=development                      # mode 3, 4 chỉ chạy khi !=product
 
 ---
 
-## 6.1 Blockers / Deferred
+## 6.1 Blockers / Deferred (sau Phase B)
 
-- **B1 IoT Devices** — Deferred to next session. Cần: entity `IotDeviceEntity` (id, farmId, name, status, batteryLevel, lastUpdate, sensorTypes[]); module `devices` trong `monitoring-service`; DTO trong `@trustagri/shared`; service `deviceService` FE; tab/CRUD UI thay placeholder hiện tại.
-- **B2 Daily Care Plan** — Deferred to next session. Phụ thuộc:
-  - Cột mới `farms.planting_date date` (migration).
-  - Logic compute today's tasks từ `standard.steps[].expectedDurationDays` + planting_date.
-  - Endpoint `GET /farms/:id/care-plan/today` + `POST /care-plan/tasks/:taskId/complete`.
 - **B5 RoleAppShell bell integration** — Bell component + route đã sẵn. Render trong shell cần thiết kế top header thống nhất cho farmer/trader/buyer (hiện mỗi screen có header riêng) — out of scope session này.
+- **Phase C** — chưa bắt đầu. Bao gồm: offline-first farms cache, WS reconnect, bundle CI check, Playwright E2E, integration tests.
+
+### Notes về deviation Phase B
+
+- **B1**: agent BE bỏ controller-level `@UseGuards(JwtAuthGuard)` vì global guard đã enforce auth qua `applyTrustagriHttpStack` trong `main.ts`. Hợp lý.
+- **B2**: `completeTask` insert trực tiếp vào CareLogEntity repo thay vì gọi `CareLogsService.createCareLog()` để tránh circular module dependency. Action `'process_step_complete'` được dùng cho care logs sinh từ care-plan.
+- **B4**: avatar lưu base64 trong DB column `avatar_url` (≤200KB FE-side). Production cần migrate sang multipart + S3 (xem §7 R3).
 
 ## 7. Risks / Open questions
 

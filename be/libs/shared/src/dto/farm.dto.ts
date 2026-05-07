@@ -5,6 +5,7 @@ import {
   IsObject,
   IsArray,
   IsInt,
+  IsDateString,
   ValidateNested,
   IsDefined,
 } from 'class-validator';
@@ -50,6 +51,7 @@ export interface FarmDto {
   area: number;
   cropType: string;
   standardId?: string;
+  plantingDate?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -73,6 +75,10 @@ export class CreateFarmDto {
   @IsOptional()
   @IsString()
   standardId?: string;
+
+  @IsOptional()
+  @IsDateString()
+  plantingDate?: string;
 }
 
 export class UpdateFarmDto {
@@ -97,6 +103,10 @@ export class UpdateFarmDto {
   @IsOptional()
   @IsString()
   standardId?: string;
+
+  @IsOptional()
+  @IsDateString()
+  plantingDate?: string;
 }
 
 // ─── EVIDENCE ──────────────────────────────────────────────────────────────────

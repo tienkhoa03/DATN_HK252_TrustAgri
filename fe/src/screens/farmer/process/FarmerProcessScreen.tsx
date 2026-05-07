@@ -36,6 +36,7 @@ import {
 } from '@/services/careLogOfflineQueue';
 import { ApiError } from '@/api/errors';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { useCarePlan } from '@/hooks/useCarePlan';
 
 // ── Action type helpers ───────────────────────────────────────────────────────
 
@@ -131,9 +132,38 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
   // ── Tab state ────────────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<'tasks' | 'diary' | 'standards'>('tasks');
 
-  // ── Task tab state ────────────────────────────────────────────────────────────
-  // initialTasks vẫn nhận từ props (cho example/demo); production sẽ load từ API care-plan (Phase B2).
+  // ── Care plan (Phase B2) — load tasks từ API khi không có initialTasks ────────
+  const {
+    tasks: carePlanTasks,
+    isLoading: carePlanLoading,
+    error: carePlanError,
+    complete: completeCareTask,
+    clearError: clearCarePlanError,
+  } = useCarePlan(initialTasks ? null : farmId);
+
+  // Local tasks: ưu tiên initialTasks (cho example), fallback sang carePlan từ API.
   const [tasks, setTasks] = useState<Task[]>(initialTasks ?? []);
+  useEffect(() => {
+    if (initialTasks) return;
+    setTasks(
+      carePlanTasks.map((t) => ({
+        id: t.standardStepId,
+        title: t.title,
+        description: t.description,
+        completed: t.completed,
+        dueDate: t.dueDate ? new Date(t.dueDate) : undefined,
+        hasGuide: !!t.acceptanceCriteria,
+        guideContent: t.acceptanceCriteria ? { text: t.acceptanceCriteria } : undefined,
+      })),
+    );
+  }, [initialTasks, carePlanTasks]);
+
+  useEffect(() => {
+    if (carePlanError) {
+      openSnackbar({ type: 'error', text: carePlanError, duration: 4000, icon: true });
+      clearCarePlanError();
+    }
+  }, [carePlanError, openSnackbar, clearCarePlanError]);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showGuideModal, setShowGuideModal] = useState(false);
 
@@ -530,10 +560,26 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
 
   // ── Task helpers ──────────────────────────────────────────────────────────────
   const handleTaskToggle = (taskId: string) => {
+    const target = tasks.find((t) => t.id === taskId);
+    // Optimistic toggle (UI ngay lập tức)
     setTasks((prev) =>
       prev.map((t) => (t.id === taskId ? { ...t, completed: !t.completed } : t)),
     );
     onTaskToggle?.(taskId);
+
+    // Khi dùng API thật và task đang chuyển từ chưa-xong → xong → ghi nhận trên server.
+    if (!initialTasks && target && !target.completed) {
+      void completeCareTask(taskId).then((ok) => {
+        if (!ok) {
+          // Rollback nếu API fail
+          setTasks((prev) =>
+            prev.map((t) => (t.id === taskId ? { ...t, completed: target.completed } : t)),
+          );
+        } else {
+          openSnackbar({ type: 'success', text: 'Đã ghi nhận hoàn thành', duration: 2000 });
+        }
+      });
+    }
   };
 
   // ── Progress ──────────────────────────────────────────────────────────────────
@@ -709,12 +755,13 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
       {activeTab === 'tasks' && (
         <div style={{ padding: spacing.md, paddingBottom: '80px' }}>
           <Text.Title size="small" style={{ marginBottom: spacing.md }}>Công việc hôm nay</Text.Title>
-          {tasks.length === 0 && (
+          {carePlanLoading && tasks.length === 0 && [1, 2, 3].map((k) => <SkeletonCard key={k} />)}
+          {!carePlanLoading && tasks.length === 0 && (
             <div style={{ textAlign: 'center', padding: spacing.xl, color: colors.text.secondary }}>
               <div style={{ fontSize: 48, marginBottom: spacing.md }}>📋</div>
-              <Text>Chưa có công việc nào.</Text>
+              <Text>Chưa có công việc nào hôm nay.</Text>
               <Text size="small" style={{ color: colors.text.secondary, marginTop: spacing.sm }}>
-                Tính năng "Lịch công việc theo mùa vụ" đang phát triển.
+                Đảm bảo vườn đã chọn quy trình + có ngày trồng để hệ thống lên lịch tự động.
               </Text>
             </div>
           )}

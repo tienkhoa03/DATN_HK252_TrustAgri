@@ -11,6 +11,7 @@ import { FarmsModule } from './farms/farms.module';
 import { StandardsModule } from './standards/standards.module';
 import { CareLogsModule } from './care-logs/care-logs.module';
 import { TraceabilityModule } from './traceability/traceability.module';
+import { CarePlansModule } from './care-plans/care-plans.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { TraceabilityModule } from './traceability/traceability.module';
     StandardsModule,
     CareLogsModule,
     TraceabilityModule,
+    CarePlansModule,
   ],
   controllers: [HealthController],
   providers: [JwtStrategy],

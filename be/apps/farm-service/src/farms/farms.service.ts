@@ -30,6 +30,7 @@ export class FarmsService {
       area: dto.area,
       cropType: dto.cropType,
       standardId: dto.standardId ?? null,
+      plantingDate: dto.plantingDate ?? null,
     });
     const saved = await this.farmRepo.save(farm);
     if (!saved.traceabilityCode) {
@@ -104,6 +105,7 @@ export class FarmsService {
     if (dto.area !== undefined) farm.area = dto.area;
     if (dto.cropType !== undefined) farm.cropType = dto.cropType;
     if (dto.standardId !== undefined) farm.standardId = dto.standardId ?? null;
+    if (dto.plantingDate !== undefined) farm.plantingDate = dto.plantingDate ?? null;
 
     const saved = await this.farmRepo.save(farm);
     return this.toDto(saved);
@@ -169,6 +171,7 @@ export class FarmsService {
       area: farm.area,
       cropType: farm.cropType,
       standardId: farm.standardId ?? undefined,
+      plantingDate: farm.plantingDate ?? undefined,
       createdAt: farm.createdAt.toISOString(),
       updatedAt: farm.updatedAt.toISOString(),
     };

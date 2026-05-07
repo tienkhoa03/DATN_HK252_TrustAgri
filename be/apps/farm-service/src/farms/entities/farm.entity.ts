@@ -55,6 +55,10 @@ export class FarmEntity {
   @JoinColumn({ name: 'standard_id' })
   standard: StandardEntity | null;
 
+  /** Ngày trồng — dùng để tính cycleDay cho care plan */
+  @Column({ name: 'planting_date', type: 'date', nullable: true })
+  plantingDate: string | null;
+
   /** Mã QR truy xuất công khai (duy nhất); sinh khi tạo vườn */
   @Column({ name: 'traceability_code', nullable: true, unique: true })
   traceabilityCode: string | null;

@@ -27,6 +27,8 @@ import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { useFarms } from '@/hooks/useFarms';
 import type { FarmDto, CreateFarmDto } from '@/hooks/useFarms';
+import { useDevices } from '@/hooks/useDevices';
+import type { IotDeviceDto } from '@/services/deviceService';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -163,6 +165,29 @@ export const FarmerFarmProfileScreen: React.FC = () => {
   const [showQR, setShowQR] = useState(false);
   const [formData, setFormData] = useState<CreateFarmDto>(emptyForm());
   const [formError, setFormError] = useState('');
+
+  // ── Devices (Phase B1) — load khi xem chi tiết một farm ─────────────────────
+  const {
+    devices,
+    isLoading: devicesLoading,
+    isMutating: devicesMutating,
+    error: devicesError,
+    create: createDevice,
+    remove: removeDevice,
+    clearError: clearDevicesError,
+  } = useDevices(viewMode === 'detail' && selectedFarm ? selectedFarm.id : null);
+  const [deviceFormOpen, setDeviceFormOpen] = useState(false);
+  const [deviceForm, setDeviceForm] = useState<{ name: string; sensorTypes: string[] }>({
+    name: '',
+    sensorTypes: [],
+  });
+
+  useEffect(() => {
+    if (devicesError) {
+      openSnackbar({ type: 'error', text: devicesError, duration: 3500, icon: true });
+      clearDevicesError();
+    }
+  }, [devicesError, openSnackbar, clearDevicesError]);
   const warnedNoSessionRef = useRef(false);
   const inFlightLoadRef = useRef(false);
   const loadedSessionKeyRef = useRef<string | null>(null);
@@ -696,28 +721,261 @@ export const FarmerFarmProfileScreen: React.FC = () => {
           )}
         </div>
 
-        {/* IoT section — placeholder. CRUD thật sẽ wire ở Phase B1 (devices module + endpoint). */}
+        {/* IoT section — Phase B1: load thật từ /monitoring/farms/:farmId/devices */}
         <div style={sectionStyles}>
-          <Text.Title size="small" style={{ fontWeight: fontWeight.semibold, marginBottom: spacing.md }}>
-            Thiết bị IoT
-          </Text.Title>
-          <div
-            style={{
-              padding: spacing.lg,
-              borderRadius: '10px',
-              border: `1px dashed ${colors.background.tertiary}`,
-              textAlign: 'center',
-              color: colors.text.secondary,
-            }}
-          >
-            <div style={{ fontSize: 36, marginBottom: spacing.sm }}>📡</div>
-            <Text size="small" style={{ color: colors.text.primary, fontWeight: fontWeight.semibold, margin: 0 }}>
-              Quản lý thiết bị IoT — sắp ra mắt
-            </Text>
-            <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.xs }}>
-              Theo dõi trạng thái, pin và cảm biến của các node IoT.
-            </Text>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+            <Text.Title size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
+              Thiết bị IoT ({devices.length})
+            </Text.Title>
+            <button
+              type="button"
+              onClick={() => setDeviceFormOpen((v) => !v)}
+              style={{
+                padding: `${spacing.xs} ${spacing.sm}`,
+                background: deviceFormOpen ? colors.background.tertiary : colors.primary.zaloBlue,
+                color: deviceFormOpen ? colors.text.primary : colors.text.inverse,
+                border: 'none',
+                borderRadius: 6,
+                fontSize: fontSize.small,
+                cursor: 'pointer',
+              }}
+            >
+              {deviceFormOpen ? 'Đóng' : '+ Thêm'}
+            </button>
           </div>
+
+          {/* Add form */}
+          {deviceFormOpen && (
+            <div
+              style={{
+                padding: spacing.md,
+                border: `1px solid ${colors.background.tertiary}`,
+                borderRadius: 8,
+                marginBottom: spacing.md,
+                backgroundColor: colors.background.secondary,
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Tên thiết bị (vd: Node Cảm biến 1)"
+                value={deviceForm.name}
+                onChange={(e) => setDeviceForm((p) => ({ ...p, name: e.target.value }))}
+                style={{
+                  width: '100%',
+                  padding: spacing.sm,
+                  border: `1px solid ${colors.background.tertiary}`,
+                  borderRadius: 6,
+                  marginBottom: spacing.sm,
+                  fontSize: fontSize.body,
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm }}>
+                {(['temperature', 'humidity', 'light', 'soil_moisture'] as const).map((s) => {
+                  const checked = deviceForm.sensorTypes.includes(s);
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() =>
+                        setDeviceForm((p) => ({
+                          ...p,
+                          sensorTypes: checked
+                            ? p.sensorTypes.filter((x) => x !== s)
+                            : [...p.sensorTypes, s],
+                        }))
+                      }
+                      style={{
+                        padding: `${spacing.xs} ${spacing.sm}`,
+                        borderRadius: 99,
+                        border: `1px solid ${checked ? colors.primary.agriGreen : colors.background.tertiary}`,
+                        backgroundColor: checked ? `${colors.primary.agriGreen}18` : 'transparent',
+                        color: checked ? colors.primary.agriGreen : colors.text.secondary,
+                        fontSize: fontSize.small,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {s}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!deviceForm.name.trim() || deviceForm.sensorTypes.length === 0) {
+                    openSnackbar({ type: 'error', text: 'Nhập tên + chọn ít nhất 1 loại cảm biến', duration: 3000 });
+                    return;
+                  }
+                  const created = await createDevice({
+                    name: deviceForm.name.trim(),
+                    sensorTypes: deviceForm.sensorTypes,
+                    status: 'offline',
+                  });
+                  if (created) {
+                    setDeviceForm({ name: '', sensorTypes: [] });
+                    setDeviceFormOpen(false);
+                    openSnackbar({ type: 'success', text: 'Đã thêm thiết bị', duration: 2500 });
+                  }
+                }}
+                disabled={devicesMutating}
+                style={{
+                  width: '100%',
+                  padding: spacing.sm,
+                  background: colors.primary.agriGreen,
+                  color: colors.text.inverse,
+                  border: 'none',
+                  borderRadius: 6,
+                  fontSize: fontSize.body,
+                  fontWeight: fontWeight.semibold,
+                  cursor: devicesMutating ? 'wait' : 'pointer',
+                }}
+              >
+                {devicesMutating ? 'Đang lưu…' : 'Lưu thiết bị'}
+              </button>
+            </div>
+          )}
+
+          {/* List */}
+          {devicesLoading && (
+            <div style={{ textAlign: 'center', padding: spacing.lg, color: colors.text.secondary }}>
+              Đang tải…
+            </div>
+          )}
+
+          {!devicesLoading && devices.length === 0 && (
+            <div
+              style={{
+                padding: spacing.lg,
+                borderRadius: 10,
+                border: `1px dashed ${colors.background.tertiary}`,
+                textAlign: 'center',
+                color: colors.text.secondary,
+              }}
+            >
+              <div style={{ fontSize: 36, marginBottom: spacing.sm }}>📡</div>
+              <Text size="small" style={{ color: colors.text.primary, fontWeight: fontWeight.semibold, margin: 0 }}>
+                Chưa có thiết bị nào
+              </Text>
+              <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.xs }}>
+                Bấm "+ Thêm" để đăng ký node IoT đầu tiên cho vườn này.
+              </Text>
+            </div>
+          )}
+
+          {!devicesLoading &&
+            devices.map((device: IotDeviceDto) => (
+              <div
+                key={device.id}
+                style={{
+                  padding: spacing.md,
+                  borderRadius: 10,
+                  border: `2px solid ${
+                    device.status === 'online' ? colors.primary.agriGreen : colors.background.tertiary
+                  }`,
+                  marginBottom: spacing.md,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+                    <Icon
+                      name="farm"
+                      size="md"
+                      color={device.status === 'online' ? colors.primary.agriGreen : colors.text.secondary}
+                    />
+                    <div>
+                      <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
+                        {device.name}
+                      </Text>
+                      <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                        ID: {device.id.slice(0, 8)}…
+                      </Text>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs }}>
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        padding: `2px ${spacing.sm}`,
+                        backgroundColor:
+                          device.status === 'online'
+                            ? `${colors.primary.agriGreen}18`
+                            : colors.background.secondary,
+                        borderRadius: 99,
+                        fontSize: fontSize.small,
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          backgroundColor:
+                            device.status === 'online' ? colors.primary.agriGreen : colors.text.secondary,
+                        }}
+                      />
+                      {device.status === 'online' ? 'Online' : 'Offline'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void removeDevice(device.id)}
+                      disabled={devicesMutating}
+                      aria-label="Xóa thiết bị"
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: devicesMutating ? 'wait' : 'pointer',
+                        color: colors.functional.alertRed,
+                        fontSize: fontSize.small,
+                        padding: spacing.xs,
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.xs }}>
+                  {device.sensorTypes.map((s) => (
+                    <span
+                      key={s}
+                      style={{
+                        padding: `2px ${spacing.sm}`,
+                        backgroundColor: colors.background.secondary,
+                        borderRadius: 4,
+                        fontSize: fontSize.small,
+                        color: colors.text.secondary,
+                      }}
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+                {(device.batteryLevel != null || device.lastSeenAt) && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: spacing.sm }}>
+                    {device.batteryLevel != null && (
+                      <Text
+                        size="xSmall"
+                        style={{
+                          color:
+                            device.batteryLevel < 20
+                              ? colors.functional.alertRed
+                              : colors.primary.agriGreen,
+                        }}
+                      >
+                        🔋 {device.batteryLevel}%
+                      </Text>
+                    )}
+                    {device.lastSeenAt && (
+                      <Text size="xSmall" style={{ color: colors.text.secondary }}>
+                        Cập nhật {new Date(device.lastSeenAt).toLocaleString('vi-VN')}
+                      </Text>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
         </div>
 
         {/* Detail actions */}
