@@ -23,6 +23,7 @@ import * as authService from '@/services/authService';
 import { resolveZaloAccessToken } from '@/services/zaloAccessToken';
 import type { UserProfileDto } from '@/services/authService';
 import { authSessionAtom } from '@/state/authAtoms';
+import { ROLE_HOME_PATH } from '@/router/roleHome';
 import { bootstrapMockAuthSession, isMockOnlyJwt } from '@/services/mockAuthBootstrap';
 import { primaryColors, functionalColors } from '@/design-system/tokens/colors';
 
@@ -134,6 +135,22 @@ export function AppInitScreen() {
     hasAutoRunRef.current = true;
     void runSmokeTest();
   }, [runSmokeTest]);
+
+  // Khi smoke test OK: điều hướng sang trang chính theo role để AppShell + BottomNav hiển thị.
+  useEffect(() => {
+    if (status !== 'ok' || !result) return;
+
+    const roleFromResult =
+      (result.profile?.role as keyof typeof ROLE_HOME_PATH | undefined) ??
+      (result.verifyResponse?.role as keyof typeof ROLE_HOME_PATH | undefined);
+
+    if (!roleFromResult) return;
+
+    const target = ROLE_HOME_PATH[roleFromResult] ?? '/guest';
+    if (target && target !== '/') {
+      navigate(target, { replace: true });
+    }
+  }, [status, result, navigate]);
 
   return (
     <Page className="bg-gray-50" style={{ minHeight: '100vh' }}>

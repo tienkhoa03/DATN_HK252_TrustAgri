@@ -1,12 +1,17 @@
-import React, { lazy, Suspense } from 'react';
-import { Route, AnimationRoutes } from 'zmp-ui';
+import React, { lazy, Suspense, useEffect, useRef } from 'react';
+import { Route, AnimationRoutes, useNavigate } from 'zmp-ui';
 import { Box, Spinner } from 'zmp-ui';
 import { Outlet } from 'react-router-dom';
+import { useAtomValue, useSetAtom } from 'jotai';
 
 import { RequireRole } from '@/router/RequireRole';
 import type { UserRole } from '@/state/authAtoms';
+import { authSessionAtom, currentRoleAtom } from '@/state/authAtoms';
 import { ChunkErrorBoundary } from '@/components/ErrorBoundary/ChunkErrorBoundary';
 import { RoleAppShell } from '@/navigation/RoleAppShell';
+import { ROLE_HOME_PATH } from '@/router/roleHome';
+import { ENV } from '@/config/env';
+import { bootstrapMockAuthSession } from '@/services/mockAuthBootstrap';
 
 function RoleRoute({ role, children }: { role: UserRole; children: React.ReactNode }) {
   return <RequireRole allowedRoles={[role]}>{children}</RequireRole>;
@@ -119,6 +124,44 @@ const RouteLoadingFallback = () => (
   </Box>
 );
 
+function RootEntry() {
+  const session = useAtomValue(authSessionAtom);
+  const role = useAtomValue(currentRoleAtom);
+  const setSession = useSetAtom(authSessionAtom);
+  const navigate = useNavigate();
+  const startedRef = useRef(false);
+
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+
+    // 1) If we already have a session (e.g., rehydrated from sessionStorage) -> go straight to role home.
+    if (session) {
+      navigate(ROLE_HOME_PATH[role] ?? '/guest', { replace: true });
+      return;
+    }
+
+    // 2) Mock dev: auto-bootstrap to a role and route there (skip the smoke/init page).
+    if (ENV.USE_MOCK) {
+      bootstrapMockAuthSession()
+        .then(({ session: s }) => {
+          setSession(s);
+          navigate(ROLE_HOME_PATH[s.role] ?? '/guest', { replace: true });
+        })
+        .catch(() => {
+          // Fallback to guest routes (still shows bottom nav for guest)
+          navigate('/guest', { replace: true });
+        })
+      return;
+    }
+
+    // 3) Real flow: no persisted session -> go to login (or guest if you want public browsing).
+    navigate('/login', { replace: true });
+  }, [navigate, role, session, setSession]);
+
+  return <RouteLoadingFallback />;
+}
+
 // ─── AppRoutes ────────────────────────────────────────────────────────────────
 
 /**
@@ -132,8 +175,10 @@ export function AppRoutes() {
     <ChunkErrorBoundary>
       <Suspense fallback={<RouteLoadingFallback />}>
         <AnimationRoutes>
-        {/* ── App init / mock status screen ─────────────────── */}
-        <Route path="/"                        element={<AppInitScreen />} />
+        {/* ── Root entry: go straight to user screen by role ─── */}
+        <Route path="/" element={<RootEntry />} />
+        {/* ── App init / smoke-test screen (dev/debug) ───────── */}
+        <Route path="/init" element={<AppInitScreen />} />
 
         {/* ── Auth ──────────────────────────────────────────── */}
         <Route path="/login"                   element={<LoginScreen />} />
