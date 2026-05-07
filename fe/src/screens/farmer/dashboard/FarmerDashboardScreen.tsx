@@ -114,7 +114,7 @@ const SensorCardSkeleton: React.FC = () => (
 export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
   farmId,
   farmerName = 'Nông dân',
-  farmName = 'Farm Lab A',
+  farmName,
   avatarUrl,
   notificationCount = 0,
 }) => {
@@ -125,12 +125,9 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
   const resolvingOwnerRef = useRef(false);
 
   const [resolvedFarmId, setResolvedFarmId] = useState<string | null>(farmId ?? null);
-  const [resolvedFarmName, setResolvedFarmName] = useState<string>(farmName);
+  const [resolvedFarmName, setResolvedFarmName] = useState<string>(farmName ?? '');
 
   const [activeTab, setActiveTab] = useState<'home' | 'process' | 'connect' | 'account'>('home');
-  const [pumpActive, setPumpActive] = useState(false);
-  const [lightActive, setLightActive] = useState(false);
-  const [fanActive, setFanActive] = useState(false);
   const [selectedSensor, setSelectedSensor] = useState<SensorType>('temperature');
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
   const [farmSummary, setFarmSummary] = useState<DashboardFarmerDto | null>(null);
@@ -294,12 +291,6 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: spacing.xs,
     padding: spacing.sm, backgroundColor: 'transparent', border: 'none', cursor: 'pointer',
     color: isActive ? colors.primary.zaloBlue : colors.text.secondary, minWidth: '64px',
-  });
-
-  const actionIconContainerStyles = (isActive: boolean): React.CSSProperties => ({
-    width: '44px', height: '44px', borderRadius: '50%',
-    backgroundColor: isActive ? colors.primary.zaloBlue : colors.functional.neutralGray,
-    display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s',
   });
 
   return (
@@ -518,21 +509,7 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
           </div>
         </div>
 
-        {/* ── Quick Actions ────────────────────────────────────────────────── */}
-        <div style={{ display: 'flex', justifyContent: 'space-around', padding: spacing.md, backgroundColor: colors.background.primary, borderTop: `1px solid ${colors.background.secondary}`, borderBottom: `1px solid ${colors.background.secondary}`, marginTop: spacing.md }}>
-          {[
-            { key: 'pump', label: 'Máy bơm', icon: 'droplet', active: pumpActive, toggle: () => setPumpActive(!pumpActive) },
-            { key: 'light', label: 'Đèn', icon: 'sun', active: lightActive, toggle: () => setLightActive(!lightActive) },
-            { key: 'fan', label: 'Quạt', icon: 'wind', active: fanActive, toggle: () => setFanActive(!fanActive) },
-          ].map(({ key, label, icon, active, toggle }) => (
-            <button key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: spacing.sm, backgroundColor: 'transparent', border: 'none', cursor: 'pointer' }} onClick={toggle} aria-label={`${label} ${active ? 'đang bật' : 'đang tắt'}`}>
-              <div style={actionIconContainerStyles(active)}>
-                <Icon name={icon as any} size="md" color={active ? colors.text.inverse : colors.text.secondary} />
-              </div>
-              <Text size="xSmall" style={{ color: active ? colors.primary.zaloBlue : colors.text.secondary, margin: 0 }}>{label}</Text>
-            </button>
-          ))}
-        </div>
+        {/* Quick Actions (pump/light/fan) — ẩn vì chưa có IoT command API. Bật lại ở Phase B sau. */}
 
         {/* ── History Chart ────────────────────────────────────────────────── */}
         <div style={{ padding: `${spacing.md} ${spacing.md} 0` }}>
@@ -573,15 +550,7 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
           )}
         </div>
 
-        {/* ── Farm Info ────────────────────────────────────────────────────── */}
-        <div style={{ padding: spacing.md }}>
-          <Card title="Giai đoạn sinh trưởng" subtitle="Đang trong giai đoạn ra hoa" status="success">
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: spacing.sm }}>
-              <Text size="small" style={{ color: colors.text.secondary }}>Ngày trồng: 01/01/2024</Text>
-              <Text size="small" style={{ color: colors.text.secondary }}>Ngày 45/90</Text>
-            </div>
-          </Card>
-        </div>
+        {/* "Giai đoạn sinh trưởng" — ẩn vì chưa có API care-plan trả plantingDate/growthStage. Bật lại ở Phase B2. */}
       </div>
 
       {/* ── Bottom Navigation ─────────────────────────────────────────────── */}

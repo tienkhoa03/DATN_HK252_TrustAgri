@@ -27,6 +27,8 @@ import { ROLE_HOME_PATH } from '@/router/roleHome';
 import { bootstrapMockAuthSession, isMockOnlyJwt } from '@/services/mockAuthBootstrap';
 import { primaryColors, functionalColors } from '@/design-system/tokens/colors';
 
+const IS_PASSWORD_MODE = ENV.AUTH_MODE === 'password';
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type SmokeStatus = 'idle' | 'loading' | 'ok' | 'error';
@@ -67,6 +69,10 @@ export function AppInitScreen() {
   const [result, setResult]       = useState<SmokeResult | null>(null);
   const hasAutoRunRef = useRef(false);
   const inFlightRef = useRef(false);
+
+  // Form state cho password mode
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
 
   const runSmokeTest = useCallback(async () => {
     if (inFlightRef.current) return;
@@ -129,8 +135,45 @@ export function AppInitScreen() {
     }
   }, [openSnackbar, setAuthSession]);
 
-  // Run smoke test on mount
+  const handlePasswordLogin = useCallback(async () => {
+    if (inFlightRef.current) return;
+    if (!username.trim()) {
+      openSnackbar({ type: 'error', text: 'Vui lòng nhập tên đăng nhập', duration: 3000, icon: true });
+      return;
+    }
+    if (!password) {
+      openSnackbar({ type: 'error', text: 'Vui lòng nhập mật khẩu', duration: 3000, icon: true });
+      return;
+    }
+    inFlightRef.current = true;
+    setStatus('loading');
+    setResult(null);
+
+    try {
+      const authSession = await authService.passwordLogin(username.trim(), password);
+      setAuthSession(authSession);
+      const verifyResponse = await authService.verify(authSession.accessToken);
+      const profile = await authService.getMe(authSession.accessToken);
+      setResult({ zaloToken: '', verifyResponse, profile });
+      setStatus('ok');
+    } catch (err) {
+      setAuthSession(null);
+      // UNAUTHORIZED trong context login → sai credentials, không phải session hết hạn
+      const message =
+        err instanceof ApiError && err.code === 'UNAUTHORIZED'
+          ? err.message || 'Tên đăng nhập hoặc mật khẩu không đúng.'
+          : toVietnameseError(err);
+      setResult({ zaloToken: '', errorMessage: message });
+      setStatus('error');
+      openSnackbar({ type: 'error', text: message, duration: 5000, icon: true });
+    } finally {
+      inFlightRef.current = false;
+    }
+  }, [username, password, openSnackbar, setAuthSession]);
+
+  // Run smoke test on mount — chỉ cho Zalo mode
   useEffect(() => {
+    if (IS_PASSWORD_MODE) return;
     if (hasAutoRunRef.current) return;
     hasAutoRunRef.current = true;
     void runSmokeTest();
@@ -165,114 +208,240 @@ export function AppInitScreen() {
           🌾 TrustAgri
         </Text>
         <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.85)' }}>
-          {ENV.USE_MOCK
-            ? ENV.DEV_LOGIN_SECRET
-              ? '🟡 Mock + JWT dev (VITE_DEV_LOGIN_SECRET)'
-              : '🟡 Chế độ Mock (VITE_USE_MOCK=true)'
-            : `🟢 Kết nối thật — ${ENV.API_BASE_URL}`}
+          {IS_PASSWORD_MODE
+            ? '🔐 Đăng nhập bằng tài khoản (VITE_AUTH_MODE=password)'
+            : ENV.USE_MOCK
+              ? ENV.DEV_LOGIN_SECRET
+                ? '🟡 Mock + JWT dev (VITE_DEV_LOGIN_SECRET)'
+                : '🟡 Chế độ Mock (VITE_USE_MOCK=true)'
+              : `🟢 Kết nối thật — ${ENV.API_BASE_URL}`}
         </Text>
       </Box>
 
       <Box style={{ padding: '20px 16px' }}>
 
-        {/* ── Smoke Test Card ───────────────────────────────────────────────── */}
-        <Box
-          style={{
-            background: '#fff',
-            borderRadius: 16,
-            boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-            overflow: 'hidden',
-            marginBottom: 16,
-          }}
-        >
-          {/* Card header */}
+        {IS_PASSWORD_MODE ? (
+          /* ── Password Login Card ─────────────────────────────────────────── */
           <Box
             style={{
-              padding: '14px 16px',
-              borderBottom: '1px solid #F3F4F6',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
+              background: '#fff',
+              borderRadius: 16,
+              boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+              overflow: 'hidden',
+              marginBottom: 16,
             }}
           >
-            <Box>
-              <Text style={{ fontWeight: 700, fontSize: 15, marginBottom: 2 }}>
-                Smoke Test — POST /api/v1/auth/verify
-              </Text>
-              <Text style={{ fontSize: 11, color: '#9CA3AF' }}>
-                {ENV.USE_MOCK
-                  ? ENV.DEV_LOGIN_SECRET
-                    ? 'dev-login → JWT thật (session Redis)'
-                    : 'mockAuthService (mock.jwt)'
-                  : 'ZMP SDK → Gateway → Auth Service'}
-              </Text>
-            </Box>
-            <StatusBadge status={status} />
-          </Box>
-
-          {/* Loading */}
-          {status === 'loading' && (
-            <Box style={{ padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-              <Spinner />
-              <Text style={{ fontSize: 14, color: '#9CA3AF' }}>
-                {ENV.USE_MOCK
-                  ? ENV.DEV_LOGIN_SECRET
-                    ? 'Đang dev-login + GET /auth/me…'
-                    : 'Gọi mockAuthService…'
-                  : 'Đang lấy Zalo token + gọi /auth/verify…'}
-              </Text>
-            </Box>
-          )}
-
-          {/* Error */}
-          {status === 'error' && result?.errorMessage && (
-            <Box style={{ padding: '16px' }}>
-              <Box
-                style={{
-                  background: '#FEF2F2',
-                  border: `1px solid ${functionalColors.alertRed}33`,
-                  borderRadius: 10,
-                  padding: '12px 14px',
-                }}
-              >
-                <Text style={{ fontSize: 13, color: functionalColors.alertRed, fontWeight: 600, marginBottom: 4 }}>
-                  Lỗi kết nối
+            <Box
+              style={{
+                padding: '14px 16px',
+                borderBottom: '1px solid #F3F4F6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Box>
+                <Text style={{ fontWeight: 700, fontSize: 15, marginBottom: 2 }}>
+                  Đăng nhập bằng tài khoản
                 </Text>
-                <Text style={{ fontSize: 13, color: '#7F1D1D' }}>{result.errorMessage}</Text>
+                <Text style={{ fontSize: 11, color: '#9CA3AF' }}>
+                  POST /api/v1/auth/password-login
+                </Text>
               </Box>
-              <RetryButton onRetry={runSmokeTest} />
+              <StatusBadge status={status} />
             </Box>
-          )}
 
-          {/* Success */}
-          {status === 'ok' && result && (
-            <Box style={{ padding: '16px 16px 20px' }}>
-              {/* Verify response */}
-              <SectionTitle>Kết quả verify</SectionTitle>
-              {result.verifyResponse && (
-                <Box style={{ marginBottom: 16 }}>
-                  <InfoField label="userId" value={result.verifyResponse.userId} />
-                  <InfoField label="role"   value={result.verifyResponse.role} />
-                  <InfoField label="valid"  value={String(result.verifyResponse.valid)} />
-                </Box>
-              )}
+            {status === 'loading' && (
+              <Box style={{ padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                <Spinner />
+                <Text style={{ fontSize: 14, color: '#9CA3AF' }}>Đang đăng nhập…</Text>
+              </Box>
+            )}
 
-              {/* Zalo token (truncated) */}
-              <SectionTitle>Zalo Access Token</SectionTitle>
-              <Box style={{ marginBottom: 16 }}>
-                <InfoField
-                  label="token"
-                  value={result.zaloToken.length > 30
-                    ? result.zaloToken.slice(0, 30) + '…'
-                    : result.zaloToken}
+            {status !== 'loading' && status !== 'ok' && (
+              <Box style={{ padding: '20px 16px 16px' }}>
+                <input
+                  type="text"
+                  placeholder="Tên đăng nhập"
+                  value={username}
+                  onChange={e => setUsername((e.target as HTMLInputElement).value)}
+                  style={{
+                    width: '100%',
+                    padding: '11px 14px',
+                    borderRadius: 10,
+                    border: '1.5px solid #E5E7EB',
+                    fontSize: 14,
+                    outline: 'none',
+                    marginBottom: 10,
+                    boxSizing: 'border-box',
+                  }}
                 />
-              </Box>
+                <input
+                  type="password"
+                  placeholder="Mật khẩu"
+                  value={password}
+                  onChange={e => setPassword((e.target as HTMLInputElement).value)}
+                  onKeyDown={e => { if (e.key === 'Enter') void handlePasswordLogin(); }}
+                  style={{
+                    width: '100%',
+                    padding: '11px 14px',
+                    borderRadius: 10,
+                    border: '1.5px solid #E5E7EB',
+                    fontSize: 14,
+                    outline: 'none',
+                    marginBottom: 12,
+                    boxSizing: 'border-box',
+                  }}
+                />
 
-              {/* User profile */}
-              {result.profile && <ProfileCard profile={result.profile} />}
+                {status === 'error' && result?.errorMessage && (
+                  <Box
+                    style={{
+                      background: '#FEF2F2',
+                      border: `1px solid ${functionalColors.alertRed}33`,
+                      borderRadius: 8,
+                      padding: '10px 12px',
+                      marginBottom: 12,
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, color: functionalColors.alertRed }}>
+                      {result.errorMessage}
+                    </Text>
+                  </Box>
+                )}
+
+                <button
+                  onClick={() => void handlePasswordLogin()}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: primaryColors.agriGreen,
+                    color: '#fff',
+                    borderRadius: 10,
+                    fontSize: 15,
+                    fontWeight: 600,
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Đăng nhập
+                </button>
+              </Box>
+            )}
+
+            {status === 'ok' && result && (
+              <Box style={{ padding: '16px 16px 20px' }}>
+                {result.verifyResponse && (
+                  <Box style={{ marginBottom: 16 }}>
+                    <SectionTitle>Đăng nhập thành công</SectionTitle>
+                    <InfoField label="userId" value={result.verifyResponse.userId} />
+                    <InfoField label="role"   value={result.verifyResponse.role} />
+                  </Box>
+                )}
+                {result.profile && <ProfileCard profile={result.profile} />}
+              </Box>
+            )}
+          </Box>
+        ) : (
+          /* ── Smoke Test Card (Zalo mode) ─────────────────────────────────── */
+          <Box
+            style={{
+              background: '#fff',
+              borderRadius: 16,
+              boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+              overflow: 'hidden',
+              marginBottom: 16,
+            }}
+          >
+            {/* Card header */}
+            <Box
+              style={{
+                padding: '14px 16px',
+                borderBottom: '1px solid #F3F4F6',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Box>
+                <Text style={{ fontWeight: 700, fontSize: 15, marginBottom: 2 }}>
+                  Smoke Test — POST /api/v1/auth/verify
+                </Text>
+                <Text style={{ fontSize: 11, color: '#9CA3AF' }}>
+                  {ENV.USE_MOCK
+                    ? ENV.DEV_LOGIN_SECRET
+                      ? 'dev-login → JWT thật (session Redis)'
+                      : 'mockAuthService (mock.jwt)'
+                    : 'ZMP SDK → Gateway → Auth Service'}
+                </Text>
+              </Box>
+              <StatusBadge status={status} />
             </Box>
-          )}
-        </Box>
+
+            {/* Loading */}
+            {status === 'loading' && (
+              <Box style={{ padding: 32, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+                <Spinner />
+                <Text style={{ fontSize: 14, color: '#9CA3AF' }}>
+                  {ENV.USE_MOCK
+                    ? ENV.DEV_LOGIN_SECRET
+                      ? 'Đang dev-login + GET /auth/me…'
+                      : 'Gọi mockAuthService…'
+                    : 'Đang lấy Zalo token + gọi /auth/verify…'}
+                </Text>
+              </Box>
+            )}
+
+            {/* Error */}
+            {status === 'error' && result?.errorMessage && (
+              <Box style={{ padding: '16px' }}>
+                <Box
+                  style={{
+                    background: '#FEF2F2',
+                    border: `1px solid ${functionalColors.alertRed}33`,
+                    borderRadius: 10,
+                    padding: '12px 14px',
+                  }}
+                >
+                  <Text style={{ fontSize: 13, color: functionalColors.alertRed, fontWeight: 600, marginBottom: 4 }}>
+                    Lỗi kết nối
+                  </Text>
+                  <Text style={{ fontSize: 13, color: '#7F1D1D' }}>{result.errorMessage}</Text>
+                </Box>
+                <RetryButton onRetry={runSmokeTest} />
+              </Box>
+            )}
+
+            {/* Success */}
+            {status === 'ok' && result && (
+              <Box style={{ padding: '16px 16px 20px' }}>
+                {/* Verify response */}
+                <SectionTitle>Kết quả verify</SectionTitle>
+                {result.verifyResponse && (
+                  <Box style={{ marginBottom: 16 }}>
+                    <InfoField label="userId" value={result.verifyResponse.userId} />
+                    <InfoField label="role"   value={result.verifyResponse.role} />
+                    <InfoField label="valid"  value={String(result.verifyResponse.valid)} />
+                  </Box>
+                )}
+
+                {/* Zalo token (truncated) */}
+                <SectionTitle>Zalo Access Token</SectionTitle>
+                <Box style={{ marginBottom: 16 }}>
+                  <InfoField
+                    label="token"
+                    value={result.zaloToken.length > 30
+                      ? result.zaloToken.slice(0, 30) + '…'
+                      : result.zaloToken}
+                  />
+                </Box>
+
+                {/* User profile */}
+                {result.profile && <ProfileCard profile={result.profile} />}
+              </Box>
+            )}
+          </Box>
+        )}
 
         {/* ── Infrastructure info ──────────────────────────────────────────── */}
         <Box

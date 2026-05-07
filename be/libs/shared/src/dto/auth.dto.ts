@@ -68,6 +68,18 @@ export class AuthLoginDto {
 }
 
 /**
+ * POST /api/v1/auth/password-login — chỉ bật khi AUTH_PASSWORD_LOGIN_ENABLED=true.
+ * User phải đã được seed với username + password_hash trong DB.
+ */
+export class AuthPasswordLoginDto {
+  @IsString()
+  username: string;
+
+  @IsString()
+  password: string;
+}
+
+/**
  * POST /api/v1/auth/dev-login — chỉ bật khi AUTH_DEV_LOGIN_ENABLED=true (không dùng production).
  * Body: secret + zaloId (user phải đã tồn tại trong DB, ví dụ sau seed-dev-users.sql).
  */

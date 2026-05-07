@@ -44,29 +44,7 @@ interface Review {
 
 const IMAGE_EMOJIS = ['🌳', '🌿', '🍃'];
 
-const MOCK_REVIEWS: Review[] = [
-  {
-    id: '1',
-    userName: 'Nguyễn Văn A',
-    rating: 5,
-    comment: 'Sầu riêng rất ngon, ngọt đậm, múi dày. Giao hàng đúng hẹn!',
-    date: '15/12/2024',
-  },
-  {
-    id: '2',
-    userName: 'Trần Thị B',
-    rating: 5,
-    comment: 'Chất lượng tuyệt vời, đúng như mô tả. Sẽ mua lại!',
-    date: '10/12/2024',
-  },
-  {
-    id: '3',
-    userName: 'Lê Văn C',
-    rating: 4,
-    comment: 'Sản phẩm tốt, giá hợp lý. Đóng gói cẩn thận.',
-    date: '05/12/2024',
-  },
-];
+// Reviews removed — sẽ load từ API khi BE thêm endpoint /products/:id/reviews.
 
 const SkeletonBlock: React.FC<{ height?: number | string; width?: string }> = ({
   height = 16,
@@ -486,40 +464,7 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
           {renderLockSection('📹', 'Camera giám sát thời gian thực')}
           {renderLockSection('🌱', 'Mô hình Bản sao số (Digital Twin)')}
 
-          {/* Reviews */}
-          <div style={sectionStyles}>
-            <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.md }}>
-              Đánh giá từ người mua ({MOCK_REVIEWS.length})
-            </Text.Title>
-
-            {MOCK_REVIEWS.map((review) => (
-              <div key={review.id} style={reviewCardStyles}>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: spacing.xs,
-                  }}
-                >
-                  <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
-                    {review.userName}
-                  </Text>
-                  <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>
-                    {review.date}
-                  </Text>
-                </div>
-
-                <div style={{ display: 'flex', gap: '2px', marginBottom: spacing.xs }}>
-                  {renderStars(review.rating)}
-                </div>
-
-                <Text size="small" style={{ margin: 0, color: colors.text.secondary, lineHeight: 1.5 }}>
-                  {review.comment}
-                </Text>
-              </div>
-            ))}
-          </div>
+          {/* Reviews — ẩn vì chưa có API đánh giá. Có thể bật lại khi BE thêm /products/:id/reviews. */}
         </div>
 
         {/* Sticky Footer */}

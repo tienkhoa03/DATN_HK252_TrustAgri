@@ -1,5 +1,41 @@
 # TrustAgri — Project Documentation
 
+> **Agent context loading protocol:** Đọc đúng doc theo task, KHÔNG re-explore toàn repo mỗi prompt. Xem [`.claude/rules/00-context-loading.md`](.claude/rules/00-context-loading.md).
+
+## Documentation Source of Truth
+
+Tất cả mô tả chi tiết về dự án nằm trong [`.claude/docs/`](.claude/docs/). Index theo nhu cầu:
+
+| Cần... | Đọc |
+|--------|-----|
+| Yêu cầu nghiệp vụ (US/FR/NFR + traceability) | [`.claude/docs/requirements.md`](.claude/docs/requirements.md) |
+| Kiến trúc hệ thống + ADR | [`.claude/docs/architecture.md`](.claude/docs/architecture.md) |
+| Workflow nghiệp vụ chi tiết | [`.claude/docs/business-logic.md`](.claude/docs/business-logic.md) |
+| Stack, DB schema, env, integration | [`.claude/docs/tech-stack.md`](.claude/docs/tech-stack.md) |
+| Cấu trúc thư mục + naming | [`.claude/docs/project-structure.md`](.claude/docs/project-structure.md) |
+| Design tokens (color/font/icon/spacing) | [`.claude/docs/design-system.md`](.claude/docs/design-system.md) |
+| Thuật ngữ Việt-Anh, mã US/FR/NFR | [`.claude/docs/glossary.md`](.claude/docs/glossary.md) |
+
+**Specs gốc** (KHÔNG sửa): `/specs/backend-api-specification/`, `/specs/frontend-ui-specification/`.
+
+## Sub-agents
+
+- `backend-developer` — implement BE NestJS task. Read `.claude/agents/backend-developer.md`.
+- `frontend-developer` — implement FE ZMP task. Read `.claude/agents/frontend-developer.md`.
+- `code-reviewer` — review changed code.
+- `spec-aligner` — verify code khớp specs + docs.
+
+## Slash commands
+
+- `/make-plan <feature>` — sinh plan vào `.claude/plan/<date>-<slug>.md`. KHÔNG code.
+- `/implementation-plan <slug>` — đọc plan + thực thi từng bước, cập nhật status.
+
+## Rules
+
+- [`.claude/rules/00-context-loading.md`](.claude/rules/00-context-loading.md) — protocol đọc context.
+- [`.claude/rules/10-backend.md`](.claude/rules/10-backend.md) — quy ước BE.
+- [`.claude/rules/20-frontend.md`](.claude/rules/20-frontend.md) — quy ước FE.
+
 ## Quick Commands
 
 ### Backend (Monorepo with Turbo)

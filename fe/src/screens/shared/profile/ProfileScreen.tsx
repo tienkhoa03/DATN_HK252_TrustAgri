@@ -18,9 +18,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { Page, Box, Text, Spinner } from 'zmp-ui';
+import { useNavigate } from 'zmp-ui';
+import { useSetAtom } from 'jotai';
 import { useProfile } from '@/hooks/useProfile';
 import type { UserProfileDto, UserProfileUpdateDto } from '@/hooks/useProfile';
 import { primaryColors, functionalColors } from '@/design-system/tokens/colors';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { authSessionAtom } from '@/state/authAtoms';
+import * as authService from '@/services/authService';
 
 // ── Role metadata ─────────────────────────────────────────────────────────────
 
@@ -39,6 +44,8 @@ export function ProfileScreen() {
   const openSnackbar = useStableOpenSnackbar();
   const { profile, isLoading, isSaving, error, updateProfile } = useProfile();
   const [isEditing, setIsEditing] = useState(false);
+  const setSession = useSetAtom(authSessionAtom);
+  const navigate = useNavigate();
 
   // Edit form state
   const [form, setForm] = useState<Partial<UserProfileUpdateDto & {
@@ -125,6 +132,18 @@ export function ProfileScreen() {
       });
     }
     setIsEditing(false);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authService.logout();
+    } catch {
+      // ignore network/server errors; we still clear local session
+    } finally {
+      setSession(null);
+      openSnackbar({ type: 'success', text: 'Đã đăng xuất.', duration: 2500, icon: true });
+      navigate('/login', { replace: true });
+    }
   };
 
   // ── Loading state ────────────────────────────────────────────────────────────
@@ -299,6 +318,19 @@ export function ProfileScreen() {
         <SectionCard title="Thông tin tài khoản" color="#6B7280">
           <InfoRow label="User ID"   value={profile.userId} mono />
           <InfoRow label="Vai trò"   value={meta.label} highlight={meta.color} isLast />
+        </SectionCard>
+
+        {/* ── Actions ─────────────────────────────────────────────────── */}
+        <SectionCard title="Hành động" color={functionalColors.alertRed}>
+          <Box style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <ActionButton
+              label="Đăng xuất"
+              onClick={handleLogout}
+              variant="outline"
+              color={functionalColors.alertRed}
+              disabled={isSaving}
+            />
+          </Box>
         </SectionCard>
 
       </Box>

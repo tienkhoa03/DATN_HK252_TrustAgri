@@ -54,6 +54,28 @@ export interface VerifyResponseDto {
 // ── Service functions ─────────────────────────────────────────────────────────
 
 /**
+ * POST /api/v1/auth/password-login
+ * Đăng nhập bằng username/password. Yêu cầu AUTH_PASSWORD_LOGIN_ENABLED=true ở backend.
+ */
+export async function passwordLogin(username: string, password: string): Promise<AuthSession> {
+  const { data } = await apiClient.post<{
+    accessToken: string;
+    refreshToken: string;
+    userId: string;
+    role: 'farmer' | 'trader' | 'buyer' | 'guest';
+    expiresAt: string;
+  }>('/auth/password-login', { username, password });
+
+  return {
+    accessToken: data.accessToken,
+    refreshToken: data.refreshToken,
+    userId: data.userId,
+    role: data.role,
+    expiresAt: data.expiresAt,
+  };
+}
+
+/**
  * POST /api/v1/auth/login
  * Exchanges a Zalo access token (from ZMP SDK) for a TrustAgri session.
  */

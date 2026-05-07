@@ -10,8 +10,11 @@ import { authSessionAtom, currentRoleAtom } from '@/state/authAtoms';
 import { ChunkErrorBoundary } from '@/components/ErrorBoundary/ChunkErrorBoundary';
 import { RoleAppShell } from '@/navigation/RoleAppShell';
 import { ROLE_HOME_PATH } from '@/router/roleHome';
-import { ENV } from '@/config/env';
-import { bootstrapMockAuthSession } from '@/services/mockAuthBootstrap';
+import {
+  bootstrapAuthSession,
+  isPasswordMode,
+  RequirePasswordLoginError,
+} from '@/services/authStrategy';
 
 function RoleRoute({ role, children }: { role: UserRole; children: React.ReactNode }) {
   return <RequireRole allowedRoles={[role]}>{children}</RequireRole>;
@@ -135,28 +138,35 @@ function RootEntry() {
     if (startedRef.current) return;
     startedRef.current = true;
 
-    // 1) If we already have a session (e.g., rehydrated from sessionStorage) -> go straight to role home.
+    // 1) Already authenticated (rehydrated from sessionStorage) → role home.
     if (session) {
       navigate(ROLE_HOME_PATH[role] ?? '/guest', { replace: true });
       return;
     }
 
-    // 2) Mock dev: auto-bootstrap to a role and route there (skip the smoke/init page).
-    if (ENV.USE_MOCK) {
-      bootstrapMockAuthSession()
-        .then(({ session: s }) => {
-          setSession(s);
-          navigate(ROLE_HOME_PATH[s.role] ?? '/guest', { replace: true });
-        })
-        .catch(() => {
-          // Fallback to guest routes (still shows bottom nav for guest)
-          navigate('/guest', { replace: true });
-        })
+    // 2) Password mode → redirect form đăng nhập.
+    if (isPasswordMode()) {
+      navigate('/login', { replace: true });
       return;
     }
 
-    // 3) Real flow: no persisted session -> go to login (or guest if you want public browsing).
-    navigate('/login', { replace: true });
+    // 3) Auto-bootstrap mode (zalo-oauth | zalo-token | dev-seeded) — biểu hiện như Zalo Mini App.
+    bootstrapAuthSession()
+      .then((s) => {
+        setSession(s);
+        navigate(ROLE_HOME_PATH[s.role] ?? '/guest', { replace: true });
+      })
+      .catch((err) => {
+        // RequirePasswordLoginError không xảy ra ở đây vì đã guard ở (2), nhưng safety fallback.
+        if (err instanceof RequirePasswordLoginError) {
+          navigate('/login', { replace: true });
+          return;
+        }
+        // Lỗi mạng/Zalo SDK → vào /guest để vẫn xem được public; user có thể retry.
+        // eslint-disable-next-line no-console
+        console.error('[RootEntry] bootstrapAuthSession failed:', err);
+        navigate('/guest', { replace: true });
+      });
   }, [navigate, role, session, setSession]);
 
   return <RouteLoadingFallback />;

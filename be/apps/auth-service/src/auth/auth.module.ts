@@ -7,6 +7,7 @@ import { ZaloService } from './zalo.service';
 import { RedisService } from './redis.service';
 import { DevLoginEnabledGuard } from './guards/dev-login-enabled.guard';
 import { DevLocalhostGuard } from './guards/dev-localhost.guard';
+import { PasswordLoginEnabledGuard } from './guards/password-login-enabled.guard';
 
 @Module({
   imports: [TypeOrmModule.forFeature([UserEntity])],
@@ -17,6 +18,7 @@ import { DevLocalhostGuard } from './guards/dev-localhost.guard';
     RedisService,
     DevLoginEnabledGuard,
     DevLocalhostGuard,
+    PasswordLoginEnabledGuard,
   ],
   exports: [AuthService],
 })

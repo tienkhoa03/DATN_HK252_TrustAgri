@@ -118,10 +118,10 @@ function defaultForm(): CareLogFormState {
 
 export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
   farmId = 'farm-001',
-  farmName = 'Sầu riêng Monthong',
-  currentDay = 15,
-  totalDays = 90,
-  growthStage = 'Ra hoa',
+  farmName,
+  currentDay,
+  totalDays,
+  growthStage,
   tasks: initialTasks,
   onTaskToggle,
   onBack,
@@ -132,7 +132,8 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
   const [activeTab, setActiveTab] = useState<'tasks' | 'diary' | 'standards'>('tasks');
 
   // ── Task tab state ────────────────────────────────────────────────────────────
-  const [tasks, setTasks] = useState<Task[]>(initialTasks ?? defaultTasks);
+  // initialTasks vẫn nhận từ props (cho example/demo); production sẽ load từ API care-plan (Phase B2).
+  const [tasks, setTasks] = useState<Task[]>(initialTasks ?? []);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showGuideModal, setShowGuideModal] = useState(false);
 
@@ -536,7 +537,8 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
   };
 
   // ── Progress ──────────────────────────────────────────────────────────────────
-  const progressPercentage = (currentDay / totalDays) * 100;
+  const hasGrowthInfo = typeof currentDay === 'number' && typeof totalDays === 'number' && totalDays > 0;
+  const progressPercentage = hasGrowthInfo ? (currentDay! / totalDays!) * 100 : 0;
 
   // ── Date formatter ────────────────────────────────────────────────────────────
   const fmtDate = (iso: string) =>
@@ -650,9 +652,11 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
           <Text.Title size="small" style={{ margin: 0 }}>
             Quy trình canh tác
           </Text.Title>
-          <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-            {farmName}
-          </Text>
+          {farmName && (
+            <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+              {farmName}
+            </Text>
+          )}
         </div>
         {onBack && (
           <button
@@ -665,30 +669,34 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
         )}
       </div>
 
-      {/* ── Progress bar ── */}
-      <div style={{ padding: spacing.md, backgroundColor: colors.background.primary }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-          <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-            Ngày {currentDay}/{totalDays}
-          </Text>
-          <Text size="small" style={{ color: colors.primary.agriGreen, fontWeight: fontWeight.semibold, margin: 0 }}>
-            Giai đoạn: {growthStage}
+      {/* ── Progress bar — chỉ hiện khi có dữ liệu mùa vụ (sẽ lấy từ care-plan API ở Phase B2) ── */}
+      {hasGrowthInfo && (
+        <div style={{ padding: spacing.md, backgroundColor: colors.background.primary }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
+              Ngày {currentDay}/{totalDays}
+            </Text>
+            {growthStage && (
+              <Text size="small" style={{ color: colors.primary.agriGreen, fontWeight: fontWeight.semibold, margin: 0 }}>
+                Giai đoạn: {growthStage}
+              </Text>
+            )}
+          </div>
+          <div style={progressBarContainerStyles}>
+            <div
+              style={{
+                height: '100%',
+                backgroundColor: colors.primary.agriGreen,
+                width: `${progressPercentage}%`,
+                transition: 'width 0.3s ease',
+              }}
+            />
+          </div>
+          <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.xs }}>
+            {progressPercentage.toFixed(0)}% hoàn thành
           </Text>
         </div>
-        <div style={progressBarContainerStyles}>
-          <div
-            style={{
-              height: '100%',
-              backgroundColor: colors.primary.agriGreen,
-              width: `${progressPercentage}%`,
-              transition: 'width 0.3s ease',
-            }}
-          />
-        </div>
-        <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.xs }}>
-          {progressPercentage.toFixed(0)}% hoàn thành
-        </Text>
-      </div>
+      )}
 
       {/* ── Tabs ── */}
       <div style={{ display: 'flex', borderBottom: `2px solid ${colors.background.secondary}`, backgroundColor: colors.background.primary }}>
@@ -701,6 +709,15 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
       {activeTab === 'tasks' && (
         <div style={{ padding: spacing.md, paddingBottom: '80px' }}>
           <Text.Title size="small" style={{ marginBottom: spacing.md }}>Công việc hôm nay</Text.Title>
+          {tasks.length === 0 && (
+            <div style={{ textAlign: 'center', padding: spacing.xl, color: colors.text.secondary }}>
+              <div style={{ fontSize: 48, marginBottom: spacing.md }}>📋</div>
+              <Text>Chưa có công việc nào.</Text>
+              <Text size="small" style={{ color: colors.text.secondary, marginTop: spacing.sm }}>
+                Tính năng "Lịch công việc theo mùa vụ" đang phát triển.
+              </Text>
+            </div>
+          )}
           {tasks.map((task) => (
             <div key={task.id} style={cardStyles}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: spacing.md }}>
@@ -1315,50 +1332,3 @@ export const FarmerProcessScreen: React.FC<FarmerProcessScreenProps> = ({
 };
 
 export default FarmerProcessScreen;
-
-// ── Default tasks seed (unchanged from Phase 4) ───────────────────────────────
-
-const defaultTasks: Task[] = [
-  {
-    id: '1',
-    title: 'Tưới nước buổi sáng',
-    description: 'Tưới đều 20 lít/cây, tránh úng rễ',
-    completed: true,
-    dueDate: new Date(),
-    hasGuide: true,
-    guideContent: {
-      text: 'Hướng dẫn tưới nước:\n\n1. Kiểm tra độ ẩm đất trước khi tưới\n2. Tưới đều xung quanh gốc cây\n3. Tránh tưới vào lúc trời nắng gắt\n4. Đảm bảo nước thoát tốt, không úng\n\nLưu ý: Giai đoạn ra hoa cần giữ độ ẩm ổn định 60-70%',
-      videoUrl: 'https://example.com/watering-guide.mp4',
-    },
-  },
-  {
-    id: '2',
-    title: 'Bón phân lá',
-    description: 'Phun phân lá NPK 20-20-20, pha loãng 2g/lít',
-    completed: false,
-    dueDate: new Date(Date.now() + 2 * 60 * 60 * 1000),
-    hasGuide: true,
-    guideContent: {
-      text: 'Hướng dẫn bón phân lá:\n\n1. Pha phân NPK 20-20-20 với tỷ lệ 2g/1 lít nước\n2. Phun đều vào mặt dưới lá\n3. Thực hiện vào buổi chiều mát\n4. Tránh phun khi trời mưa',
-    },
-  },
-  {
-    id: '3',
-    title: 'Kiểm tra sâu bệnh',
-    description: 'Quan sát lá, thân, hoa để phát hiện sâu bệnh sớm',
-    completed: false,
-    dueDate: new Date(Date.now() + 4 * 60 * 60 * 1000),
-    hasGuide: true,
-    guideContent: {
-      text: 'Hướng dẫn kiểm tra sâu bệnh:\n\n1. Quan sát mặt trên và dưới lá\n2. Kiểm tra thân cây có vết lạ\n3. Xem hoa có bị sâu đục không\n4. Chụp ảnh nếu phát hiện bất thường',
-    },
-  },
-  {
-    id: '4',
-    title: 'Ghi nhận nhiệt độ và độ ẩm',
-    description: 'Kiểm tra và ghi lại các chỉ số môi trường',
-    completed: false,
-    dueDate: new Date(Date.now() + 6 * 60 * 60 * 1000),
-    hasGuide: false,
-  },
-];

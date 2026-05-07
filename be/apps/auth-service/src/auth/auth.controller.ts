@@ -15,6 +15,7 @@ import type { Request } from 'express';
 import {
   AuthLoginDto,
   AuthDevLoginDto,
+  AuthPasswordLoginDto,
   AuthLoginResponseDto,
   AuthVerifyResponseDto,
   UserProfileDto,
@@ -26,6 +27,7 @@ import {
 import { AuthService } from './auth.service';
 import { DevLoginEnabledGuard } from './guards/dev-login-enabled.guard';
 import { DevLocalhostGuard } from './guards/dev-localhost.guard';
+import { PasswordLoginEnabledGuard } from './guards/password-login-enabled.guard';
 import { getClientIp } from './utils/client-ip';
 
 @Controller('auth')
@@ -42,6 +44,19 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: AuthLoginDto): Promise<AuthLoginResponseDto> {
     return this.authService.login(dto.zaloAccessToken);
+  }
+
+  /**
+   * POST /api/v1/auth/password-login
+   * Đăng nhập bằng username/password. Chỉ hoạt động khi AUTH_PASSWORD_LOGIN_ENABLED=true.
+   * User cần được seed trước với username + password_hash trong DB.
+   */
+  @Post('password-login')
+  @Public()
+  @UseGuards(PasswordLoginEnabledGuard)
+  @HttpCode(HttpStatus.OK)
+  passwordLogin(@Body() dto: AuthPasswordLoginDto): Promise<AuthLoginResponseDto> {
+    return this.authService.passwordLogin(dto.username, dto.password);
   }
 
   /**

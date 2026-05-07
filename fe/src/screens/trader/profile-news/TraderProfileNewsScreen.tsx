@@ -23,6 +23,9 @@ import {
   type ForecastDto,
   type NewsArticleDto,
 } from '../../../services/newsForecastService';
+import { getMe, updateMe } from '@/services/authService';
+import type { UserProfileDto } from '@/services/authService';
+import { ApiError } from '@/api/errors';
 
 export interface TraderProfileNewsScreenProps {
   /** Giữ tương thích ví dụ / tích hợp sau (hồ sơ mock hiện dùng companyName). */
@@ -72,16 +75,60 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
   const [isWritingForecast, setIsWritingForecast] = useState(false);
   const [editingForecastId, setEditingForecastId] = useState<string | null>(null);
 
+  // Hồ sơ công ty — sync với GET/PUT /auth/me. Trường được lưu trên server:
+  //   name → traderProfile.companyName
+  //   address → traderProfile.region
+  //   capacity → traderProfile.capacity
+  //   phone → user.phone
+  //   email → user.email
+  // Trường UI-only (chưa có API): logo, license, description.
   const [companyProfile, setCompanyProfile] = useState({
     logo: '🏢',
     name: companyName,
-    license: 'GP-2024-001234',
-    description:
-      'Chuyên cung cấp sầu riêng Monthong chất lượng cao, tuân thủ tiêu chuẩn VietGAP và GlobalGAP. Với hơn 10 năm kinh nghiệm trong ngành.',
-    address: 'Khu vực Đồng bằng sông Cửu Long',
-    phone: '0901234567',
-    email: 'contact@monthong.vn',
+    license: '',
+    description: '',
+    address: '',
+    capacity: '',
+    phone: '',
+    email: '',
   });
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [trustScore, setTrustScore] = useState<number | null>(null);
+
+  // Load hồ sơ thật khi mở tab "Doanh nghiệp"
+  useEffect(() => {
+    if (activeTab !== 'profile') return;
+    let cancelled = false;
+    setProfileLoading(true);
+    (async () => {
+      try {
+        const me: UserProfileDto = await getMe();
+        if (cancelled) return;
+        setCompanyProfile((prev) => ({
+          ...prev,
+          name: me.traderProfile?.companyName ?? me.displayName ?? prev.name,
+          address: me.traderProfile?.region ?? '',
+          capacity: me.traderProfile?.capacity ?? '',
+          phone: me.phone ?? '',
+          email: me.email ?? '',
+        }));
+        setTrustScore(me.traderProfile?.trustScore ?? null);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        const message =
+          err instanceof ApiError
+            ? err.message || 'Không tải được hồ sơ doanh nghiệp.'
+            : 'Không tải được hồ sơ doanh nghiệp.';
+        openSnackbar({ type: 'error', text: message, duration: 4000, icon: true });
+      } finally {
+        if (!cancelled) setProfileLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, openSnackbar]);
 
   const [newArticle, setNewArticle] = useState({
     title: '',
@@ -293,8 +340,41 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
     }
   };
 
-  const handleSaveProfile = () => {
-    setIsEditing(false);
+  const handleSaveProfile = async () => {
+    if (profileSaving) return;
+    setProfileSaving(true);
+    try {
+      const updated = await updateMe({
+        phone: companyProfile.phone || undefined,
+        email: companyProfile.email || undefined,
+        traderProfile: {
+          companyName: companyProfile.name,
+          region: companyProfile.address,
+          capacity: companyProfile.capacity,
+          // trustScore chỉ đọc, không cập nhật từ FE
+          trustScore: trustScore ?? 0,
+        },
+      });
+      setCompanyProfile((prev) => ({
+        ...prev,
+        name: updated.traderProfile?.companyName ?? prev.name,
+        address: updated.traderProfile?.region ?? prev.address,
+        capacity: updated.traderProfile?.capacity ?? prev.capacity,
+        phone: updated.phone ?? '',
+        email: updated.email ?? '',
+      }));
+      setTrustScore(updated.traderProfile?.trustScore ?? trustScore);
+      setIsEditing(false);
+      openSnackbar({ type: 'success', text: 'Đã cập nhật hồ sơ doanh nghiệp', duration: 2500 });
+    } catch (err: unknown) {
+      const message =
+        err instanceof ApiError
+          ? err.message || 'Lưu hồ sơ thất bại. Vui lòng thử lại.'
+          : 'Lưu hồ sơ thất bại. Vui lòng thử lại.';
+      openSnackbar({ type: 'error', text: message, duration: 4000, icon: true });
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
   const headerStyles: React.CSSProperties = {
@@ -549,18 +629,33 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
               <div style={{ display: 'flex', gap: spacing.md, marginTop: spacing.lg }}>
                 {isEditing ? (
                   <>
-                    <button type="button" style={buttonStyles('primary')} onClick={handleSaveProfile}>
+                    <button
+                      type="button"
+                      style={buttonStyles('primary')}
+                      onClick={() => void handleSaveProfile()}
+                      disabled={profileSaving}
+                    >
                       <Icon name="check" size="sm" color={colors.text.inverse} />
-                      Lưu thay đổi
+                      {profileSaving ? 'Đang lưu…' : 'Lưu thay đổi'}
                     </button>
-                    <button type="button" style={buttonStyles('outline')} onClick={() => setIsEditing(false)}>
+                    <button
+                      type="button"
+                      style={buttonStyles('outline')}
+                      onClick={() => setIsEditing(false)}
+                      disabled={profileSaving}
+                    >
                       Hủy
                     </button>
                   </>
                 ) : (
-                  <button type="button" style={buttonStyles('primary')} onClick={() => setIsEditing(true)}>
+                  <button
+                    type="button"
+                    style={buttonStyles('primary')}
+                    onClick={() => setIsEditing(true)}
+                    disabled={profileLoading}
+                  >
                     <Icon name="edit" size="sm" color={colors.text.inverse} />
-                    Chỉnh sửa thông tin
+                    {profileLoading ? 'Đang tải…' : 'Chỉnh sửa thông tin'}
                   </button>
                 )}
               </div>

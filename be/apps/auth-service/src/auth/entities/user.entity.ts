@@ -58,4 +58,11 @@ export class UserEntity {
 
   @Column({ name: 'last_login', type: 'timestamptz', nullable: true })
   lastLogin: Date | null;
+
+  // Dùng cho đăng nhập bằng username/password (không bắt buộc có tài khoản Zalo)
+  @Column({ name: 'username', unique: true, nullable: true })
+  username: string | null;
+
+  @Column({ name: 'password_hash', nullable: true })
+  passwordHash: string | null;
 }

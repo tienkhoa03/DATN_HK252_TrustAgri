@@ -7,7 +7,10 @@ import {
   HttpStatus,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { timingSafeEqual } from 'crypto';
+import { timingSafeEqual, scrypt, randomBytes } from 'crypto';
+import { promisify } from 'util';
+
+const scryptAsync = promisify(scrypt);
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
@@ -66,6 +69,43 @@ export class AuthService {
     await this.userRepo.save(user);
 
     return this.issueSessionForUser(user);
+  }
+
+  /**
+   * Đăng nhập bằng username/password — chỉ hoạt động khi AUTH_PASSWORD_LOGIN_ENABLED=true.
+   * User phải được seed sẵn với username + password_hash (dùng AuthService.hashPassword).
+   */
+  async passwordLogin(username: string, password: string): Promise<AuthLoginResponseDto> {
+    const user = await this.userRepo.findOne({ where: { username } });
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không đúng');
+    }
+
+    const valid = await this.verifyPassword(password, user.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không đúng');
+    }
+
+    user.lastLogin = new Date();
+    await this.userRepo.save(user);
+
+    return this.issueSessionForUser(user);
+  }
+
+  /** Tạo password_hash để seed user. Dùng Node.js crypto.scrypt — không cần bcrypt. */
+  static async hashPassword(password: string): Promise<string> {
+    const salt = randomBytes(16).toString('hex');
+    const hash = (await scryptAsync(password, salt, 64)) as Buffer;
+    return `${salt}:${hash.toString('hex')}`;
+  }
+
+  private async verifyPassword(password: string, stored: string): Promise<boolean> {
+    const [salt, hashHex] = stored.split(':');
+    if (!salt || !hashHex) return false;
+    const hash = (await scryptAsync(password, salt, 64)) as Buffer;
+    const storedHash = Buffer.from(hashHex, 'hex');
+    if (hash.length !== storedHash.length) return false;
+    return timingSafeEqual(hash, storedHash);
   }
 
   /**

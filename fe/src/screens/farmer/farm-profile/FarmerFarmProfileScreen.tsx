@@ -98,49 +98,7 @@ const FarmCardSkeleton: React.FC = () => (
 
 // ── IoT devices (static — Phase 6 sẽ nối API monitoring) ─────────────────────
 
-interface IoTDevice {
-  id: string;
-  name: string;
-  status: 'online' | 'offline';
-  batteryLevel: number;
-  sensors: string[];
-  lastUpdate: string;
-}
-
-const MOCK_DEVICES: IoTDevice[] = [
-  {
-    id: 'node-001',
-    name: 'Node Cảm biến 1',
-    status: 'online',
-    batteryLevel: 85,
-    sensors: ['temperature', 'humidity', 'light'],
-    lastUpdate: '5 phút trước',
-  },
-  {
-    id: 'node-002',
-    name: 'Node Cảm biến 2',
-    status: 'online',
-    batteryLevel: 92,
-    sensors: ['temperature', 'humidity', 'ph'],
-    lastUpdate: '3 phút trước',
-  },
-  {
-    id: 'node-003',
-    name: 'Node Cảm biến 3',
-    status: 'offline',
-    batteryLevel: 15,
-    sensors: ['temperature', 'humidity'],
-    lastUpdate: '2 giờ trước',
-  },
-];
-
-const SENSOR_LABELS: Record<string, string> = {
-  temperature: '🌡️ Nhiệt độ',
-  humidity: '💧 Độ ẩm',
-  light: '☀️ Ánh sáng',
-  ph: '⚗️ pH',
-  soil_moisture: '🌱 Ẩm đất',
-};
+// IoT device list & SENSOR_LABELS removed — sẽ load từ API ở Phase B1.
 
 // ── Form helpers ──────────────────────────────────────────────────────────────
 
@@ -740,115 +698,27 @@ export const FarmerFarmProfileScreen: React.FC = () => {
           )}
         </div>
 
-        {/* IoT section */}
+        {/* IoT section — placeholder. CRUD thật sẽ wire ở Phase B1 (devices module + endpoint). */}
         <div style={sectionStyles}>
           <Text.Title size="small" style={{ fontWeight: fontWeight.semibold, marginBottom: spacing.md }}>
-            Thiết bị IoT ({MOCK_DEVICES.length})
+            Thiết bị IoT
           </Text.Title>
-
-          {MOCK_DEVICES.map((device) => (
-            <div
-              key={device.id}
-              style={{
-                padding: spacing.md,
-                borderRadius: '10px',
-                border: `2px solid ${
-                  device.status === 'online' ? colors.primary.agriGreen : colors.background.tertiary
-                }`,
-                marginBottom: spacing.md,
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: spacing.sm,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                  <Icon
-                    name="farm"
-                    size="md"
-                    color={device.status === 'online' ? colors.primary.agriGreen : colors.text.secondary}
-                  />
-                  <div>
-                    <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
-                      {device.name}
-                    </Text>
-                    <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                      ID: {device.id}
-                    </Text>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    padding: `2px ${spacing.sm}`,
-                    backgroundColor:
-                      device.status === 'online'
-                        ? `${colors.primary.agriGreen}18`
-                        : colors.background.secondary,
-                    borderRadius: '99px',
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      backgroundColor:
-                        device.status === 'online' ? colors.primary.agriGreen : colors.text.secondary,
-                    }}
-                  />
-                  <Text size="xSmall" style={{ margin: 0, fontWeight: fontWeight.medium }}>
-                    {device.status === 'online' ? 'Online' : 'Offline'}
-                  </Text>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.xs }}>
-                {device.sensors.map((s) => (
-                  <span
-                    key={s}
-                    style={{
-                      padding: `2px ${spacing.sm}`,
-                      backgroundColor: colors.background.secondary,
-                      borderRadius: '4px',
-                      fontSize: fontSize.small,
-                      color: colors.text.secondary,
-                    }}
-                  >
-                    {SENSOR_LABELS[s] ?? s}
-                  </span>
-                ))}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: spacing.sm }}>
-                <Text
-                  size="xSmall"
-                  style={{
-                    color:
-                      device.batteryLevel < 20
-                        ? colors.functional.alertRed
-                        : colors.primary.agriGreen,
-                  }}
-                >
-                  🔋 {device.batteryLevel}%
-                </Text>
-                <Text size="xSmall" style={{ color: colors.text.secondary }}>
-                  Cập nhật {device.lastUpdate}
-                </Text>
-              </div>
-            </div>
-          ))}
-
-          <div style={{ width: '100%', marginTop: spacing.sm }}>
-            <Button variant="outline" size="medium" icon="add">
-              Thêm thiết bị mới
-            </Button>
+          <div
+            style={{
+              padding: spacing.lg,
+              borderRadius: '10px',
+              border: `1px dashed ${colors.background.tertiary}`,
+              textAlign: 'center',
+              color: colors.text.secondary,
+            }}
+          >
+            <div style={{ fontSize: 36, marginBottom: spacing.sm }}>📡</div>
+            <Text size="small" style={{ color: colors.text.primary, fontWeight: fontWeight.semibold, margin: 0 }}>
+              Quản lý thiết bị IoT — sắp ra mắt
+            </Text>
+            <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.xs }}>
+              Theo dõi trạng thái, pin và cảm biến của các node IoT.
+            </Text>
           </div>
         </div>
 
