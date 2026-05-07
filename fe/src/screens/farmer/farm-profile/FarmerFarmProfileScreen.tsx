@@ -20,6 +20,7 @@ import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
 import { Icon } from '../../../design-system/components/Icon';
 import { Button } from '../../../design-system/components/Button';
+import { QRCode } from '../../../design-system/components/QRCode';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
@@ -677,22 +678,19 @@ export const FarmerFarmProfileScreen: React.FC = () => {
                 borderRadius: '12px',
               }}
             >
-              <div
-                style={{
-                  width: 180,
-                  height: 180,
-                  backgroundColor: colors.background.secondary,
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginBottom: spacing.md,
-                }}
-              >
-                <Icon name="qr-code" size="lg" color={colors.text.secondary} />
+              <div style={{ marginBottom: spacing.md }}>
+                <QRCode
+                  value={`https://trustagri.vn/trace?code=${
+                    selectedFarm.traceabilityCode ?? `TR-${selectedFarm.id.replace(/-/g, '').slice(0, 12)}`
+                  }`}
+                  size={180}
+                />
               </div>
               <Text size="small" style={{ textAlign: 'center', color: colors.text.secondary, margin: 0 }}>
                 Khách hàng quét để xem truy xuất nguồn gốc vườn {selectedFarm.name}
+              </Text>
+              <Text size="xSmall" style={{ textAlign: 'center', color: colors.text.secondary, marginTop: spacing.xs, fontFamily: 'monospace' }}>
+                {selectedFarm.traceabilityCode ?? `TR-${selectedFarm.id.replace(/-/g, '').slice(0, 12)}`}
               </Text>
             </div>
           )}

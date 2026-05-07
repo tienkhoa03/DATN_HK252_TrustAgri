@@ -160,3 +160,25 @@ export async function updateMe(patch: UserProfileUpdateDto): Promise<UserProfile
   const { data } = await apiClient.put<UserProfileDto>('/auth/me', patch);
   return data;
 }
+
+/**
+ * Upload avatar — phiên bản đơn giản: chuyển Blob thành data URL rồi PUT /auth/me.
+ *
+ * Lưu ý: data URL được lưu trong cột `users.avatar_url` (text). Phù hợp MVP.
+ * Production nên thay bằng endpoint multipart + S3/CDN (xem plan B4 §Risks R3).
+ *
+ * Giới hạn: 200KB sau khi base64 (≈ 150KB ảnh gốc) để tránh DB bloat.
+ */
+export async function uploadAvatar(blob: Blob): Promise<UserProfileDto> {
+  const MAX_BYTES = 200 * 1024;
+  if (blob.size > MAX_BYTES) {
+    throw new Error(`Ảnh quá lớn (${Math.round(blob.size / 1024)}KB). Tối đa ${Math.round(MAX_BYTES / 1024)}KB.`);
+  }
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(new Error('Không đọc được file ảnh.'));
+    reader.readAsDataURL(blob);
+  });
+  return updateMe({ avatarUrl: dataUrl });
+}

@@ -35,6 +35,7 @@ export interface FarmDto {
   area: number;             // m²
   cropType: string;         // ví dụ: "dragon_fruit"
   standardId?: string;      // liên kết tiêu chuẩn (FR-F06)
+  traceabilityCode?: string; // FR-G01: mã QR truy xuất công khai (TR-<12chars>)
   createdAt: string;        // ISO-8601
   updatedAt: string;        // ISO-8601
 }

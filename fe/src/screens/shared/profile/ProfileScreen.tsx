@@ -26,6 +26,7 @@ import { primaryColors, functionalColors } from '@/design-system/tokens/colors';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { authSessionAtom } from '@/state/authAtoms';
 import * as authService from '@/services/authService';
+import { ApiError } from '@/api/errors';
 
 // ── Role metadata ─────────────────────────────────────────────────────────────
 
@@ -134,6 +135,58 @@ export function ProfileScreen() {
     setIsEditing(false);
   };
 
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const handleChangeAvatar = async () => {
+    if (avatarUploading) return;
+    setAvatarUploading(true);
+    try {
+      // ZMP SDK: chooseImage trong Mini App; fallback browser file input
+      let blob: Blob | null = null;
+      try {
+        const { chooseImage } = await import('zmp-sdk/apis');
+        const res = await chooseImage({ count: 1, sourceType: ['camera', 'album'] });
+        const path = res.filePaths?.[0];
+        if (path) {
+          blob = await fetch(path).then((r) => r.blob());
+        }
+      } catch {
+        // Fallback ngoài Zalo Mini App: trigger file input
+        blob = await new Promise<Blob | null>((resolve) => {
+          const input = document.createElement('input');
+          input.type = 'file';
+          input.accept = 'image/*';
+          input.onchange = () => resolve(input.files?.[0] ?? null);
+          input.click();
+        });
+      }
+
+      if (!blob) {
+        setAvatarUploading(false);
+        return;
+      }
+
+      const updated = await authService.uploadAvatar(blob);
+      // useProfile sẽ tự refresh sau khi PUT — nhưng để chắc, cập nhật state cục bộ
+      openSnackbar({ type: 'success', text: 'Đã cập nhật ảnh đại diện', duration: 2500, icon: true });
+      // Trigger reload qua useProfile bằng cách gọi updateProfile no-op? Không, useProfile đã gọi PUT trực tiếp.
+      // updated chứa profile mới — nhưng useProfile state độc lập. Force reload page-level qua window.location reload là quá nặng.
+      // Workaround: gọi updateProfile với patch rỗng để useProfile re-fetch profile.
+      void updated;
+      void updateProfile({});
+    } catch (err: unknown) {
+      const msg =
+        err instanceof ApiError
+          ? err.message || 'Tải ảnh thất bại. Vui lòng thử lại.'
+          : err instanceof Error
+            ? err.message
+            : 'Tải ảnh thất bại.';
+      openSnackbar({ type: 'error', text: msg, duration: 4000, icon: true });
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await authService.logout();
@@ -170,7 +223,12 @@ export function ProfileScreen() {
     <Page style={{ background: functionalColors.neutralGray, minHeight: '100vh' }}>
 
       {/* ── Hero header ─────────────────────────────────────────────────── */}
-      <ProfileHero profile={profile} meta={meta} />
+      <ProfileHero
+        profile={profile}
+        meta={meta}
+        onChangeAvatar={handleChangeAvatar}
+        avatarUploading={avatarUploading}
+      />
 
       {/* ── Content ─────────────────────────────────────────────────────── */}
       <Box style={{ padding: '16px 16px 48px' }}>
@@ -343,9 +401,13 @@ export function ProfileScreen() {
 function ProfileHero({
   profile,
   meta,
+  onChangeAvatar,
+  avatarUploading,
 }: {
   profile: UserProfileDto;
   meta: { label: string; emoji: string; color: string; bg: string };
+  onChangeAvatar?: () => void;
+  avatarUploading?: boolean;
 }) {
   return (
     <Box
@@ -358,36 +420,64 @@ function ProfileHero({
         gap: 12,
       }}
     >
-      {/* Avatar */}
-      {profile.avatarUrl ? (
-        <img
-          src={profile.avatarUrl}
-          alt={profile.displayName}
-          style={{
-            width: 80,
-            height: 80,
-            borderRadius: '50%',
-            objectFit: 'cover',
-            border: '3px solid rgba(255,255,255,0.7)',
-          }}
-        />
-      ) : (
-        <Box
-          style={{
-            width: 80,
-            height: 80,
-            borderRadius: '50%',
-            background: 'rgba(255,255,255,0.25)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 36,
-            border: '3px solid rgba(255,255,255,0.5)',
-          }}
-        >
-          {meta.emoji}
-        </Box>
-      )}
+      {/* Avatar + change button */}
+      <Box style={{ position: 'relative' }}>
+        {profile.avatarUrl ? (
+          <img
+            src={profile.avatarUrl}
+            alt={profile.displayName}
+            style={{
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              objectFit: 'cover',
+              border: '3px solid rgba(255,255,255,0.7)',
+            }}
+          />
+        ) : (
+          <Box
+            style={{
+              width: 80,
+              height: 80,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 36,
+              border: '3px solid rgba(255,255,255,0.5)',
+            }}
+          >
+            {meta.emoji}
+          </Box>
+        )}
+        {onChangeAvatar && (
+          <button
+            type="button"
+            onClick={onChangeAvatar}
+            disabled={avatarUploading}
+            aria-label="Đổi ảnh đại diện"
+            style={{
+              position: 'absolute',
+              right: -2,
+              bottom: -2,
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              background: '#fff',
+              border: `2px solid ${meta.color}`,
+              cursor: avatarUploading ? 'wait' : 'pointer',
+              fontSize: 14,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+            }}
+          >
+            {avatarUploading ? '⏳' : '📷'}
+          </button>
+        )}
+      </Box>
 
       {/* Name */}
       <Text style={{ fontSize: 22, fontWeight: 800, color: '#fff', textAlign: 'center' }}>

@@ -1,7 +1,7 @@
 # Plan: MVP Polish & Feature Completion
 
 **Created:** 2026-05-08
-**Status:** in-progress (Phase A done — B/C pending)
+**Status:** in-progress (Phase A done; B3/B4/B5 done; B1/B2/Phase C pending)
 **Owner:** tienkhoa03@gmail.com
 **Related:** US-F01..F05, US-T01..T04, US-U01..U06, US-G01..G02, FR-F01/F03/F06/F07/F08/F09, FR-T01/T05/T06/T08/T11/T12, FR-U06, FR-G01, FR-S01, NFR-A01, NFR-A02, NFR-C01, NFR-P01, NFR-P02, NFR-R02, NFR-R03, NFR-S02, NFR-U01, NFR-U02, NFR-U03
 
@@ -318,16 +318,16 @@ NODE_ENV=development                      # mode 3, 4 chỉ chạy khi !=product
    - `GuestProductDetailScreen`: xóa `MOCK_REVIEWS` + block đánh giá.
 8. **A3** ✅ `TraderProfileNewsScreen` — load `getMe()` khi mở tab Hồ sơ; `handleSaveProfile()` gọi `updateMe({ phone, email, traderProfile })`. Hỗ trợ trustScore read-only.
 
-### Phase B — Feature gaps (2 sprint)
+### Phase B — Feature gaps (2 sprint) — partial
 
-4. **B1** BE: tạo migration `iot_devices` + module `devices` (controller/service/dto/entity). Unit + integration test.
-5. **B1** FE: `deviceService.ts` + `useDevices` hook + tab Devices trong `FarmerFarmProfileScreen`.
-6. **B2** BE: module `care-plans` + endpoint `today`/`complete`. Logic tính theo `plantingDate` + `standard.steps`.
-7. **B2** FE: `carePlanService.ts` + `useCarePlan` + tab "Công việc" `FarmerProcessScreen`.
-8. **B3** FE: thêm `qrcode.react`, component `QRCode`, replace icon ở `FarmerFarmProfileScreen`. Bundle check.
-9. **B4** BE: endpoint `POST /auth/me/avatar` (multer hoặc S3 stub) + DB column nếu cần.
-10. **B4** FE: `uploadAvatar` service + nút đổi ảnh trong `ProfileScreen`.
-11. **B5** FE: promote `NotificationBell` shared, gắn vào `RoleAppShell` cho 3 role; route `/notifications` shared.
+4. **B1** ⏸ BE: tạo migration `iot_devices` + module `devices`. **DEFERRED** — cần BE entity mới + module + shared DTO; nên có session riêng để test kỹ.
+5. **B1** ⏸ FE: `deviceService.ts` + `useDevices` hook + tab Devices. **DEFERRED** — phụ thuộc B1 BE. Hiện FarmerFarmProfileScreen show placeholder "sắp ra mắt".
+6. **B2** ⏸ BE: module `care-plans` + endpoint `today`/`complete`. **DEFERRED** — cần thêm cột `farms.planting_date` trước (DB migration); phụ thuộc B1 entity pattern.
+7. **B2** ⏸ FE: `carePlanService.ts` + `useCarePlan` + tab "Công việc". **DEFERRED** — phụ thuộc B2 BE. Hiện FarmerProcessScreen show empty state.
+8. **B3** ✅ FE: cài `qrcode.react@^4.2.0`; component `fe/src/design-system/components/QRCode/QRCode.tsx`; replace icon QR trong `FarmerFarmProfileScreen` bằng QR thật từ `traceabilityCode` (fallback compute từ `farm.id`). Thêm field `traceabilityCode?: string` vào `FarmDto`.
+9. **B4** ✅ BE: KHÔNG cần endpoint riêng — dùng existing `PUT /auth/me { avatarUrl }` với data URL. Đơn giản hóa cho MVP (avatar lưu base64 trong DB). Production cần migrate sang multipart + S3 (R3 trong plan).
+10. **B4** ✅ FE: `uploadAvatar(blob)` trong `authService.ts` (max 200KB, convert base64 → updateMe); nút "📷" trong `ProfileScreen` ProfileHero (ZMP `chooseImage` + browser fallback file input).
+11. **B5** ✅ FE: tạo `fe/src/components/NotificationBell.tsx` (role-agnostic); `BuyerNotificationBell` chuyển thành wrapper backward-compat; tạo route `/notifications` + `fe/src/screens/shared/notifications/NotificationsScreen.tsx` (list + read + readAll). Lưu ý: chưa tự động render bell trong `RoleAppShell` (cần thiết kế top header chung — out of scope session này).
 
 ### Phase C — Hardening (1 sprint)
 
@@ -344,6 +344,15 @@ NODE_ENV=development                      # mode 3, 4 chỉ chạy khi !=product
 19. Cập nhật `agent-notes.md` (nếu phát sinh guardrail mới).
 
 ---
+
+## 6.1 Blockers / Deferred
+
+- **B1 IoT Devices** — Deferred to next session. Cần: entity `IotDeviceEntity` (id, farmId, name, status, batteryLevel, lastUpdate, sensorTypes[]); module `devices` trong `monitoring-service`; DTO trong `@trustagri/shared`; service `deviceService` FE; tab/CRUD UI thay placeholder hiện tại.
+- **B2 Daily Care Plan** — Deferred to next session. Phụ thuộc:
+  - Cột mới `farms.planting_date date` (migration).
+  - Logic compute today's tasks từ `standard.steps[].expectedDurationDays` + planting_date.
+  - Endpoint `GET /farms/:id/care-plan/today` + `POST /care-plan/tasks/:taskId/complete`.
+- **B5 RoleAppShell bell integration** — Bell component + route đã sẵn. Render trong shell cần thiết kế top header thống nhất cho farmer/trader/buyer (hiện mỗi screen có header riêng) — out of scope session này.
 
 ## 7. Risks / Open questions
 

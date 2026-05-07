@@ -107,6 +107,10 @@ const ConnectionRequestsScreen = lazy(() =>
   import('@/screens/shared/connections').then((m) => ({ default: m.ConnectionRequestsScreen })),
 );
 
+const NotificationsScreen = lazy(() =>
+  import('@/screens/shared/notifications').then((m) => ({ default: m.NotificationsScreen })),
+);
+
 const AppInitScreen = lazy(() =>
   import('@/pages/AppInitScreen').then((m) => ({ default: m.AppInitScreen })),
 );
@@ -192,6 +196,9 @@ export function AppRoutes() {
 
         {/* ── Auth ──────────────────────────────────────────── */}
         <Route path="/login"                   element={<LoginScreen />} />
+
+        {/* ── Trung tâm thông báo (shared, mọi role auth) ───── */}
+        <Route path="/notifications"           element={<NotificationsScreen />} />
 
         {/* ── Guest (chỉ role guest / chưa đăng nhập) ───────── */}
         <Route path="/guest" element={<RoleLayout role="guest" />}>
