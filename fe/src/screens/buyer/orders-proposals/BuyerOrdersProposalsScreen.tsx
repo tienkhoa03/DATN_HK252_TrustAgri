@@ -15,6 +15,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Page, Text } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
+import { EmptyState } from '../../../design-system/components/EmptyState';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
@@ -298,11 +299,6 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
       'none',
   });
 
-  const emptyStyle: React.CSSProperties = {
-    textAlign: 'center',
-    padding: `${spacing.xl} ${spacing.md}`,
-  };
-
   // ── Tab renderers ─────────────────────────────────────────────────────────
 
   const renderProposalsTab = () => {
@@ -311,30 +307,11 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
     }
 
     if (propError) {
-      return (
-        <div style={emptyStyle}>
-          <div style={{ fontSize: '40px', marginBottom: spacing.md }}>⚠️</div>
-          <Text size="small" style={{ color: colors.functional.alertRed }}>{propError}</Text>
-          <button
-            style={{ ...btnStyle('secondary'), flex: 'none', marginTop: spacing.md, padding: `${spacing.sm} ${spacing.lg}` }}
-            onClick={loadProposals}
-          >
-            Thử lại
-          </button>
-        </div>
-      );
+      return <EmptyState icon="⚠️" title="Không tải được đề xuất" description={propError} cta={{ label: 'Thử lại', onClick: loadProposals }} />;
     }
 
     if (pendingProposals.length === 0) {
-      return (
-        <div style={emptyStyle}>
-          <div style={{ fontSize: '48px', marginBottom: spacing.md }}>📋</div>
-          <Text.Title size="small" style={{ marginBottom: spacing.sm }}>Chưa có đề xuất nào</Text.Title>
-          <Text size="small" style={{ color: colors.text.secondary }}>
-            Thương lái sẽ phản hồi yêu cầu mua của bạn tại đây
-          </Text>
-        </div>
-      );
+      return <EmptyState icon="📋" title="Chưa có đề xuất nào" description="Thương lái sẽ phản hồi yêu cầu mua của bạn tại đây" />;
     }
 
     return (
@@ -469,30 +446,11 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
     }
 
     if (ordersError) {
-      return (
-        <div style={emptyStyle}>
-          <div style={{ fontSize: '40px', marginBottom: spacing.md }}>⚠️</div>
-          <Text size="small" style={{ color: colors.functional.alertRed }}>{ordersError}</Text>
-          <button
-            style={{ ...btnStyle('secondary'), flex: 'none', marginTop: spacing.md, padding: `${spacing.sm} ${spacing.lg}` }}
-            onClick={loadOrders}
-          >
-            Thử lại
-          </button>
-        </div>
-      );
+      return <EmptyState icon="⚠️" title="Không tải được đơn hàng" description={ordersError} cta={{ label: 'Thử lại', onClick: loadOrders }} />;
     }
 
     if (activeOrders.length === 0) {
-      return (
-        <div style={emptyStyle}>
-          <div style={{ fontSize: '48px', marginBottom: spacing.md }}>📦</div>
-          <Text.Title size="small" style={{ marginBottom: spacing.sm }}>Chưa có đơn hàng đang thực hiện</Text.Title>
-          <Text size="small" style={{ color: colors.text.secondary }}>
-            Chấp nhận đề xuất từ thương lái để bắt đầu đơn hàng
-          </Text>
-        </div>
-      );
+      return <EmptyState icon="📦" title="Chưa có đơn hàng đang thực hiện" description="Chấp nhận đề xuất từ thương lái để bắt đầu đơn hàng" />;
     }
 
     return (
@@ -605,30 +563,11 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
     }
 
     if (ordersError) {
-      return (
-        <div style={emptyStyle}>
-          <div style={{ fontSize: '40px', marginBottom: spacing.md }}>⚠️</div>
-          <Text size="small" style={{ color: colors.functional.alertRed }}>{ordersError}</Text>
-          <button
-            style={{ ...btnStyle('secondary'), flex: 'none', marginTop: spacing.md, padding: `${spacing.sm} ${spacing.lg}` }}
-            onClick={loadOrders}
-          >
-            Thử lại
-          </button>
-        </div>
-      );
+      return <EmptyState icon="⚠️" title="Không tải được lịch sử đơn hàng" description={ordersError} cta={{ label: 'Thử lại', onClick: loadOrders }} />;
     }
 
     if (historyOrders.length === 0) {
-      return (
-        <div style={emptyStyle}>
-          <div style={{ fontSize: '48px', marginBottom: spacing.md }}>📜</div>
-          <Text.Title size="small" style={{ marginBottom: spacing.sm }}>Chưa có lịch sử đơn hàng</Text.Title>
-          <Text size="small" style={{ color: colors.text.secondary }}>
-            Các đơn hàng hoàn tất hoặc đã hủy sẽ hiển thị tại đây
-          </Text>
-        </div>
-      );
+      return <EmptyState icon="📜" title="Chưa có lịch sử đơn hàng" description="Các đơn hàng hoàn tất hoặc đã hủy sẽ hiển thị tại đây" />;
     }
 
     return (
@@ -688,18 +627,7 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
       return <>{Array.from({ length: 2 }).map((_, i) => <SkeletonCard key={i} />)}</>;
     }
     if (contractError && contractItems.length === 0) {
-      return (
-        <div style={emptyStyle}>
-          <Text size="small" style={{ color: colors.functional.alertRed }}>{contractError}</Text>
-          <button
-            type="button"
-            style={{ ...btnStyle('secondary'), flex: 'none', marginTop: spacing.md, padding: `${spacing.sm} ${spacing.lg}` }}
-            onClick={loadContracts}
-          >
-            Thử lại
-          </button>
-        </div>
-      );
+      return <EmptyState icon="⚠️" title="Không tải được hợp đồng" description={contractError} cta={{ label: 'Thử lại', onClick: loadContracts }} />;
     }
 
     const contractStatusColor = (s: ContractDto['status']) =>
@@ -720,13 +648,7 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
           Hợp đồng với thương lái (theo JWT người mua).
         </Text>
         {contractItems.length === 0 ? (
-          <div style={emptyStyle}>
-            <div style={{ fontSize: '48px', marginBottom: spacing.md }}>📄</div>
-            <Text.Title size="small" style={{ marginBottom: spacing.sm }}>Chưa có hợp đồng</Text.Title>
-            <Text size="small" style={{ color: colors.text.secondary }}>
-              Sau khi chấp nhận đề xuất, hợp đồng sẽ hiển thị tại đây
-            </Text>
-          </div>
+          <EmptyState icon="📄" title="Chưa có hợp đồng" description="Sau khi chấp nhận đề xuất, hợp đồng sẽ hiển thị tại đây" />
         ) : (
           contractItems.map((c) => {
             const cColor = contractStatusColor(c.status);

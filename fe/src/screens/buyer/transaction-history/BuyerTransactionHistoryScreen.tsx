@@ -9,6 +9,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Page, Text, Spinner, useNavigate } from 'zmp-ui';
 import { Icon } from '@/design-system/components/Icon';
+import { EmptyState } from '@/design-system/components/EmptyState';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
@@ -453,35 +454,13 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
         )}
 
         {!loading && tab === 'orders' && orderError && !orderData && (
-          <div style={{ textAlign: 'center', padding: spacing.xl }}>
-            <Text size="small" style={{ color: colors.functional.alertRed, marginBottom: spacing.md }}>
-              {orderError}
-            </Text>
-            <button
-              type="button"
-              onClick={() => load()}
-              style={{
-                padding: `${spacing.sm} ${spacing.lg}`,
-                borderRadius: 8,
-                border: 'none',
-                backgroundColor: colors.primary.zaloBlue,
-                color: colors.text.inverse,
-                fontWeight: fontWeight.semibold,
-                cursor: 'pointer',
-              }}
-            >
-              Thử lại
-            </button>
-          </div>
+          <EmptyState icon="⚠️" title="Không tải được đơn hàng" description={orderError} cta={{ label: 'Thử lại', onClick: () => load() }} />
         )}
 
         {!loading && tab === 'orders' && orderData && (
           <>
             {orderData.items.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: spacing.xl, color: colors.text.secondary }}>
-                <div style={{ fontSize: 40, marginBottom: spacing.sm }}>📦</div>
-                <Text size="small">Không có đơn hàng phù hợp.</Text>
-              </div>
+              <EmptyState icon="📦" title="Không có đơn hàng phù hợp" description="Thử thay đổi bộ lọc để xem kết quả." />
             ) : (
               orderData.items.map((order) => (
                 <div key={order.id} style={cardStyle}>
@@ -558,35 +537,13 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
         )}
 
         {!loading && tab === 'contracts' && contractError && !contractData && (
-          <div style={{ textAlign: 'center', padding: spacing.xl }}>
-            <Text size="small" style={{ color: colors.functional.alertRed, marginBottom: spacing.md }}>
-              {contractError}
-            </Text>
-            <button
-              type="button"
-              onClick={() => load()}
-              style={{
-                padding: `${spacing.sm} ${spacing.lg}`,
-                borderRadius: 8,
-                border: 'none',
-                backgroundColor: colors.primary.zaloBlue,
-                color: colors.text.inverse,
-                fontWeight: fontWeight.semibold,
-                cursor: 'pointer',
-              }}
-            >
-              Thử lại
-            </button>
-          </div>
+          <EmptyState icon="⚠️" title="Không tải được hợp đồng" description={contractError} cta={{ label: 'Thử lại', onClick: () => load() }} />
         )}
 
         {!loading && tab === 'contracts' && contractData && (
           <>
             {contractData.items.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: spacing.xl, color: colors.text.secondary }}>
-                <div style={{ fontSize: 40, marginBottom: spacing.sm }}>📄</div>
-                <Text size="small">Không có hợp đồng phù hợp.</Text>
-              </div>
+              <EmptyState icon="📄" title="Không có hợp đồng phù hợp" description="Thử thay đổi bộ lọc để xem kết quả." />
             ) : (
               contractData.items.map((c) => (
                 <div key={c.id} style={cardStyle}>

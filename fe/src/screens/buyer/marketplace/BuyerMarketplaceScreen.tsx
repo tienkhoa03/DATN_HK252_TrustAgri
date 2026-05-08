@@ -25,8 +25,13 @@ import {
   toMarketplaceViMessage,
   type ProductDto,
 } from '../../../services/marketplaceService';
+import { listNews, type NewsArticleDto } from '@/services/newsForecastService';
+import { getMe } from '@/services/authService';
 import { BuyerNotificationBell } from '../components/BuyerNotificationBell';
 import { BuyerDashboardScreen } from '../dashboard';
+
+const NEWS_LIMIT = 5;
+const PRODUCTS_PER_PAGE = 12;
 
 export interface BuyerMarketplaceScreenProps {
   buyerName?: string;
@@ -34,33 +39,6 @@ export interface BuyerMarketplaceScreenProps {
   onPostBuyingRequest?: () => void;
 }
 
-interface NewsItem {
-  id: string;
-  title: string;
-  type: 'price-forecast' | 'farming-highlight';
-  image: string;
-}
-
-const NEWS_ITEMS: NewsItem[] = [
-  {
-    id: '1',
-    title: 'Dự báo giá Bưởi Da Xanh tăng 15% tuần tới',
-    type: 'price-forecast',
-    image: '📊',
-  },
-  {
-    id: '2',
-    title: 'Tiêu điểm: Vụ Sầu riêng Monthong đạt năng suất cao',
-    type: 'farming-highlight',
-    image: '🌟',
-  },
-  {
-    id: '3',
-    title: 'Giá Xoài Cát Chu ổn định trong tháng 12',
-    type: 'price-forecast',
-    image: '🥭',
-  },
-];
 
 // Skeleton card placeholder
 const SkeletonCard: React.FC = () => (
@@ -103,27 +81,52 @@ const SkeletonCard: React.FC = () => (
  * Requirements: FR-U01, FR-U02, FR-G02, 20.1-20.4
  */
 export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
-  buyerName = 'Người mua',
+  buyerName: buyerNameProp,
   onProductPress,
   onPostBuyingRequest,
 }) => {
   const openSnackbar = useStableOpenSnackbar();
   const [searchQuery, setSearchQuery] = useState('');
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
+  const [newsItems, setNewsItems] = useState<NewsArticleDto[]>([]);
   const [products, setProducts] = useState<ProductDto[]>([]);
+  const [productPage, setProductPage] = useState(1);
+  const [productTotal, setProductTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [buyerName, setBuyerName] = useState(buyerNameProp ?? '');
 
-  // Load products on mount
+  // Load buyer profile name
+  useEffect(() => {
+    if (buyerNameProp) return;
+    getMe()
+      .then((profile) => setBuyerName(profile.displayName || 'Người mua'))
+      .catch(() => setBuyerName('Người mua'));
+  }, [buyerNameProp]);
+
+  // Load news from API
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    listNews({ limit: NEWS_LIMIT })
+      .then((res) => { if (!cancelled) setNewsItems(res.items); })
+      .catch(() => { /* silently hide news on error */ });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Load products page
+  useEffect(() => {
+    let cancelled = false;
+    if (productPage === 1) setLoading(true);
+    else setLoadingMore(true);
     setError(null);
-    listProducts({ status: 'active' })
+    listProducts({ status: 'active', page: productPage, limit: PRODUCTS_PER_PAGE })
       .then((res) => {
         if (!cancelled) {
-          setProducts(res.items);
+          setProducts((prev) => productPage === 1 ? res.items : [...prev, ...res.items]);
+          setProductTotal(res.total);
           setLoading(false);
+          setLoadingMore(false);
         }
       })
       .catch((err: unknown) => {
@@ -131,12 +134,13 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
           const msg = toMarketplaceViMessage(err, 'list');
           setError(msg);
           setLoading(false);
+          setLoadingMore(false);
           openSnackbar({ type: 'error', text: msg, duration: 4000, icon: true });
         }
       });
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [productPage]);
 
   // Client-side filter based on search query
   const filteredProducts = products.filter(
@@ -379,7 +383,7 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
                     if (isAvailable) onProductPress?.(product.id);
                   }}
                   onMouseEnter={(e) => {
-                    if (isAvailable) e.currentTarget.style.backgroundColor = '#0052CC';
+                    if (isAvailable) e.currentTarget.style.backgroundColor = colors.primary.zaloBlueDark;
                   }}
                   onMouseLeave={(e) => {
                     if (isAvailable)
@@ -430,53 +434,78 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
           </div>
         </div>
 
-        {/* News Banner */}
-        <div style={newsBannerStyles}>
-          <div
-            style={newsCardStyles}
-            onClick={() => {/* navigate to news */ }}
-            onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.02)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-          >
-            <div style={{ fontSize: '32px', marginBottom: spacing.sm }}>
-              {NEWS_ITEMS[currentNewsIndex].image}
+        {/* News Banner — hiển thị khi có news từ API */}
+        {newsItems.length > 0 && (
+          <div style={newsBannerStyles}>
+            <div
+              style={newsCardStyles}
+              onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.02)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+            >
+              <div style={{ fontSize: '32px', marginBottom: spacing.sm }}>
+                {newsItems[currentNewsIndex].imageUrl ? '🖼️' : '📰'}
+              </div>
+              <Text.Title
+                size="small"
+                style={{ margin: 0, color: colors.text.inverse, fontWeight: fontWeight.semibold }}
+              >
+                {newsItems[currentNewsIndex].title}
+              </Text.Title>
+              <Text
+                size="xSmall"
+                style={{ color: colors.text.inverse, marginTop: spacing.xs, opacity: 0.9 }}
+              >
+                {newsItems[currentNewsIndex].category === 'price_forecast'
+                  ? '📊 Dự báo giá'
+                  : '🌾 Tiêu điểm nông vụ'}
+              </Text>
             </div>
-            <Text.Title
-              size="small"
-              style={{ margin: 0, color: colors.text.inverse, fontWeight: fontWeight.semibold }}
-            >
-              {NEWS_ITEMS[currentNewsIndex].title}
-            </Text.Title>
-            <Text
-              size="xSmall"
-              style={{ color: colors.text.inverse, marginTop: spacing.xs, opacity: 0.9 }}
-            >
-              {NEWS_ITEMS[currentNewsIndex].type === 'price-forecast'
-                ? '📊 Dự báo giá'
-                : '🌾 Tiêu điểm nông vụ'}
-            </Text>
-          </div>
 
-          <div style={newsDotsStyles}>
-            {NEWS_ITEMS.map((_, index) => (
-              <div
-                key={index}
-                style={dotStyles(index === currentNewsIndex)}
-                onClick={() => setCurrentNewsIndex(index)}
-              />
-            ))}
+            <div style={newsDotsStyles}>
+              {newsItems.map((_, index) => (
+                <div
+                  key={index}
+                  style={dotStyles(index === currentNewsIndex)}
+                  onClick={() => setCurrentNewsIndex(index)}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Section title */}
         <div style={{ padding: `${spacing.md} ${spacing.md} 0` }}>
           <Text.Title size="small" style={{ margin: 0 }}>
-            {loading ? 'Đang tải...' : `Nông sản (${filteredProducts.length})`}
+            {loading ? 'Đang tải...' : `Nông sản (${filteredProducts.length}${productTotal > products.length ? `/${productTotal}` : ''})`}
           </Text.Title>
         </div>
 
         {/* Product Grid */}
         {renderProductGrid()}
+
+        {/* Xem thêm button */}
+        {!loading && !error && products.length < productTotal && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: `0 ${spacing.md} ${spacing.md}` }}>
+            <button
+              type="button"
+              disabled={loadingMore}
+              onClick={() => setProductPage((p) => p + 1)}
+              style={{
+                padding: `${spacing.sm} ${spacing.lg}`,
+                backgroundColor: colors.background.secondary,
+                color: colors.primary.zaloBlue,
+                border: `1px solid ${colors.primary.zaloBlue}`,
+                borderRadius: '8px',
+                fontSize: fontSize.body,
+                fontWeight: fontWeight.semibold,
+                cursor: loadingMore ? 'not-allowed' : 'pointer',
+                minHeight: '44px',
+              }}
+            >
+              {loadingMore ? 'Đang tải...' : 'Xem thêm'}
+            </button>
+          </div>
+        )}
 
         {/* Floating Action Button */}
         <button

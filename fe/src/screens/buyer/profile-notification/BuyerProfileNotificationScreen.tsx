@@ -786,7 +786,7 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
           }}
           onClick={() => console.log('Confirm delivery')}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#35A55F';
+            e.currentTarget.style.backgroundColor = colors.primary.agriGreenDark;
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = colors.primary.agriGreen;

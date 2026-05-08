@@ -19,6 +19,7 @@ import { Page, Text, useNavigate } from 'zmp-ui';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { Icon } from '@/design-system/components/Icon';
+import { EmptyState } from '@/design-system/components/EmptyState';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
@@ -582,33 +583,21 @@ export const FarmerAlertListScreen: React.FC<FarmerAlertListScreenProps> = ({
           {isLoading ? (
             Array.from({ length: 4 }).map((_, i) => <AlertCardSkeleton key={i} />)
           ) : alerts.length === 0 ? (
-            <div style={{
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center',
-              padding: `${spacing.xl} ${spacing.md}`, gap: spacing.md,
-            }}>
-              <div style={{
-                width: 64, height: 64, borderRadius: '50%',
-                backgroundColor: `${colors.primary.agriGreen}15`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Icon name="plant" size="lg" color={colors.primary.agriGreen} />
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <Text.Title size="small" style={{ margin: '0 0 4px', color: colors.text.primary }}>
-                  {statusFilter === 'unacknowledged'
-                    ? 'Không có cảnh báo nào cần xử lý'
-                    : statusFilter === 'acknowledged'
-                    ? 'Chưa có cảnh báo nào được xử lý'
-                    : 'Chưa có cảnh báo nào'}
-                </Text.Title>
-                <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-                  {statusFilter === 'unacknowledged'
-                    ? 'Tất cả cảnh báo đều đã được xử lý. Vườn đang trong trạng thái tốt!'
-                    : 'Hệ thống sẽ thông báo khi có giá trị vượt ngưỡng an toàn.'}
-                </Text>
-              </div>
-            </div>
+            <EmptyState
+              icon="🌱"
+              title={
+                statusFilter === 'unacknowledged'
+                  ? 'Không có cảnh báo nào cần xử lý'
+                  : statusFilter === 'acknowledged'
+                  ? 'Chưa có cảnh báo nào được xử lý'
+                  : 'Chưa có cảnh báo nào'
+              }
+              description={
+                statusFilter === 'unacknowledged'
+                  ? 'Tất cả cảnh báo đều đã được xử lý. Vườn đang trong trạng thái tốt!'
+                  : 'Hệ thống sẽ thông báo khi có giá trị vượt ngưỡng an toàn.'
+              }
+            />
           ) : (
             alerts.map((alert) => (
               <AlertCard

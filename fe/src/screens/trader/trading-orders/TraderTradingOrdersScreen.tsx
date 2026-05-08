@@ -13,6 +13,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Page, Text } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
+import { EmptyState } from '../../../design-system/components/EmptyState';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
@@ -691,21 +692,9 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
 
     if (productsError) {
       return (
-        <div style={{ textAlign: 'center', padding: spacing.lg }}>
-          <div style={{ fontSize: '48px', marginBottom: spacing.md }}>⚠️</div>
-          <Text size="small" style={{ color: colors.functional.alertRed }}>
-            {productsError}
-          </Text>
-          <button
-            style={{ ...actionButtonStyles(true), marginTop: spacing.md, flex: 'none' }}
-            onClick={loadProducts}
-          >
-            Thử lại
-          </button>
-        </div>
+        <EmptyState icon="⚠️" title="Không tải được sản phẩm" description={productsError} cta={{ label: 'Thử lại', onClick: loadProducts }} />
       );
     }
-
     const activeProducts = products.filter((p) => p.status === 'active');
     const inactiveProducts = products.filter((p) => p.status === 'inactive');
 
@@ -843,12 +832,7 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
         </div>
 
         {products.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: spacing.lg }}>
-            <div style={{ fontSize: '48px', marginBottom: spacing.md }}>📦</div>
-            <Text size="small" style={{ color: colors.text.secondary }}>
-              Chưa có sản phẩm nào. Tạo mới để bắt đầu!
-            </Text>
-          </div>
+          <EmptyState icon="📦" title="Chưa có sản phẩm nào" description="Tạo sản phẩm mới để bắt đầu đăng bán!" />
         ) : (
           products.map(renderProductCard)
         )}
@@ -884,34 +868,11 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
     }
 
     if (brError) {
-      return (
-        <div style={{ textAlign: 'center', padding: spacing.lg }}>
-          <div style={{ fontSize: '48px', marginBottom: spacing.md }}>⚠️</div>
-          <Text size="small" style={{ color: colors.functional.alertRed }}>
-            {brError}
-          </Text>
-          <button
-            style={{ ...actionButtonStyles(true), marginTop: spacing.md, flex: 'none' }}
-            onClick={loadBuyingRequests}
-          >
-            Thử lại
-          </button>
-        </div>
-      );
+      return <EmptyState icon="⚠️" title="Không tải được nhu cầu mua" description={brError} cta={{ label: 'Thử lại', onClick: loadBuyingRequests }} />;
     }
 
     if (buyingRequests.length === 0) {
-      return (
-        <div style={{ textAlign: 'center', padding: spacing.xl }}>
-          <div style={{ fontSize: '48px', marginBottom: spacing.md }}>🛒</div>
-          <Text.Title size="small" style={{ marginBottom: spacing.sm }}>
-            Chưa có nhu cầu mua nào
-          </Text.Title>
-          <Text size="small" style={{ color: colors.text.secondary }}>
-            Người mua chưa đăng yêu cầu nào đang mở
-          </Text>
-        </div>
-      );
+      return <EmptyState icon="🛒" title="Chưa có nhu cầu mua nào" description="Người mua chưa đăng yêu cầu nào đang mở" />;
     }
 
     return (
@@ -1080,32 +1041,11 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
     }
 
     if (ordersError) {
-      return (
-        <div style={{ textAlign: 'center', padding: spacing.lg }}>
-          <div style={{ fontSize: '48px', marginBottom: spacing.md }}>⚠️</div>
-          <Text size="small" style={{ color: colors.functional.alertRed }}>{ordersError}</Text>
-          <button
-            style={{ ...actionButtonStyles(true), marginTop: spacing.md, flex: 'none' }}
-            onClick={loadOrders}
-          >
-            Thử lại
-          </button>
-        </div>
-      );
+      return <EmptyState icon="⚠️" title="Không tải được đơn hàng" description={ordersError} cta={{ label: 'Thử lại', onClick: loadOrders }} />;
     }
 
     if (orders.length === 0) {
-      return (
-        <div style={{ textAlign: 'center', padding: spacing.xl }}>
-          <div style={{ fontSize: '48px', marginBottom: spacing.md }}>📋</div>
-          <Text.Title size="small" style={{ marginBottom: spacing.sm }}>
-            Chưa có đơn hàng nào
-          </Text.Title>
-          <Text size="small" style={{ color: colors.text.secondary }}>
-            Người mua đặt hàng trực tiếp sẽ xuất hiện tại đây
-          </Text>
-        </div>
-      );
+      return <EmptyState icon="📋" title="Chưa có đơn hàng nào" description="Người mua đặt hàng trực tiếp sẽ xuất hiện tại đây" />;
     }
 
     return (
@@ -1303,14 +1243,7 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
       );
     }
     if (contractError && contractItems.length === 0) {
-      return (
-        <div style={{ textAlign: 'center', padding: spacing.lg }}>
-          <Text size="small" style={{ color: colors.functional.alertRed }}>{contractError}</Text>
-          <button type="button" style={{ ...actionButtonStyles(true), marginTop: spacing.md }} onClick={loadContracts}>
-            Thử lại
-          </button>
-        </div>
-      );
+      return <EmptyState icon="⚠️" title="Không tải được hợp đồng" description={contractError} cta={{ label: 'Thử lại', onClick: loadContracts }} />;
     }
 
     return (
@@ -1322,9 +1255,7 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
           Danh sách theo vai trò thương lái trên máy chủ (JWT).
         </Text>
         {contractItems.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: spacing.xl, color: colors.text.secondary }}>
-            <Text size="small">Chưa có hợp đồng</Text>
-          </div>
+          <EmptyState icon="📄" title="Chưa có hợp đồng" description="Hợp đồng với người mua sẽ hiển thị tại đây" />
         ) : (
           contractItems.map((c) => {
             const statusColor = getContractStatusColor(c.status);

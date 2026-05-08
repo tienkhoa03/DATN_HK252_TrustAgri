@@ -5,10 +5,11 @@
  */
 
 import React, { useEffect, useMemo, useState, lazy, Suspense } from 'react';
-import { Text } from 'zmp-ui';
+import { Text, useNavigate } from 'zmp-ui';
 import type { ChartDataPoint } from '../../../design-system/components/Chart';
 import { Icon } from '../../../design-system/components/Icon';
-import { colors } from '../../../design-system/tokens/colors';
+import { colors, chartPalette } from '../../../design-system/tokens/colors';
+import { ConnectionStatusBanner } from '@/components/ConnectionStatusBanner';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontWeight } from '../../../design-system/tokens/typography';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
@@ -46,6 +47,7 @@ const ChartFallback: React.FC = () => (
 
 export const BuyerDashboardScreen: React.FC = () => {
   const openSnackbar = useStableOpenSnackbar();
+  const navigate = useNavigate();
   const [data, setData] = useState<DashboardBuyerDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -113,8 +115,57 @@ export const BuyerDashboardScreen: React.FC = () => {
     );
   }
 
+  const isEmpty =
+    data.openBuyingRequests === 0 &&
+    data.pendingProposals === 0 &&
+    data.activeContracts === 0 &&
+    data.completedOrders === 0;
+
+  if (isEmpty) {
+    return (
+      <div style={{ padding: `0 ${spacing.md} ${spacing.md}` }}>
+        <ConnectionStatusBanner />
+        <div
+          style={{
+            textAlign: 'center',
+            padding: spacing.lg,
+            backgroundColor: colors.background.primary,
+            borderRadius: 12,
+            border: `1px solid ${colors.background.secondary}`,
+          }}
+        >
+          <div style={{ fontSize: '48px', marginBottom: spacing.md }}>🛒</div>
+          <Text.Title size="small" style={{ margin: `0 0 ${spacing.sm}` }}>
+            Chào mừng bạn đến TrustAgri!
+          </Text.Title>
+          <Text size="small" style={{ color: colors.text.secondary, margin: `0 0 ${spacing.md}` }}>
+            Bắt đầu đặt hàng để thấy tổng quan hoạt động của bạn ở đây.
+          </Text>
+          <button
+            type="button"
+            onClick={() => navigate('/buyer/request')}
+            style={{
+              padding: `${spacing.sm} ${spacing.lg}`,
+              backgroundColor: colors.primary.zaloBlue,
+              color: colors.text.inverse,
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              minHeight: '44px',
+            }}
+          >
+            Bắt đầu đặt hàng đầu tiên
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: `0 ${spacing.md} ${spacing.md}` }}>
+      <ConnectionStatusBanner />
       <Text.Title size="small" style={{ margin: `0 0 ${spacing.sm}` }}>
         Tóm tắt của bạn
       </Text.Title>
@@ -180,6 +231,31 @@ export const BuyerDashboardScreen: React.FC = () => {
         ))}
       </div>
 
+      {data.totalSpent !== undefined && (
+        <div
+          style={{
+            padding: spacing.sm,
+            backgroundColor: colors.background.primary,
+            borderRadius: 10,
+            border: `1px solid ${colors.background.secondary}`,
+            marginBottom: spacing.md,
+            display: 'flex',
+            alignItems: 'center',
+            gap: spacing.md,
+          }}
+        >
+          <Icon name="trending-up" size="md" color={colors.primary.zaloBlue} />
+          <div>
+            <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+              Tổng chi tiêu
+            </Text>
+            <Text.Title size="small" style={{ margin: 0, fontWeight: fontWeight.bold }}>
+              {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(data.totalSpent)}
+            </Text.Title>
+          </div>
+        </div>
+      )}
+
       <div
         style={{
           backgroundColor: colors.background.primary,
@@ -204,7 +280,7 @@ export const BuyerDashboardScreen: React.FC = () => {
             data={barData}
             xAxis={{ label: 'Chỉ số' }}
             yAxis={{ label: 'Số lượng' }}
-            colors={[colors.primary.zaloBlue, '#FFCC00', colors.primary.agriGreen, '#5C6BC0']}
+            colors={[colors.primary.zaloBlue, colors.functional.warningYellow, colors.primary.agriGreen, chartPalette[4]]}
             showGrid
             showLegend={false}
             width={328}

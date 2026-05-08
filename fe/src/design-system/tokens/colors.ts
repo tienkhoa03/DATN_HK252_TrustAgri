@@ -15,8 +15,19 @@ export interface ColorToken {
 // Primary Colors
 export const primaryColors = {
   zaloBlue: '#0068FF',
+  zaloBlueDark: '#0052CC',
   agriGreen: '#3EBB6C',
+  agriGreenDark: '#35A55F',
 } as const;
+
+// Chart accent palette (data-series colors, not UI elements)
+export const chartPalette = [
+  '#0068FF', // zaloBlue
+  '#FFCC00', // warningYellow
+  '#3EBB6C', // agriGreen
+  '#9B59B6', // purple
+  '#5C6BC0', // indigo
+] as const;
 
 // Functional Colors
 export const functionalColors = {

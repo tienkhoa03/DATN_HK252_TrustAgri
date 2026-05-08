@@ -40,6 +40,7 @@ export interface DashboardBuyerDto {
   pendingProposals: number;
   activeContracts: number;
   completedOrders: number;
+  totalSpent?: number;
 }
 
 // ── Normalizers (phòng khi proxy/legacy trả snake_case) ──────────────────────
@@ -112,6 +113,8 @@ function normalizeFarmer(raw: unknown): DashboardFarmerDto {
 
 function normalizeBuyer(raw: unknown): DashboardBuyerDto {
   const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const summaryRaw = o.summary && typeof o.summary === 'object' ? (o.summary as Record<string, unknown>) : o;
+  const rawSpent = summaryRaw.totalSpent ?? summaryRaw.total_spent ?? o.totalSpent ?? o.total_spent;
   return {
     periodFrom: str(o.periodFrom ?? o.period_from),
     periodTo: str(o.periodTo ?? o.period_to),
@@ -119,6 +122,7 @@ function normalizeBuyer(raw: unknown): DashboardBuyerDto {
     pendingProposals: num(o.pendingProposals ?? o.pending_proposals),
     activeContracts: num(o.activeContracts ?? o.active_contracts),
     completedOrders: num(o.completedOrders ?? o.completed_orders),
+    totalSpent: rawSpent !== undefined && rawSpent !== null ? num(rawSpent) : undefined,
   };
 }
 

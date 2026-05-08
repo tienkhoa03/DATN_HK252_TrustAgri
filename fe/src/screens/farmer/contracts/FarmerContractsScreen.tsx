@@ -16,6 +16,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Text } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
+import { EmptyState } from '../../../design-system/components/EmptyState';
 import { Card } from '../../../design-system/components/Card';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
@@ -450,18 +451,11 @@ export const FarmerContractsScreen: React.FC<FarmerContractsScreenProps> = ({
           {loading && <ContractsSkeleton />}
 
           {loadError && (
-            <div style={{ textAlign: 'center', padding: spacing.lg, color: colors.functional.alertRed }}>
-              <Text size="small">{loadError}</Text>
-            </div>
+            <EmptyState icon="⚠️" title="Không tải được hợp đồng" description={loadError} />
           )}
 
           {!loading && !loadError && contracts.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: spacing.xl, color: colors.text.secondary }}>
-              <Icon name="farm" size="lg" color={colors.text.secondary} />
-              <Text style={{ marginTop: spacing.md }}>
-                Chưa có hợp đồng nào
-              </Text>
-            </div>
+            <EmptyState icon="📄" title="Chưa có hợp đồng nào" description="Hợp đồng bao tiêu với thương lái sẽ hiển thị tại đây" />
           ) : !loading && !loadError ? (
             contracts.map(contract => (
               <div

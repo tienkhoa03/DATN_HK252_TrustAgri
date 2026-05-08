@@ -4,12 +4,13 @@
  * GET /api/v1/dashboard/trader qua dashboardService; biểu đồ lazy load.
  */
 
-import React, { useState, useEffect, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { Page, Box, Text } from 'zmp-ui';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { Icon } from '../../../design-system/components/Icon';
 import type { ChartDataPoint } from '../../../design-system/components/Chart';
-import { colors } from '../../../design-system/tokens/colors';
+import { colors, chartPalette } from '../../../design-system/tokens/colors';
+import { ConnectionStatusBanner } from '@/components/ConnectionStatusBanner';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
 import {
@@ -17,6 +18,8 @@ import {
   toDashboardViMessage,
   type DashboardTraderDto,
 } from '@/services/dashboardService';
+import { getMe } from '@/services/authService';
+import { subscribeConnectionStatus } from '@/api/monitoringSocket';
 import { orderStatusLabel, type OrderDto } from '@/services/orderService';
 
 const LazyChart = lazy(() =>
@@ -76,43 +79,87 @@ const ChartFallback: React.FC = () => (
   </div>
 );
 
+const RECONNECT_REFETCH_DEBOUNCE_MS = 60_000;
+
 export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
-  traderName = 'Thương lái',
-  companyName = 'Công ty TNHH Nông sản',
+  traderName: traderNameProp,
+  companyName: companyNameProp,
 }) => {
   const openSnackbar = useStableOpenSnackbar();
-  const [selectedPeriod, setSelectedPeriod] = useState<'7days' | '30days'>('7days');
+  const [selectedPeriod, setSelectedPeriod] = useState<'today' | '7days' | '30days'>('7days');
   const [data, setData] = useState<DashboardTraderDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [traderName, setTraderName] = useState(traderNameProp ?? '');
+  const [companyName, setCompanyName] = useState(companyNameProp ?? '');
+  const lastRefetchRef = useRef<number>(0);
 
+  const doFetch = useMemo(
+    () => () => {
+      let cancelled = false;
+      setLoading(true);
+      setError(null);
+      fetchTraderDashboard()
+        .then((dto) => {
+          if (!cancelled) {
+            setData(dto);
+            setLoading(false);
+          }
+        })
+        .catch((err: unknown) => {
+          if (!cancelled) {
+            const msg = toDashboardViMessage(err);
+            setError(msg);
+            setLoading(false);
+            openSnackbar({ type: 'error', text: msg, duration: 4500, icon: true });
+          }
+        });
+      return () => { cancelled = true; };
+    },
+    [openSnackbar],
+  );
+
+  // Load profile (getMe) for real name + company
   useEffect(() => {
+    if (traderNameProp && companyNameProp) return;
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    fetchTraderDashboard()
-      .then((dto) => {
-        if (!cancelled) {
-          setData(dto);
-          setLoading(false);
-        }
+    getMe()
+      .then((profile) => {
+        if (cancelled) return;
+        setTraderName(profile.displayName || '-');
+        setCompanyName(profile.traderProfile?.companyName ?? '-');
       })
-      .catch((err: unknown) => {
+      .catch(() => {
         if (!cancelled) {
-          const msg = toDashboardViMessage(err);
-          setError(msg);
-          setLoading(false);
-          openSnackbar({ type: 'error', text: msg, duration: 4500, icon: true });
+          setTraderName(traderNameProp ?? 'Thương lái');
+          setCompanyName(companyNameProp ?? '-');
         }
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [openSnackbar]);
+    return () => { cancelled = true; };
+  }, [traderNameProp, companyNameProp]);
+
+  // Initial dashboard fetch
+  useEffect(() => {
+    lastRefetchRef.current = Date.now();
+    return doFetch();
+  }, [doFetch]);
+
+  // Auto-refetch on WS reconnect after downtime > 30s (debounce 60s)
+  useEffect(() => {
+    return subscribeConnectionStatus((status, info) => {
+      if (status !== 'connected') return;
+      if (!info || info.downtimeMs <= 30_000) return;
+      const now = Date.now();
+      if (now - lastRefetchRef.current < RECONNECT_REFETCH_DEBOUNCE_MS) return;
+      lastRefetchRef.current = now;
+      doFetch();
+      openSnackbar({ type: 'success', text: 'Đã đồng bộ lại dữ liệu dashboard', duration: 3000, icon: true });
+    });
+  }, [doFetch, openSnackbar]);
 
   const demandChartData: ChartDataPoint[] = useMemo(() => {
     if (!data) return [];
-    const sliceLen = selectedPeriod === '7days' ? 7 : data.demandTrend.length;
+    const sliceLen = selectedPeriod === 'today' ? 1 : selectedPeriod === '7days' ? 7 : data.demandTrend.length;
     const slice = data.demandTrend.slice(-sliceLen);
     return slice.map((d) => ({
       label: formatShortDate(d.date),
@@ -202,6 +249,7 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
       <style>{`
         @keyframes trader-dash-pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
       `}</style>
+      <ConnectionStatusBanner />
       <div style={contentStyles}>
         <div style={headerStyles}>
           <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
@@ -373,6 +421,13 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
               <div style={periodSelectorStyles}>
                 <button
                   type="button"
+                  style={periodButtonStyles(selectedPeriod === 'today')}
+                  onClick={() => setSelectedPeriod('today')}
+                >
+                  Hôm nay
+                </button>
+                <button
+                  type="button"
                   style={periodButtonStyles(selectedPeriod === '7days')}
                   onClick={() => setSelectedPeriod('7days')}
                 >
@@ -426,7 +481,7 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
                       data={topCropChartData}
                       xAxis={{ label: 'Loại cây' }}
                       yAxis={{ label: 'Tấn' }}
-                      colors={[colors.primary.zaloBlue, colors.primary.agriGreen, '#FFCC00', '#9B59B6']}
+                      colors={[colors.primary.zaloBlue, colors.primary.agriGreen, colors.functional.warningYellow, chartPalette[3]]}
                       showGrid
                       showLegend={false}
                       width={340}

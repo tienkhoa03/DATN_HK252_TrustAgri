@@ -22,6 +22,7 @@ import { Alert } from '../../../design-system/components/Alert';
 import { Card } from '../../../design-system/components/Card';
 import { SensorLineChart } from '../../../design-system/components/SensorLineChart';
 import { colors } from '../../../design-system/tokens/colors';
+import { ConnectionStatusBanner } from '@/components/ConnectionStatusBanner';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
 import { ApiError } from '@/api/errors';
@@ -299,7 +300,7 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
         @keyframes skeleton-pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
         .skeleton-pulse { animation: skeleton-pulse 1.4s ease-in-out infinite; }
       `}</style>
-
+      <ConnectionStatusBanner />
       <div style={{ paddingBottom: '80px' }}>
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div style={headerStyles}>

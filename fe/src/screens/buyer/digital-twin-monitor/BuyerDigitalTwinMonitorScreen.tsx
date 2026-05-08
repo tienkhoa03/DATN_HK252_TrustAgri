@@ -17,6 +17,7 @@ import { DigitalTwinViewer, GrowthStage, HealthStatus } from '../../../design-sy
 import { Icon } from '../../../design-system/components/Icon';
 import { SensorLineChart } from '../../../design-system/components/SensorLineChart';
 import { colors } from '../../../design-system/tokens/colors';
+import { ConnectionStatusBanner } from '@/components/ConnectionStatusBanner';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
 import { useMonitoring } from '@/hooks/useMonitoring';
@@ -405,6 +406,7 @@ export const BuyerDigitalTwinMonitorScreen: React.FC<BuyerDigitalTwinMonitorScre
 
   return (
     <Page className="buyer-digital-twin-monitor-screen">
+      <ConnectionStatusBanner />
       {/* Header */}
       <div style={headerStyles}>
         {onBack && (
