@@ -31,6 +31,10 @@ export interface TraderProfileNewsScreenProps {
   /** Giữ tương thích ví dụ / tích hợp sau (hồ sơ mock hiện dùng companyName). */
   traderName?: string;
   companyName?: string;
+  /** Khi nhúng vào hub: bỏ <Page> wrapper và header ngoài. */
+  inTab?: boolean;
+  /** Tab nội bộ mặc định khi nhúng trong hub. */
+  defaultTab?: MainTab;
 }
 
 type MainTab = 'profile' | 'news' | 'forecasts';
@@ -57,12 +61,109 @@ function formatIsoDate(iso: string): string {
   }
 }
 
+// ── forecastData structured types ────────────────────────────────────────────
+
+interface PriceSeriesRow { day: string; price: string }
+interface DemandSeriesRow { day: string; demand: string }
+
+interface ForecastDataFields {
+  productLabel: string;
+  trend: 'up' | 'down' | 'stable';
+  changePercent: string;
+  priceSeries: PriceSeriesRow[];
+  demandSeries: DemandSeriesRow[];
+  description: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  details: string;
+}
+
+const DEFAULT_FORECAST_FIELDS: ForecastDataFields = {
+  productLabel: 'Nông sản',
+  trend: 'stable',
+  changePercent: '0',
+  priceSeries: [
+    { day: 'T2', price: '30' },
+    { day: 'T3', price: '31' },
+    { day: 'T4', price: '30' },
+  ],
+  demandSeries: [
+    { day: 'T2', demand: '100' },
+    { day: 'T3', demand: '110' },
+    { day: 'T4', demand: '105' },
+  ],
+  description: '',
+  riskLevel: 'low',
+  details: '',
+};
+
+function buildForecastData(type: 'price' | 'demand' | 'weather', fields: ForecastDataFields): unknown {
+  if (type === 'price') {
+    return {
+      productLabel: fields.productLabel,
+      trend: fields.trend,
+      changePercent: Number(fields.changePercent) || 0,
+      series: fields.priceSeries.map((r) => ({ day: r.day, price: Number(r.price) || 0 })),
+    };
+  }
+  if (type === 'demand') {
+    return {
+      productLabel: fields.productLabel,
+      trend: fields.trend,
+      changePercent: Number(fields.changePercent) || 0,
+      series: fields.demandSeries.map((r) => ({ day: r.day, demand: Number(r.demand) || 0 })),
+    };
+  }
+  return {
+    description: fields.description,
+    riskLevel: fields.riskLevel,
+    details: fields.details,
+  };
+}
+
+function parseForecastDataFields(type: 'price' | 'demand' | 'weather', data: unknown): ForecastDataFields {
+  const base = { ...DEFAULT_FORECAST_FIELDS };
+  if (!data || typeof data !== 'object') return base;
+  const d = data as Record<string, unknown>;
+  if (type === 'price') {
+    const series = Array.isArray(d.series)
+      ? (d.series as Array<Record<string, unknown>>).map((r) => ({ day: String(r.day ?? ''), price: String(r.price ?? '0') }))
+      : base.priceSeries;
+    return {
+      ...base,
+      productLabel: String(d.productLabel ?? base.productLabel),
+      trend: (['up', 'down', 'stable'].includes(d.trend as string) ? d.trend : base.trend) as ForecastDataFields['trend'],
+      changePercent: String(d.changePercent ?? '0'),
+      priceSeries: series,
+    };
+  }
+  if (type === 'demand') {
+    const series = Array.isArray(d.series)
+      ? (d.series as Array<Record<string, unknown>>).map((r) => ({ day: String(r.day ?? ''), demand: String(r.demand ?? '0') }))
+      : base.demandSeries;
+    return {
+      ...base,
+      productLabel: String(d.productLabel ?? base.productLabel),
+      trend: (['up', 'down', 'stable'].includes(d.trend as string) ? d.trend : base.trend) as ForecastDataFields['trend'],
+      changePercent: String(d.changePercent ?? '0'),
+      demandSeries: series,
+    };
+  }
+  return {
+    ...base,
+    description: String(d.description ?? ''),
+    riskLevel: (['low', 'medium', 'high'].includes(d.riskLevel as string) ? d.riskLevel : base.riskLevel) as ForecastDataFields['riskLevel'],
+    details: String(d.details ?? ''),
+  };
+}
+
 export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = ({
   traderName: _traderName,
   companyName = 'Công ty TNHH Nông sản Sầu riêng Monthong',
+  inTab,
+  defaultTab,
 }) => {
   const openSnackbar = useStableOpenSnackbar();
-  const [activeTab, setActiveTab] = useState<MainTab>('profile');
+  const [activeTab, setActiveTab] = useState<MainTab>(defaultTab ?? 'profile');
   const [isEditing, setIsEditing] = useState(false);
   const [isWritingArticle, setIsWritingArticle] = useState(false);
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
@@ -138,30 +239,15 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
     imageUrl: '',
   });
 
-  const defaultPriceForecastJson = () =>
-    JSON.stringify(
-      {
-        productLabel: 'Nông sản',
-        trend: 'stable',
-        changePercent: 0,
-        series: [
-          { day: 'T2', price: 30 },
-          { day: 'T3', price: 31 },
-          { day: 'T4', price: 30 },
-        ],
-      },
-      null,
-      2,
-    );
-
   const [forecastForm, setForecastForm] = useState({
     region: 'mekong_delta',
     cropType: 'pomelo',
     type: 'price' as 'price' | 'demand' | 'weather',
-    forecastDataJson: defaultPriceForecastJson(),
     validFrom: '',
     validTo: '',
   });
+
+  const [forecastDataFields, setForecastDataFields] = useState<ForecastDataFields>(DEFAULT_FORECAST_FIELDS);
 
   const loadNews = useCallback(async () => {
     setNewsLoading(true);
@@ -271,10 +357,10 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
       region: 'mekong_delta',
       cropType: 'pomelo',
       type: 'price',
-      forecastDataJson: defaultPriceForecastJson(),
       validFrom: '',
       validTo: '',
     });
+    setForecastDataFields(DEFAULT_FORECAST_FIELDS);
     setEditingForecastId(null);
     setIsWritingForecast(false);
   };
@@ -285,10 +371,10 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
       region: f.region,
       cropType: f.cropType,
       type: f.type,
-      forecastDataJson: JSON.stringify(f.forecastData, null, 2),
       validFrom: f.validFrom.slice(0, 16),
       validTo: f.validTo.slice(0, 16),
     });
+    setForecastDataFields(parseForecastDataFields(f.type, f.forecastData));
     setIsWritingForecast(true);
   };
 
@@ -297,13 +383,7 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
       openSnackbar({ type: 'error', text: 'Chọn khoảng hiệu lực (từ — đến)', duration: 3000 });
       return;
     }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(forecastForm.forecastDataJson);
-    } catch {
-      openSnackbar({ type: 'error', text: 'forecastData không phải JSON hợp lệ', duration: 3000 });
-      return;
-    }
+    const forecastData = buildForecastData(forecastForm.type, forecastDataFields);
     const validFrom = new Date(forecastForm.validFrom).toISOString();
     const validTo = new Date(forecastForm.validTo).toISOString();
     try {
@@ -312,7 +392,7 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
           region: forecastForm.region,
           cropType: forecastForm.cropType,
           type: forecastForm.type,
-          forecastData: parsed,
+          forecastData,
           validFrom,
           validTo,
         });
@@ -322,7 +402,7 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
           region: forecastForm.region,
           cropType: forecastForm.cropType,
           type: forecastForm.type,
-          forecastData: parsed,
+          forecastData,
           validFrom,
           validTo,
         });
@@ -511,17 +591,8 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
     fontSize: fontSize.small,
   };
 
-  return (
-    <Page className="trader-profile-news-screen">
-      <div style={headerStyles}>
-        <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-          Quản lý
-        </Text>
-        <Text.Title size="normal" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
-          Hồ sơ & Tin tức
-        </Text.Title>
-      </div>
-
+  const innerContent = (
+    <>
       <div style={tabContainerStyles}>
         <button type="button" style={tabButtonStyles(activeTab === 'profile')} onClick={() => setActiveTab('profile')}>
           Doanh nghiệp
@@ -873,20 +944,22 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
                 </Text.Title>
 
                 <div style={fieldStyles}>
-                  <label style={labelStyles}>Vùng (region)</label>
+                  <label style={labelStyles}>Vùng</label>
                   <input
                     type="text"
                     style={inputStyles}
+                    placeholder="VD: mekong_delta"
                     value={forecastForm.region}
                     onChange={(e) => setForecastForm({ ...forecastForm, region: e.target.value })}
                   />
                 </div>
 
                 <div style={fieldStyles}>
-                  <label style={labelStyles}>Cây trồng (cropType)</label>
+                  <label style={labelStyles}>Cây trồng</label>
                   <input
                     type="text"
                     style={inputStyles}
+                    placeholder="VD: pomelo"
                     value={forecastForm.cropType}
                     onChange={(e) => setForecastForm({ ...forecastForm, cropType: e.target.value })}
                   />
@@ -897,27 +970,202 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
                   <select
                     style={inputStyles}
                     value={forecastForm.type}
-                    onChange={(e) =>
-                      setForecastForm({
-                        ...forecastForm,
-                        type: e.target.value as 'price' | 'demand' | 'weather',
-                      })
-                    }
+                    onChange={(e) => {
+                      const newType = e.target.value as 'price' | 'demand' | 'weather';
+                      setForecastForm({ ...forecastForm, type: newType });
+                      setForecastDataFields(DEFAULT_FORECAST_FIELDS);
+                    }}
                   >
-                    <option value="price">Giá (price)</option>
-                    <option value="demand">Nhu cầu (demand)</option>
-                    <option value="weather">Thời tiết (weather)</option>
+                    <option value="price">Dự báo giá</option>
+                    <option value="demand">Dự báo nhu cầu</option>
+                    <option value="weather">Dự báo thời tiết</option>
                   </select>
                 </div>
 
-                <div style={fieldStyles}>
-                  <label style={labelStyles}>forecastData (JSON)</label>
-                  <textarea
-                    style={{ ...textareaStyles, minHeight: '160px', fontFamily: 'monospace', fontSize: fontSize.small }}
-                    value={forecastForm.forecastDataJson}
-                    onChange={(e) => setForecastForm({ ...forecastForm, forecastDataJson: e.target.value })}
-                  />
-                </div>
+                {/* ── Structured forecastData inputs by type ── */}
+
+                {forecastForm.type !== 'weather' && (
+                  <>
+                    <div style={fieldStyles}>
+                      <label style={labelStyles}>Tên sản phẩm</label>
+                      <input
+                        type="text"
+                        style={inputStyles}
+                        placeholder="VD: Bưởi da xanh"
+                        value={forecastDataFields.productLabel}
+                        onChange={(e) => setForecastDataFields({ ...forecastDataFields, productLabel: e.target.value })}
+                      />
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing.md }}>
+                      <div style={fieldStyles}>
+                        <label style={labelStyles}>Xu hướng</label>
+                        <select
+                          style={inputStyles}
+                          value={forecastDataFields.trend}
+                          onChange={(e) =>
+                            setForecastDataFields({ ...forecastDataFields, trend: e.target.value as ForecastDataFields['trend'] })
+                          }
+                        >
+                          <option value="up">↑ Tăng</option>
+                          <option value="down">↓ Giảm</option>
+                          <option value="stable">→ Ổn định</option>
+                        </select>
+                      </div>
+                      <div style={fieldStyles}>
+                        <label style={labelStyles}>Thay đổi (%)</label>
+                        <input
+                          type="number"
+                          style={inputStyles}
+                          placeholder="VD: 5"
+                          value={forecastDataFields.changePercent}
+                          onChange={(e) => setForecastDataFields({ ...forecastDataFields, changePercent: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {forecastForm.type === 'price' && (
+                  <div style={fieldStyles}>
+                    <label style={labelStyles}>Chuỗi giá theo ngày (nghìn đồng/kg)</label>
+                    {forecastDataFields.priceSeries.map((row, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: spacing.sm, marginBottom: spacing.xs, alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          style={{ ...inputStyles, width: '80px', flex: '0 0 80px' }}
+                          placeholder="Ngày"
+                          value={row.day}
+                          onChange={(e) => {
+                            const next = forecastDataFields.priceSeries.map((r, i) => i === idx ? { ...r, day: e.target.value } : r);
+                            setForecastDataFields({ ...forecastDataFields, priceSeries: next });
+                          }}
+                        />
+                        <input
+                          type="number"
+                          style={{ ...inputStyles, flex: 1 }}
+                          placeholder="Giá"
+                          value={row.price}
+                          onChange={(e) => {
+                            const next = forecastDataFields.priceSeries.map((r, i) => i === idx ? { ...r, price: e.target.value } : r);
+                            setForecastDataFields({ ...forecastDataFields, priceSeries: next });
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForecastDataFields({
+                              ...forecastDataFields,
+                              priceSeries: forecastDataFields.priceSeries.filter((_, i) => i !== idx),
+                            })
+                          }
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: spacing.xs, color: colors.functional.alertRed, fontSize: '18px', lineHeight: 1 }}
+                          aria-label="Xóa hàng"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      style={{ ...buttonStyles('outline'), fontSize: fontSize.small, padding: `${spacing.xs} ${spacing.sm}`, marginTop: spacing.xs }}
+                      onClick={() =>
+                        setForecastDataFields({ ...forecastDataFields, priceSeries: [...forecastDataFields.priceSeries, { day: '', price: '' }] })
+                      }
+                    >
+                      + Thêm ngày
+                    </button>
+                  </div>
+                )}
+
+                {forecastForm.type === 'demand' && (
+                  <div style={fieldStyles}>
+                    <label style={labelStyles}>Nhu cầu theo ngày (tấn)</label>
+                    {forecastDataFields.demandSeries.map((row, idx) => (
+                      <div key={idx} style={{ display: 'flex', gap: spacing.sm, marginBottom: spacing.xs, alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          style={{ ...inputStyles, width: '80px', flex: '0 0 80px' }}
+                          placeholder="Ngày"
+                          value={row.day}
+                          onChange={(e) => {
+                            const next = forecastDataFields.demandSeries.map((r, i) => i === idx ? { ...r, day: e.target.value } : r);
+                            setForecastDataFields({ ...forecastDataFields, demandSeries: next });
+                          }}
+                        />
+                        <input
+                          type="number"
+                          style={{ ...inputStyles, flex: 1 }}
+                          placeholder="Nhu cầu"
+                          value={row.demand}
+                          onChange={(e) => {
+                            const next = forecastDataFields.demandSeries.map((r, i) => i === idx ? { ...r, demand: e.target.value } : r);
+                            setForecastDataFields({ ...forecastDataFields, demandSeries: next });
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForecastDataFields({
+                              ...forecastDataFields,
+                              demandSeries: forecastDataFields.demandSeries.filter((_, i) => i !== idx),
+                            })
+                          }
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: spacing.xs, color: colors.functional.alertRed, fontSize: '18px', lineHeight: 1 }}
+                          aria-label="Xóa hàng"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      style={{ ...buttonStyles('outline'), fontSize: fontSize.small, padding: `${spacing.xs} ${spacing.sm}`, marginTop: spacing.xs }}
+                      onClick={() =>
+                        setForecastDataFields({ ...forecastDataFields, demandSeries: [...forecastDataFields.demandSeries, { day: '', demand: '' }] })
+                      }
+                    >
+                      + Thêm ngày
+                    </button>
+                  </div>
+                )}
+
+                {forecastForm.type === 'weather' && (
+                  <>
+                    <div style={fieldStyles}>
+                      <label style={labelStyles}>Mô tả ngắn</label>
+                      <input
+                        type="text"
+                        style={inputStyles}
+                        placeholder="VD: Mưa lớn kéo dài 3 ngày"
+                        value={forecastDataFields.description}
+                        onChange={(e) => setForecastDataFields({ ...forecastDataFields, description: e.target.value })}
+                      />
+                    </div>
+                    <div style={fieldStyles}>
+                      <label style={labelStyles}>Mức độ rủi ro</label>
+                      <select
+                        style={inputStyles}
+                        value={forecastDataFields.riskLevel}
+                        onChange={(e) =>
+                          setForecastDataFields({ ...forecastDataFields, riskLevel: e.target.value as ForecastDataFields['riskLevel'] })
+                        }
+                      >
+                        <option value="low">🟢 Thấp</option>
+                        <option value="medium">🟡 Trung bình</option>
+                        <option value="high">🔴 Cao</option>
+                      </select>
+                    </div>
+                    <div style={fieldStyles}>
+                      <label style={labelStyles}>Chi tiết</label>
+                      <textarea
+                        style={{ ...textareaStyles, minHeight: '100px' }}
+                        placeholder="Mô tả chi tiết điều kiện thời tiết và khuyến nghị..."
+                        value={forecastDataFields.details}
+                        onChange={(e) => setForecastDataFields({ ...forecastDataFields, details: e.target.value })}
+                      />
+                    </div>
+                  </>
+                )}
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing.md }}>
                   <div style={fieldStyles}>
@@ -956,28 +1204,134 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
               Danh sách dự báo ({forecasts.length})
             </Text.Title>
 
-            {forecasts.map((f) => (
-              <div key={f.id} style={articleCardStyles}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.sm }}>
-                  <Text.Title size="small" style={{ margin: 0 }}>
-                    {f.region} · {f.cropType}
-                  </Text.Title>
-                  <button
-                    type="button"
-                    style={{ ...buttonStyles('outline'), padding: `${spacing.xs} ${spacing.sm}`, fontSize: fontSize.small }}
-                    onClick={() => startEditForecast(f)}
-                  >
-                    Sửa
-                  </button>
+            {forecasts.map((f) => {
+              const parsed = parseForecastDataFields(f.type, f.forecastData);
+              const typeViLabel =
+                f.type === 'price' ? 'Dự báo giá' : f.type === 'demand' ? 'Dự báo nhu cầu' : 'Dự báo thời tiết';
+              const typeBg =
+                f.type === 'price'
+                  ? `${colors.primary.zaloBlue}15`
+                  : f.type === 'demand'
+                    ? `${colors.primary.agriGreen}15`
+                    : `${colors.functional.warningYellow}35`;
+              const typeColor =
+                f.type === 'price'
+                  ? colors.primary.zaloBlue
+                  : f.type === 'demand'
+                    ? colors.primary.agriGreen
+                    : colors.text.primary;
+              return (
+                <div key={f.id} style={articleCardStyles}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.sm }}>
+                    <div>
+                      <Text.Title size="small" style={{ margin: 0, marginBottom: '4px' }}>
+                        {f.cropType} · {f.region}
+                      </Text.Title>
+                      <span
+                        style={{
+                          display: 'inline-block',
+                          padding: `2px ${spacing.sm}`,
+                          backgroundColor: typeBg,
+                          color: typeColor,
+                          borderRadius: '4px',
+                          fontSize: fontSize.small,
+                          fontWeight: fontWeight.medium,
+                        }}
+                      >
+                        {typeViLabel}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      style={{ ...buttonStyles('outline'), padding: `${spacing.xs} ${spacing.sm}`, fontSize: fontSize.small, flexShrink: 0 }}
+                      onClick={() => startEditForecast(f)}
+                    >
+                      Sửa
+                    </button>
+                  </div>
+
+                  {f.type !== 'weather' && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: spacing.sm,
+                        padding: `${spacing.xs} ${spacing.sm}`,
+                        backgroundColor: colors.background.secondary,
+                        borderRadius: '6px',
+                        marginBottom: spacing.sm,
+                      }}
+                    >
+                      <span style={{ fontSize: '16px' }}>
+                        {parsed.trend === 'up' ? '↑' : parsed.trend === 'down' ? '↓' : '→'}
+                      </span>
+                      <Text size="small" style={{ margin: 0, fontWeight: fontWeight.medium }}>
+                        {parsed.productLabel}
+                      </Text>
+                      {Number(parsed.changePercent) !== 0 && (
+                        <Text
+                          size="small"
+                          style={{
+                            margin: 0,
+                            color:
+                              parsed.trend === 'up'
+                                ? colors.primary.agriGreen
+                                : parsed.trend === 'down'
+                                  ? colors.functional.alertRed
+                                  : colors.text.secondary,
+                          }}
+                        >
+                          {Number(parsed.changePercent) > 0 ? '+' : ''}{parsed.changePercent}%
+                        </Text>
+                      )}
+                    </div>
+                  )}
+
+                  {f.type === 'weather' && (parsed.description || parsed.riskLevel) && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: spacing.sm,
+                        padding: `${spacing.xs} ${spacing.sm}`,
+                        backgroundColor: colors.background.secondary,
+                        borderRadius: '6px',
+                        marginBottom: spacing.sm,
+                      }}
+                    >
+                      <span style={{ fontSize: '16px' }}>
+                        {parsed.riskLevel === 'high' ? '🔴' : parsed.riskLevel === 'medium' ? '🟡' : '🟢'}
+                      </span>
+                      <Text size="small" style={{ margin: 0 }}>
+                        {parsed.description || (parsed.riskLevel === 'high' ? 'Rủi ro cao' : parsed.riskLevel === 'medium' ? 'Rủi ro trung bình' : 'Rủi ro thấp')}
+                      </Text>
+                    </div>
+                  )}
+
+                  <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                    {formatIsoDate(f.validFrom)} — {formatIsoDate(f.validTo)}
+                  </Text>
                 </div>
-                <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-                  Loại: {f.type} · Từ {formatIsoDate(f.validFrom)} — {formatIsoDate(f.validTo)}
-                </Text>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
+    </>
+  );
+
+  if (inTab) return <div style={{ flex: 1, overflowY: 'auto' }}>{innerContent}</div>;
+  return (
+    <Page className="trader-profile-news-screen">
+      <div style={headerStyles}>
+        <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+          Quản lý
+        </Text>
+        <Text.Title size="normal" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
+          Hồ sơ & Tin tức
+        </Text.Title>
+      </div>
+      {innerContent}
     </Page>
   );
 };

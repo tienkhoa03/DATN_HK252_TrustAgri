@@ -1,5 +1,5 @@
 ---
-description: Sinh kế hoạch triển khai chi tiết cho một task / feature và lưu vào .claude/plan/<slug>.md
+description: Sinh kế hoạch triển khai chi tiết cho một task / feature và lưu vào .claude/plan/<YYYY-MM-DD>-<NN>-<slug>.md
 argument-hint: <feature description in Vietnamese or English>
 ---
 
@@ -9,7 +9,7 @@ Bạn vừa được gọi `/make-plan $ARGUMENTS`.
 
 ## Mục tiêu
 
-Sinh ra **kế hoạch triển khai** cho yêu cầu trên, lưu vào `.claude/plan/<YYYY-MM-DD>-<slug>.md`. KHÔNG viết code ở bước này.
+Sinh ra **kế hoạch triển khai** cho yêu cầu trên, lưu vào `.claude/plan/<YYYY-MM-DD>-<NN>-<slug>.md`. KHÔNG viết code ở bước này.
 
 ## Quy trình
 
@@ -37,7 +37,7 @@ Nếu **scope mơ hồ** hoặc **xung đột với specs** → hỏi lại user
 
 ### 3. Viết plan
 
-File: `.claude/plan/<YYYY-MM-DD>-<kebab-slug>.md` (slug từ feature name).
+File: `.claude/plan/<YYYY-MM-DD>-<NN>-<kebab-slug>.md` (slug từ feature name; NN là số thứ tự 2 chữ số của file trong ngày đó, đếm từ 01).
 
 Template:
 
@@ -100,7 +100,12 @@ N. Test + verify
 
 ### 4. Lưu file
 
-Dùng `Write` tool vào path `.claude/plan/<YYYY-MM-DD>-<slug>.md`.
+Trước khi ghi, xác định số thứ tự `<NN>` cho file trong ngày:
+1. Dùng `Glob` pattern `.claude/plan/<YYYY-MM-DD>-*.md` (với YYYY-MM-DD là ngày hiện tại).
+2. Đếm số file khớp → `count`. NN = `count + 1`, zero-padded 2 chữ số (vd: `01`, `02`, `12`).
+3. Path cuối: `.claude/plan/<YYYY-MM-DD>-<NN>-<slug>.md`.
+
+Dùng `Write` tool vào path vừa xác định.
 
 ### 5. Báo lại
 

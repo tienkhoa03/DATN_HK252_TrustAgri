@@ -97,7 +97,7 @@ function formToStepDto(s: StepFormItem): StandardStepDto {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export const TraderStandardLibraryScreen: React.FC = () => {
+export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inTab }) => {
   const role = useAtomValue(currentRoleAtom);
   const isTrader = role === 'trader';
 
@@ -773,13 +773,16 @@ export const TraderStandardLibraryScreen: React.FC = () => {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  return (
-    <Page className="trader-standard-library-screen">
+  const content = (
+    <>
       {view === 'list' && renderList()}
       {view === 'detail' && renderDetail()}
       {view === 'form' && renderForm()}
-    </Page>
+    </>
   );
+
+  if (inTab) return <div style={{ flex: 1, overflowY: 'auto' }}>{content}</div>;
+  return <Page className="trader-standard-library-screen">{content}</Page>;
 };
 
 export default TraderStandardLibraryScreen;

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, type ReactNode } from "react";
 import { BrowserRouter, MemoryRouter } from "react-router-dom";
 // Must be the same context instance zmp-ui's AnimationRoutes consumes (not a local duplicate).
 // zmp-ui's ZMPRouter forces basename `/zapps/${APP_ID}` in every production build, which breaks
@@ -9,9 +9,6 @@ const PAGE_TRANSITION_DIRECTION = {
   FORWARD: "forward",
   BACKWARD: "backward",
 } as const;
-
-type PageTransitionDirection =
-  (typeof PAGE_TRANSITION_DIRECTION)[keyof typeof PAGE_TRANSITION_DIRECTION];
 
 type ZmpHostWindow = Window & { APP_ID?: string; BASE_PATH?: string };
 
@@ -55,30 +52,12 @@ export type TrustWebRouterProps = {
  * Drop-in replacement for zmp-ui `ZMPRouter` with fixed `basename` logic for web/Docker.
  */
 export function TrustWebRouter({ children, memoryRouter }: TrustWebRouterProps) {
-  const [animate, setAnimate] = useState(true);
-  const [direction, setDirection] = useState<PageTransitionDirection>(PAGE_TRANSITION_DIRECTION.FORWARD);
   const pageScrollPosition = useRef<Record<string, unknown>>({});
 
   const basepath = resolveTrustRouterBasename();
 
-  const handleSetAnimate = useCallback(
-    ({
-      animate: ani = true,
-      direction: dir = PAGE_TRANSITION_DIRECTION.FORWARD,
-    }: {
-      animate?: boolean;
-      direction?: string;
-    }) => {
-      setAnimate(!!ani);
-      const correctDirection = [PAGE_TRANSITION_DIRECTION.FORWARD, PAGE_TRANSITION_DIRECTION.BACKWARD].some(
-        (item) => item === dir,
-      )
-        ? (dir as PageTransitionDirection)
-        : PAGE_TRANSITION_DIRECTION.FORWARD;
-      setDirection(correctDirection);
-    },
-    [],
-  );
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleSetAnimate = useCallback((_args: { animate?: boolean; direction?: string }) => {}, []);
 
   const updateScrollPosition = (key: string, position: unknown) => {
     pageScrollPosition.current[key] = position;
@@ -87,12 +66,12 @@ export function TrustWebRouter({ children, memoryRouter }: TrustWebRouterProps) 
   const contextValue = useMemo(
     () => ({
       setAnimate: handleSetAnimate,
-      animate,
-      direction,
+      animate: false,
+      direction: PAGE_TRANSITION_DIRECTION.FORWARD,
       pageScrollPosition: pageScrollPosition.current,
       updatePosition: updateScrollPosition,
     }),
-    [animate, direction, handleSetAnimate],
+    [handleSetAnimate],
   );
 
   const RouterComponent = memoryRouter ? MemoryRouter : BrowserRouter;

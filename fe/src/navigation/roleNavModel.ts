@@ -27,7 +27,7 @@ const TRADER_TABS: RoleNavItem[] = [
   { id: 'home', label: 'Tổng quan', path: '/trader', icon: 'home' },
   { id: 'supply', label: 'Nguồn cung', path: '/trader/supply', icon: 'package' },
   { id: 'trading', label: 'Sàn & kết nối', path: '/trader/trading', icon: 'trending-up' },
-  { id: 'library', label: 'Thư viện', path: '/trader/standards', icon: 'book' },
+  { id: 'library', label: 'Thư viện', path: '/trader/library', icon: 'book' },
   { id: 'me', label: 'Tôi', path: '/trader/me', icon: 'user' },
 ];
 
@@ -85,7 +85,11 @@ export function resolveActiveNavId(pathname: string, role: UserRole): string {
     if (pathname.startsWith('/trader/trading') || pathname.startsWith('/trader/connections')) {
       return 'trading';
     }
-    if (pathname.startsWith('/trader/standards') || pathname.startsWith('/trader/news')) {
+    if (
+      pathname.startsWith('/trader/library') ||
+      pathname.startsWith('/trader/standards') ||
+      pathname.startsWith('/trader/news')
+    ) {
       return 'library';
     }
     if (pathname === '/trader' || pathname.startsWith('/trader/')) return 'home';

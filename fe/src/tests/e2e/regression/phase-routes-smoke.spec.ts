@@ -29,6 +29,7 @@ const REGRESSION_ROUTES: readonly string[] = [
   '/trader',
   '/trader/supply',
   '/trader/trading',
+  '/trader/library',
   '/trader/standards',
   '/trader/news',
   '/trader/connections',

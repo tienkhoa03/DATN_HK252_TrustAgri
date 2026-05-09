@@ -92,6 +92,9 @@ const TraderSupplyMonitorScreen = lazy(() =>
 const TraderTradingOrdersScreen = lazy(() =>
   import('@/screens/trader/trading-orders').then((m) => ({ default: m.TraderTradingOrdersScreen })),
 );
+const TraderLibraryHubScreen = lazy(() =>
+  import('@/screens/trader/library').then((m) => ({ default: m.TraderLibraryHubScreen })),
+);
 const TraderStandardLibraryScreen = lazy(() =>
   import('@/screens/trader/standard-library').then((m) => ({ default: m.TraderStandardLibraryScreen })),
 );
@@ -235,6 +238,7 @@ export function AppRoutes() {
           <Route index element={<TraderDashboardScreen />} />
           <Route path="supply" element={<TraderSupplyMonitorScreen />} />
           <Route path="trading" element={<TraderTradingOrdersScreen />} />
+          <Route path="library" element={<TraderLibraryHubScreen />} />
           <Route path="standards" element={<TraderStandardLibraryScreen />} />
           <Route path="news" element={<TraderProfileNewsScreen />} />
           <Route path="connections" element={<ConnectionRequestsScreen role="trader" />} />

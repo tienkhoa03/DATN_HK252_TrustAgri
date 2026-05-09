@@ -4,6 +4,7 @@
  */
 
 export { TraderDashboardScreen } from './dashboard';
+export { TraderLibraryHubScreen } from './library';
 export { TraderDashboardScreenDemo } from './dashboard/TraderDashboardScreen.demo';
 export { TraderProfileNewsScreen } from './profile-news';
 export { TraderProfileNewsScreenDemo } from './profile-news/TraderProfileNewsScreen.demo';

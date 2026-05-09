@@ -6,7 +6,8 @@
       "Bash(npm install *)",
       "Bash(npm run *)",
       "PowerShell(cd \"C:\\\\Users\\\\VivoBookS\\\\_code_\\\\_CapstoneProject\\\\trustagri\\\\fe\"; $result = npx tsc --noEmit 2>&1; $result | Where-Object { $_ -match \"TraderDashboard|BuyerMarketplace|BuyerDashboard|ConnectionStatus|EmptyState|newsForecast|dashboardService|FarmerAlertList|BuyerOrders|TraderTrading|FarmerContracts|BuyerTransaction\" } | Select-Object -First 40)",
-      "PowerShell(cd \"C:\\\\Users\\\\VivoBookS\\\\_code_\\\\_CapstoneProject\\\\trustagri\\\\fe\"; $result = npx tsc --noEmit 2>&1; $result | Where-Object { $_ -match \"ConnectionStatusBanner|EmptyState|TraderDashboardScreen\\\\.tsx|BuyerMarketplaceScreen\\\\.tsx|BuyerDashboardScreen\\\\.tsx\" })"
+      "PowerShell(cd \"C:\\\\Users\\\\VivoBookS\\\\_code_\\\\_CapstoneProject\\\\trustagri\\\\fe\"; $result = npx tsc --noEmit 2>&1; $result | Where-Object { $_ -match \"ConnectionStatusBanner|EmptyState|TraderDashboardScreen\\\\.tsx|BuyerMarketplaceScreen\\\\.tsx|BuyerDashboardScreen\\\\.tsx\" })",
+      "PowerShell(New-Item *)"
     ]
   }
 }
