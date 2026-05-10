@@ -8,12 +8,12 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
-export type ConnectionStatus = 'pending' | 'accepted' | 'rejected';
+export type ConnectionStatus = 'pending' | 'accepted' | 'rejected' | 'negotiating' | 'signed';
 export type ConnectionRole = 'farmer' | 'trader';
 
 @Entity('connections')
 @Check('"from_user_id" <> "to_user_id"')
-@Check(`"status" IN ('pending', 'accepted', 'rejected')`)
+@Check(`"status" IN ('pending', 'accepted', 'rejected', 'negotiating', 'signed')`)
 @Check(`"from_role" IN ('farmer', 'trader')`)
 @Check(`"to_role" IN ('farmer', 'trader')`)
 export class ConnectionEntity {

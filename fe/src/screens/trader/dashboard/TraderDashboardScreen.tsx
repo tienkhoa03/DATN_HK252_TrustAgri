@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
-import { Page, Box, Text } from 'zmp-ui';
+import { Page, Box, Text, useNavigate } from 'zmp-ui';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { Icon } from '../../../design-system/components/Icon';
 import type { ChartDataPoint } from '../../../design-system/components/Chart';
@@ -24,6 +24,10 @@ import { orderStatusLabel, type OrderDto } from '@/services/orderService';
 
 const LazyChart = lazy(() =>
   import('../../../design-system/components/Chart').then((m) => ({ default: m.Chart })),
+);
+
+const LazySparkline = lazy(() =>
+  import('../../../design-system/components/Sparkline').then((m) => ({ default: m.Sparkline })),
 );
 
 export interface TraderDashboardScreenProps {
@@ -86,6 +90,7 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
   companyName: companyNameProp,
 }) => {
   const openSnackbar = useStableOpenSnackbar();
+  const navigate = useNavigate();
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | '7days' | '30days'>('7days');
   const [data, setData] = useState<DashboardTraderDto | null>(null);
   const [loading, setLoading] = useState(true);
@@ -172,9 +177,10 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
     return data.topCrops.map((c) => ({ label: c.cropType, value: c.volume }));
   }, [data]);
 
-  const totalOrders = useMemo(() => {
-    if (!data) return 0;
-    return Object.values(data.orderCountByStatus).reduce((a, b) => a + b, 0);
+  // Last 7 data points of demandTrend for sparkline
+  const sparkline7 = useMemo(() => {
+    if (!data) return [];
+    return data.demandTrend.slice(-7).map((d) => d.requestCount);
   }, [data]);
 
   const headerStyles: React.CSSProperties = {
@@ -183,21 +189,17 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
     borderBottom: `1px solid ${colors.background.secondary}`,
   };
 
-  const overviewGridStyles: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: spacing.md,
-    padding: spacing.md,
-  };
-
-  const overviewCardStyles: React.CSSProperties = {
+  const metricCardStyles: React.CSSProperties = {
     padding: spacing.md,
     backgroundColor: colors.background.primary,
-    borderRadius: '8px',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+    borderRadius: 8,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+    marginBottom: spacing.md,
+    cursor: 'pointer',
     display: 'flex',
-    flexDirection: 'column',
-    gap: spacing.sm,
+    alignItems: 'center',
+    gap: spacing.md,
+    minHeight: '44px',
   };
 
   const chartSectionStyles: React.CSSProperties = {
@@ -223,20 +225,6 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
     cursor: 'pointer',
     fontSize: fontSize.caption,
     fontWeight: fontWeight.medium,
-    transition: 'all 0.2s',
-  });
-
-  const actionCenterStyles: React.CSSProperties = {
-    padding: spacing.md,
-  };
-
-  const actionCardStyles = (bgColor: string): React.CSSProperties => ({
-    padding: spacing.md,
-    backgroundColor: `${bgColor}15`,
-    borderRadius: '8px',
-    border: `2px solid ${bgColor}`,
-    marginBottom: spacing.md,
-    cursor: 'pointer',
     transition: 'all 0.2s',
   });
 
@@ -286,8 +274,16 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
 
         {!loading && data && (
           <>
-            <div style={overviewGridStyles}>
-              <div style={overviewCardStyles}>
+            {/* 3 tap-through metric cards — FR-T02 */}
+            <div style={{ padding: spacing.md }}>
+              {/* Card 1: Đơn hàng chờ duyệt */}
+              <div
+                role="button"
+                tabIndex={0}
+                style={metricCardStyles}
+                onClick={() => navigate('/trader/transactions?flow=buyers&status=pending', { replace: false })}
+                onKeyDown={(e) => e.key === 'Enter' && navigate('/trader/transactions?flow=buyers&status=pending', { replace: false })}
+              >
                 <div
                   style={{
                     display: 'flex',
@@ -296,20 +292,38 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
                     width: '48px',
                     height: '48px',
                     borderRadius: '50%',
-                    backgroundColor: `${colors.primary.zaloBlue}15`,
+                    backgroundColor: `${colors.primary.zaloBlue}18`,
+                    flexShrink: 0,
                   }}
                 >
                   <Icon name="shopping-cart" size="lg" color={colors.primary.zaloBlue} />
                 </div>
-                <Text.Title size="large" style={{ margin: 0, fontWeight: fontWeight.bold }}>
-                  {totalOrders}
-                </Text.Title>
-                <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-                  Tổng đơn hàng (mọi trạng thái)
-                </Text>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Text.Title size="large" style={{ margin: 0, fontWeight: fontWeight.bold }}>
+                    {data.orderCountByStatus.pending ?? 0}
+                  </Text.Title>
+                  <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                    Đơn từ người mua — chờ xác nhận
+                  </Text>
+                </div>
+                <Suspense fallback={<div style={{ width: 80, height: 32 }} />}>
+                  <LazySparkline
+                    data={sparkline7}
+                    width={80}
+                    height={32}
+                    color={colors.primary.zaloBlue}
+                  />
+                </Suspense>
               </div>
 
-              <div style={overviewCardStyles}>
+              {/* Card 2: Yêu cầu kết nối mới */}
+              <div
+                role="button"
+                tabIndex={0}
+                style={metricCardStyles}
+                onClick={() => navigate('/trader/transactions?flow=farmers&status=pending', { replace: false })}
+                onKeyDown={(e) => e.key === 'Enter' && navigate('/trader/transactions?flow=farmers&status=pending', { replace: false })}
+              >
                 <div
                   style={{
                     display: 'flex',
@@ -318,20 +332,38 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
                     width: '48px',
                     height: '48px',
                     borderRadius: '50%',
-                    backgroundColor: `${colors.primary.agriGreen}15`,
+                    backgroundColor: `${colors.primary.agriGreen}18`,
+                    flexShrink: 0,
                   }}
                 >
-                  <Icon name="book" size="lg" color={colors.primary.agriGreen} />
+                  <Icon name="users" size="lg" color={colors.primary.agriGreen} />
                 </div>
-                <Text.Title size="large" style={{ margin: 0, fontWeight: fontWeight.bold }}>
-                  {data.activeContracts}
-                </Text.Title>
-                <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-                  Hợp đồng đang hoạt động
-                </Text>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Text.Title size="large" style={{ margin: 0, fontWeight: fontWeight.bold }}>
+                    {data.pendingConnections}
+                  </Text.Title>
+                  <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                    Nông dân đang chờ phản hồi
+                  </Text>
+                </div>
+                <Suspense fallback={<div style={{ width: 80, height: 32 }} />}>
+                  <LazySparkline
+                    data={sparkline7}
+                    width={80}
+                    height={32}
+                    color={colors.primary.agriGreen}
+                  />
+                </Suspense>
               </div>
 
-              <div style={overviewCardStyles}>
+              {/* Card 3: Hợp đồng đang chạy */}
+              <div
+                role="button"
+                tabIndex={0}
+                style={{ ...metricCardStyles, marginBottom: 0 }}
+                onClick={() => navigate('/trader/monitor', { replace: false })}
+                onKeyDown={(e) => e.key === 'Enter' && navigate('/trader/monitor', { replace: false })}
+              >
                 <div
                   style={{
                     display: 'flex',
@@ -340,50 +372,34 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
                     width: '48px',
                     height: '48px',
                     borderRadius: '50%',
-                    backgroundColor: `${colors.functional.warningYellow}22`,
+                    backgroundColor: `${colors.functional.warningYellow}18`,
+                    flexShrink: 0,
                   }}
                 >
-                  <Icon name="users" size="lg" color={colors.primary.zaloBlue} />
+                  <Icon name="book" size="lg" color={colors.functional.warningYellow} />
                 </div>
-                <Text.Title size="large" style={{ margin: 0, fontWeight: fontWeight.bold }}>
-                  {data.pendingConnections}
-                </Text.Title>
-                <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-                  Kết nối chờ phản hồi
-                </Text>
-              </div>
-
-              <div style={overviewCardStyles}>
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '50%',
-                    backgroundColor: `${colors.primary.agriGreen}15`,
-                  }}
-                >
-                  <Icon name="trending-up" size="lg" color={colors.primary.agriGreen} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Text.Title size="large" style={{ margin: 0, fontWeight: fontWeight.bold }}>
+                    {data.activeContracts}
+                  </Text.Title>
+                  <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                    Vùng trồng đang theo dõi
+                  </Text>
                 </div>
-                <Text.Title size="large" style={{ margin: 0, fontWeight: fontWeight.bold }}>
-                  {data.demandTrend[data.demandTrend.length - 1]?.requestCount ?? 0}
-                </Text.Title>
-                <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-                  Nhu cầu mua (ngày gần nhất)
-                </Text>
+                <Suspense fallback={<div style={{ width: 80, height: 32 }} />}>
+                  <LazySparkline data={[]} width={80} height={32} />
+                </Suspense>
               </div>
             </div>
 
-            <div style={{ padding: `0 ${spacing.md}` }}>
+            <div style={{ padding: `0 ${spacing.md} ${spacing.md}` }}>
               <Text.Title size="small" style={{ margin: `0 0 ${spacing.sm}` }}>
                 Đơn hàng theo trạng thái
               </Text.Title>
               <div
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr 1fr',
+                  display: 'flex',
+                  flexWrap: 'wrap',
                   gap: spacing.sm,
                 }}
               >
@@ -396,6 +412,7 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
                         padding: spacing.sm,
                         backgroundColor: colors.background.secondary,
                         borderRadius: 8,
+                        minWidth: '80px',
                       }}
                     >
                       <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
@@ -492,131 +509,6 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
               </div>
             </div>
 
-            <div style={actionCenterStyles}>
-              <Text.Title size="small" style={{ marginBottom: spacing.md }}>
-                Trung tâm tác vụ
-              </Text.Title>
-
-              <div style={actionCardStyles(colors.primary.zaloBlue)}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '56px',
-                      height: '56px',
-                      borderRadius: '50%',
-                      backgroundColor: colors.primary.zaloBlue,
-                    }}
-                  >
-                    <Icon name="users" size="lg" color={colors.text.inverse} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                      <Text.Title size="small" style={{ margin: 0 }}>
-                        Kết nối chờ xử lý
-                      </Text.Title>
-                      <div
-                        style={{
-                          padding: `${spacing.xs} ${spacing.sm}`,
-                          backgroundColor: colors.primary.zaloBlue,
-                          color: colors.text.inverse,
-                          borderRadius: '12px',
-                          fontSize: fontSize.small,
-                          fontWeight: fontWeight.bold,
-                        }}
-                      >
-                        {data.pendingConnections}
-                      </div>
-                    </div>
-                    <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-                      Nông dân / đối tác đang chờ bạn phản hồi
-                    </Text>
-                  </div>
-                </div>
-              </div>
-
-              <div style={actionCardStyles(colors.primary.agriGreen)}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '56px',
-                      height: '56px',
-                      borderRadius: '50%',
-                      backgroundColor: colors.primary.agriGreen,
-                    }}
-                  >
-                    <Icon name="shopping-cart" size="lg" color={colors.text.inverse} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                      <Text.Title size="small" style={{ margin: 0 }}>
-                        Đơn chờ xác nhận
-                      </Text.Title>
-                      <div
-                        style={{
-                          padding: `${spacing.xs} ${spacing.sm}`,
-                          backgroundColor: colors.primary.agriGreen,
-                          color: colors.text.inverse,
-                          borderRadius: '12px',
-                          fontSize: fontSize.small,
-                          fontWeight: fontWeight.bold,
-                        }}
-                      >
-                        {data.orderCountByStatus.pending ?? 0}
-                      </div>
-                    </div>
-                    <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-                      Theo trạng thái «Chờ xác nhận»
-                    </Text>
-                  </div>
-                </div>
-              </div>
-
-              <div style={actionCardStyles(colors.functional.warningYellow)}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.md }}>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      width: '56px',
-                      height: '56px',
-                      borderRadius: '50%',
-                      backgroundColor: colors.functional.warningYellow,
-                    }}
-                  >
-                    <Icon name="book" size="lg" color={colors.text.primary} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                      <Text.Title size="small" style={{ margin: 0 }}>
-                        Hợp đồng đang chạy
-                      </Text.Title>
-                      <div
-                        style={{
-                          padding: `${spacing.xs} ${spacing.sm}`,
-                          backgroundColor: colors.functional.warningYellow,
-                          color: colors.text.primary,
-                          borderRadius: '12px',
-                          fontSize: fontSize.small,
-                          fontWeight: fontWeight.bold,
-                        }}
-                      >
-                        {data.activeContracts}
-                      </div>
-                    </div>
-                    <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-                      Theo tổng hợp dashboard
-                    </Text>
-                  </div>
-                </div>
-              </div>
-            </div>
           </>
         )}
       </div>

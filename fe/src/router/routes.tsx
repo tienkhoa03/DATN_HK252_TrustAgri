@@ -8,6 +8,7 @@ import { RequireRole } from '@/router/RequireRole';
 import type { UserRole } from '@/state/authAtoms';
 import { authSessionAtom, currentRoleAtom } from '@/state/authAtoms';
 import { ChunkErrorBoundary } from '@/components/ErrorBoundary/ChunkErrorBoundary';
+import { RedirectTo } from '@/components/RedirectTo';
 import { RoleAppShell } from '@/navigation/RoleAppShell';
 import { ROLE_HOME_PATH } from '@/router/roleHome';
 import {
@@ -63,21 +64,30 @@ const BuyerProfileNotificationScreen = lazy(() =>
 const BuyerTransactionHistoryScreen = lazy(() =>
   import('@/screens/buyer/transaction-history').then((m) => ({ default: m.BuyerTransactionHistoryScreen })),
 );
+const BuyerSourcingScreen = lazy(() =>
+  import('@/screens/buyer/sourcing').then((m) => ({ default: m.BuyerSourcingScreen })),
+);
+const BuyerLiveMonitorScreen = lazy(() =>
+  import('@/screens/buyer/live-monitor').then((m) => ({ default: m.BuyerLiveMonitorScreen })),
+);
+const BuyerLiveMonitorDetailScreen = lazy(() =>
+  import('@/screens/buyer/live-monitor').then((m) => ({ default: m.BuyerLiveMonitorDetailScreen })),
+);
+const BuyerOrdersScreen = lazy(() =>
+  import('@/screens/buyer/orders-proposals').then((m) => ({ default: m.BuyerOrdersScreen })),
+);
 
 const FarmerDashboardScreen = lazy(() =>
   import('@/screens/farmer/dashboard').then((m) => ({ default: m.FarmerDashboardScreen })),
 );
-const FarmerFarmProfileScreen = lazy(() =>
-  import('@/screens/farmer/farm-profile').then((m) => ({ default: m.FarmerFarmProfileScreen })),
+const FarmerGardenScreen = lazy(() =>
+  import('@/screens/farmer/garden').then((m) => ({ default: m.FarmerGardenScreen })),
 );
-const FarmerProcessScreen = lazy(() =>
-  import('@/screens/farmer/process').then((m) => ({ default: m.FarmerProcessScreen })),
+const FarmerTradeScreen = lazy(() =>
+  import('@/screens/farmer/trade').then((m) => ({ default: m.FarmerTradeScreen })),
 );
-const FarmerMarketConnectScreen = lazy(() =>
-  import('@/screens/farmer/market-connect').then((m) => ({ default: m.FarmerMarketConnectScreen })),
-);
-const FarmerContractsScreen = lazy(() =>
-  import('@/screens/farmer/contracts').then((m) => ({ default: m.FarmerContractsScreen })),
+const FarmerProfileScreen = lazy(() =>
+  import('@/screens/farmer/profile').then((m) => ({ default: m.FarmerProfileScreen })),
 );
 const FarmerAlertListScreen = lazy(() =>
   import('@/screens/farmer/alerts').then((m) => ({ default: m.FarmerAlertListScreen })),
@@ -85,6 +95,15 @@ const FarmerAlertListScreen = lazy(() =>
 
 const TraderDashboardScreen = lazy(() =>
   import('@/screens/trader/dashboard').then((m) => ({ default: m.TraderDashboardScreen })),
+);
+const TraderMarketplaceScreen = lazy(() =>
+  import('@/screens/trader/marketplace').then((m) => ({ default: m.TraderMarketplaceScreen })),
+);
+const TraderTransactionsScreen = lazy(() =>
+  import('@/screens/trader/transactions').then((m) => ({ default: m.TraderTransactionsScreen })),
+);
+const TraderFarmMonitoringScreen = lazy(() =>
+  import('@/screens/trader/farm-monitoring').then((m) => ({ default: m.TraderFarmMonitoringScreen })),
 );
 const TraderSupplyMonitorScreen = lazy(() =>
   import('@/screens/trader/supply-monitor').then((m) => ({ default: m.TraderSupplyMonitorScreen })),
@@ -100,6 +119,9 @@ const TraderStandardLibraryScreen = lazy(() =>
 );
 const TraderProfileNewsScreen = lazy(() =>
   import('@/screens/trader/profile-news').then((m) => ({ default: m.TraderProfileNewsScreen })),
+);
+const TraderConnectionDetailScreen = lazy(() =>
+  import('@/screens/trader/connections').then((m) => ({ default: m.TraderConnectionDetailScreen })),
 );
 
 const ProfileScreen = lazy(() =>
@@ -214,35 +236,47 @@ export function AppRoutes() {
         <Route path="/buyer" element={<RoleLayout role="buyer" />}>
           <Route index element={<BuyerMarketplaceScreen />} />
           <Route path="products/:productId" element={<BuyerProductDetailScreen />} />
-          <Route path="orders" element={<BuyerOrdersProposalsScreen />} />
-          <Route path="request" element={<BuyerPostBuyingRequestScreen />} />
-          <Route path="monitor" element={<BuyerDigitalTwinMonitorScreen />} />
+          <Route path="sourcing" element={<BuyerSourcingScreen />} />
+          <Route path="orders" element={<BuyerOrdersScreen />} />
+          <Route path="live" element={<BuyerLiveMonitorScreen />} />
+          <Route path="live/:contractId" element={<BuyerLiveMonitorDetailScreen />} />
           <Route path="me" element={<BuyerProfileNotificationScreen />} />
-          <Route path="history" element={<BuyerTransactionHistoryScreen />} />
+          {/* Legacy redirects */}
+          <Route path="request" element={<RedirectTo to="/buyer/sourcing?action=create" />} />
+          <Route path="monitor" element={<RedirectTo to="/buyer/live" />} />
+          <Route path="history" element={<RedirectTo to="/buyer/orders?status=completed" />} />
         </Route>
 
         {/* ── Farmer ────────────────────────────────────────── */}
         <Route path="/farmer" element={<RoleLayout role="farmer" />}>
           <Route index element={<FarmerDashboardScreen />} />
-          <Route path="farm" element={<FarmerFarmProfileScreen />} />
-          <Route path="process" element={<FarmerProcessScreen />} />
-          <Route path="connect" element={<FarmerMarketConnectScreen />} />
-          <Route path="contracts" element={<FarmerContractsScreen />} />
+          <Route path="garden" element={<FarmerGardenScreen />} />
+          <Route path="trade" element={<FarmerTradeScreen />} />
+          <Route path="me" element={<FarmerProfileScreen />} />
           <Route path="connections" element={<ConnectionRequestsScreen role="farmer" />} />
           <Route path="alerts" element={<FarmerAlertListScreen />} />
-          <Route path="me" element={<ProfileScreen />} />
+          {/* Legacy redirects */}
+          <Route path="farm" element={<RedirectTo to="/farmer/me?section=farm-lab" />} />
+          <Route path="process" element={<RedirectTo to="/farmer/garden?section=timeline" />} />
+          <Route path="connect" element={<RedirectTo to="/farmer/trade?tab=search" />} />
+          <Route path="contracts" element={<RedirectTo to="/farmer/trade?tab=contracts" />} />
         </Route>
 
         {/* ── Trader ────────────────────────────────────────── */}
         <Route path="/trader" element={<RoleLayout role="trader" />}>
           <Route index element={<TraderDashboardScreen />} />
-          <Route path="supply" element={<TraderSupplyMonitorScreen />} />
-          <Route path="trading" element={<TraderTradingOrdersScreen />} />
-          <Route path="library" element={<TraderLibraryHubScreen />} />
+          <Route path="market" element={<TraderMarketplaceScreen />} />
+          <Route path="transactions" element={<TraderTransactionsScreen />} />
+          <Route path="monitor" element={<TraderFarmMonitoringScreen />} />
           <Route path="standards" element={<TraderStandardLibraryScreen />} />
-          <Route path="news" element={<TraderProfileNewsScreen />} />
           <Route path="connections" element={<ConnectionRequestsScreen role="trader" />} />
+          <Route path="connections/:id" element={<TraderConnectionDetailScreen />} />
           <Route path="me" element={<ProfileScreen />} />
+          {/* Legacy redirects — keep for backwards-compat */}
+          <Route path="supply" element={<RedirectTo to="/trader/monitor" />} />
+          <Route path="trading" element={<RedirectTo to="/trader/transactions" />} />
+          <Route path="library" element={<RedirectTo to="/trader/market?tab=feed" />} />
+          <Route path="news" element={<RedirectTo to="/trader/market?tab=news" />} />
         </Route>
 
         {/* ── Dev / QA launcher (non-production) ────────────── */}

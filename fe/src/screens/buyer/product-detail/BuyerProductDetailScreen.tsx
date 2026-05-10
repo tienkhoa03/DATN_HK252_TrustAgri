@@ -1,15 +1,8 @@
 /**
- * Buyer Product Detail & Pre-order Screen
- * Chi tiết Sản phẩm và Đặt cọc - Thuyết phục người mua qua dữ liệu minh bạch
+ * Buyer Product Detail Screen
+ * Chi tiết sản phẩm — 3 tab + sticky CTA kép
  *
- * Requirements: FR-U01, FR-G01
- *
- * Features:
- * - Slider hình ảnh: Ảnh chụp thực tế sản phẩm và video vườn trồng
- * - Thông tin định danh: Tên Thương lái, Tên Nông hộ, Địa chỉ vườn (bản đồ nhỏ)
- * - Hồ sơ năng lực vườn: Tóm tắt lịch sử vụ mùa trước
- * - Thông số cam kết: Độ ngọt, Kích thước, Không dư lượng thuốc BVTV
- * - Khu vực Đặt hàng (Sticky Footer): Giá đặt cọc, Nút Đặt cọc, Nút Chat
+ * Requirements: FR-U01, FR-G01, NFR-U03
  */
 
 import React, { useState, useEffect } from 'react';
@@ -21,32 +14,18 @@ import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import {
   getProduct,
-  standardLabel,
   cropEmoji,
   toMarketplaceViMessage,
   type ProductDto,
 } from '../../../services/marketplaceService';
+import { BuyerHeader } from '../components/BuyerHeader';
+import { ProductDetailTabs } from './ProductDetailTabs';
 
 export interface BuyerProductDetailScreenProps {
   productId?: string;
   onBack?: () => void;
   onOrder?: (productId: string) => void;
 }
-
-const DEPOSIT_PERCENT = 40;
-
-// Static quality specs (UI-only, không có trong ProductDto)
-const QUALITY_SPECS = [
-  { label: 'Độ ngọt', value: '≥ 28 Brix', icon: '🍯' },
-  { label: 'Kích thước', value: '2.5 – 3.5 kg/trái', icon: '📏' },
-  { label: 'Thuốc BVTV', value: 'Không dư lượng', icon: '✅' },
-  { label: 'Thu hoạch', value: '15–20 ngày', icon: '📅' },
-];
-
-const FARM_HISTORY = [
-  { season: 'Vụ 2024', yield: '5.2 tấn', quality: 'Đạt chuẩn GlobalGAP' },
-  { season: 'Vụ 2023', yield: '4.8 tấn', quality: 'Đạt chuẩn VietGAP' },
-];
 
 const IMAGE_EMOJIS = ['🌳', '🌿', '🎥', '🍃'];
 
@@ -63,8 +42,8 @@ const SkeletonBlock: React.FC<{ height?: number | string }> = ({ height = 16 }) 
 );
 
 /**
- * Buyer Product Detail & Pre-order Screen Component
- * Requirements: FR-U01, FR-G01
+ * Buyer Product Detail Screen
+ * Requirements: FR-U01, FR-G01, NFR-U03
  */
 export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> = ({
   productId = 'prod-001',
@@ -102,43 +81,14 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
 
   // ── Styles ──────────────────────────────────────────────────────────────────
 
-  const headerStyles: React.CSSProperties = {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '56px',
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    backdropFilter: 'blur(10px)',
-    borderBottom: `1px solid ${colors.background.tertiary}`,
-    display: 'flex',
-    alignItems: 'center',
-    padding: `0 ${spacing.md}`,
-    zIndex: 1000,
-  };
-
-  const backButtonStyles: React.CSSProperties = {
-    width: '40px',
-    height: '40px',
-    borderRadius: '50%',
-    backgroundColor: colors.background.primary,
-    border: `1px solid ${colors.background.tertiary}`,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-  };
-
   const contentStyles: React.CSSProperties = {
-    marginTop: '56px',
     paddingBottom: '140px',
   };
 
   const imageSliderStyles: React.CSSProperties = {
     position: 'relative',
     width: '100%',
-    height: '300px',
+    height: '260px',
     backgroundColor: colors.background.secondary,
     overflow: 'hidden',
   };
@@ -149,7 +99,7 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '120px',
+    fontSize: '100px',
   };
 
   const imageDotsStyles: React.CSSProperties = {
@@ -170,69 +120,6 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
     cursor: 'pointer',
   });
 
-  const sectionStyles: React.CSSProperties = {
-    padding: spacing.md,
-    backgroundColor: colors.background.primary,
-    marginBottom: spacing.sm,
-  };
-
-  const titleStyles: React.CSSProperties = {
-    fontSize: fontSize.h1,
-    fontWeight: fontWeight.bold,
-    margin: 0,
-    marginBottom: spacing.xs,
-  };
-
-  const standardBadgeStyles: React.CSSProperties = {
-    display: 'inline-block',
-    padding: `${spacing.xs} ${spacing.sm}`,
-    backgroundColor: colors.primary.agriGreen,
-    color: colors.text.inverse,
-    borderRadius: '4px',
-    fontSize: fontSize.small,
-    fontWeight: fontWeight.medium,
-  };
-
-  const infoRowStyles: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  };
-
-  const mapPlaceholderStyles: React.CSSProperties = {
-    width: '100%',
-    height: '120px',
-    backgroundColor: colors.background.secondary,
-    borderRadius: '8px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: spacing.sm,
-    fontSize: '48px',
-  };
-
-  const historyCardStyles: React.CSSProperties = {
-    padding: spacing.md,
-    backgroundColor: colors.background.secondary,
-    borderRadius: '8px',
-    marginBottom: spacing.sm,
-  };
-
-  const specGridStyles: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  };
-
-  const specCardStyles: React.CSSProperties = {
-    padding: spacing.sm,
-    backgroundColor: colors.background.secondary,
-    borderRadius: '8px',
-    textAlign: 'center',
-  };
-
   const stickyFooterStyles: React.CSSProperties = {
     position: 'fixed',
     bottom: 0,
@@ -245,64 +132,110 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
     zIndex: 1000,
   };
 
-  const priceRowStyles: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  };
-
-  const priceStyles: React.CSSProperties = {
-    fontSize: fontSize.h1,
-    fontWeight: fontWeight.bold,
-    color: colors.primary.zaloBlue,
-  };
-
-  const depositInfoStyles: React.CSSProperties = {
-    fontSize: fontSize.caption,
-    color: colors.text.secondary,
-  };
-
-  const buttonRowStyles: React.CSSProperties = {
-    display: 'flex',
-    gap: spacing.sm,
-  };
-
-  const chatButtonStyles: React.CSSProperties = {
-    flex: '0 0 auto',
-    width: '48px',
-    height: '48px',
-    borderRadius: '8px',
-    backgroundColor: colors.background.secondary,
-    border: `1px solid ${colors.background.tertiary}`,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    cursor: 'pointer',
-    transition: 'all 0.2s',
-  };
-
-  const depositButtonStyles: React.CSSProperties = {
+  const primaryBtnStyles: React.CSSProperties = {
     flex: 1,
     height: '48px',
     borderRadius: '8px',
-    backgroundColor: colors.primary.zaloBlue,
+    backgroundColor: colors.primary.agriGreen,
     color: colors.text.inverse,
     border: 'none',
-    fontSize: fontSize.body,
+    fontSize: fontSize.caption,
     fontWeight: fontWeight.semibold,
     cursor: 'pointer',
     transition: 'all 0.2s',
+    minHeight: '44px',
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  const secondaryBtnStyles: React.CSSProperties = {
+    flex: 1,
+    height: '48px',
+    borderRadius: '8px',
+    backgroundColor: 'transparent',
+    color: colors.primary.zaloBlue,
+    border: `2px solid ${colors.primary.zaloBlue}`,
+    fontSize: fontSize.caption,
+    fontWeight: fontWeight.semibold,
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    minHeight: '44px',
+  };
+
+  // ── Render helpers ───────────────────────────────────────────────────────────
+
+  const renderStickyFooter = (p: ProductDto) => {
+    const supportsDeposit = (p as any).supportsDeposit ?? false;
+    const harvestStatus = (p as any).harvestStatus as string | undefined;
+
+    const showBuyNow = harvestStatus === 'available' || !harvestStatus;
+    const showDeposit = supportsDeposit === true || harvestStatus === 'upcoming';
+    const bothVisible = showBuyNow && showDeposit;
+
+    return (
+      <div style={stickyFooterStyles}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: spacing.sm,
+        }}>
+          <div>
+            <div style={{ fontSize: fontSize.h1, fontWeight: fontWeight.bold, color: colors.primary.zaloBlue }}>
+              {p.price.toLocaleString('vi-VN')} VNĐ
+            </div>
+            <div style={{ fontSize: fontSize.caption, color: colors.text.secondary }}>
+              Đơn vị: {p.unit}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: spacing.sm }}>
+          {showBuyNow && (
+            <button
+              type="button"
+              style={{ ...primaryBtnStyles, flex: bothVisible ? 1 : undefined, width: bothVisible ? undefined : '100%' }}
+              onClick={() => {
+                onOrder?.(p.id);
+                openSnackbar({ text: 'Chức năng đang phát triển', type: 'info' });
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = colors.primary.agriGreenDark; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = colors.primary.agriGreen; }}
+            >
+              Mua ngay
+            </button>
+          )}
+          {showDeposit && (
+            <button
+              type="button"
+              style={{ ...secondaryBtnStyles, flex: bothVisible ? 1 : undefined, width: bothVisible ? undefined : '100%' }}
+              onClick={() => {
+                openSnackbar({ text: 'Chức năng đang phát triển', type: 'info' });
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = colors.primary.zaloBlueDark; e.currentTarget.style.color = colors.primary.zaloBlueDark; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = colors.primary.zaloBlue; e.currentTarget.style.color = colors.primary.zaloBlue; }}
+            >
+              Thỏa thuận đặt cọc
+            </button>
+          )}
+          {!showBuyNow && !showDeposit && (
+            <button
+              type="button"
+              style={{ ...primaryBtnStyles, width: '100%', opacity: 0.5, cursor: 'not-allowed' }}
+              disabled
+            >
+              Liên hệ thương lái
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const renderContent = () => {
     if (loading) {
       return (
         <div style={contentStyles}>
           <div style={{ ...imageSliderStyles, backgroundColor: colors.background.secondary }} />
-          <div style={sectionStyles}>
+          <div style={{ padding: spacing.md }}>
             <SkeletonBlock height={28} />
             <SkeletonBlock height={14} />
             <SkeletonBlock height={14} />
@@ -322,9 +255,7 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
       );
     }
 
-    const depositPrice = Math.round(product.price * (DEPOSIT_PERCENT / 100));
-    const emoji = product.images[0] ?? cropEmoji(product.cropType);
-    const std = standardLabel(product.standardCode);
+    const emoji = (product.images[0] as string | undefined) ?? cropEmoji(product.cropType);
 
     return (
       <>
@@ -367,182 +298,40 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
             </div>
           </div>
 
-          {/* Product Info */}
-          <div style={sectionStyles}>
-            <h1 style={titleStyles}>{product.name}</h1>
-
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: spacing.xs,
-                marginBottom: spacing.sm,
-              }}
-            >
-              <Icon name="star-filled" size="sm" color={colors.functional.warningYellow} />
-              <Text size="small" style={{ margin: 0, fontWeight: fontWeight.medium }}>
-                4.8
-              </Text>
-              <Text size="small" style={{ margin: 0, color: colors.text.secondary }}>
-                (127 đánh giá)
-              </Text>
+          {/* Product name + price summary above tabs */}
+          <div style={{
+            padding: `${spacing.md} ${spacing.md} 0`,
+            backgroundColor: colors.background.primary,
+            marginBottom: spacing.sm,
+          }}>
+            <h1 style={{ fontSize: fontSize.h1, fontWeight: fontWeight.bold, margin: 0, marginBottom: spacing.xs }}>
+              {product.name}
+            </h1>
+            <div style={{ fontSize: fontSize.h2, fontWeight: fontWeight.bold, color: colors.primary.zaloBlue, marginBottom: spacing.xs }}>
+              {product.price.toLocaleString('vi-VN')} VNĐ/{product.unit}
             </div>
-
-            {std && <div style={standardBadgeStyles}>{std}</div>}
-
-            {product.description && (
-              <Text size="small" style={{ marginTop: spacing.md, lineHeight: 1.6 }}>
-                {product.description}
-              </Text>
-            )}
+            <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+              {product.cropType}
+            </Text>
           </div>
 
-          {/* Farm Identity */}
-          <div style={sectionStyles}>
-            <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.sm }}>
-              Thông tin định danh
-            </Text.Title>
-
-            <div style={infoRowStyles}>
-              <Icon name="users" size="md" color={colors.text.secondary} />
-              <div>
-                <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>
-                  Thương lái
-                </Text>
-                <Text size="small" style={{ margin: 0, fontWeight: fontWeight.medium }}>
-                  {product.traderId}
-                </Text>
-              </div>
-            </div>
-
-            <div style={infoRowStyles}>
-              <Icon name="map-pin" size="md" color={colors.text.secondary} />
-              <div>
-                <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>
-                  Vườn nguồn
-                </Text>
-                <Text size="small" style={{ margin: 0, fontWeight: fontWeight.medium }}>
-                  {product.farmId ?? 'Chưa gán vườn'}
-                </Text>
-              </div>
-            </div>
-
-            <div style={mapPlaceholderStyles}>🗺️</div>
-          </div>
-
-          {/* Farm History */}
-          <div style={sectionStyles}>
-            <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.sm }}>
-              Hồ sơ năng lực vườn
-            </Text.Title>
-            {FARM_HISTORY.map((h, i) => (
-              <div key={i} style={historyCardStyles}>
-                <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
-                  {h.season}
-                </Text>
-                <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>
-                  Sản lượng: {h.yield}
-                </Text>
-                <Text size="xSmall" style={{ margin: 0, color: colors.primary.agriGreen }}>
-                  ✓ {h.quality}
-                </Text>
-              </div>
-            ))}
-          </div>
-
-          {/* Quality Specs */}
-          <div style={sectionStyles}>
-            <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.sm }}>
-              Thông số cam kết
-            </Text.Title>
-            <div style={specGridStyles}>
-              {QUALITY_SPECS.map((spec, i) => (
-                <div key={i} style={specCardStyles}>
-                  <div style={{ fontSize: '32px', marginBottom: spacing.xs }}>{spec.icon}</div>
-                  <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>
-                    {spec.label}
-                  </Text>
-                  <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
-                    {spec.value}
-                  </Text>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* 3-Tab Panel */}
+          <ProductDetailTabs product={product} />
         </div>
 
-        {/* Sticky Footer */}
-        <div style={stickyFooterStyles}>
-          <div style={priceRowStyles}>
-            <div>
-              <div style={priceStyles}>
-                {depositPrice.toLocaleString('vi-VN')} VNĐ
-              </div>
-              <div style={depositInfoStyles}>
-                Đặt cọc {DEPOSIT_PERCENT}% • Giá gốc:{' '}
-                {product.price.toLocaleString('vi-VN')} VNĐ/{product.unit}
-              </div>
-            </div>
-          </div>
-
-          <div style={buttonRowStyles}>
-            <button
-              style={chatButtonStyles}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = colors.background.tertiary;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = colors.background.secondary;
-              }}
-              aria-label="Chat với thương lái"
-            >
-              <Icon name="message-circle" size="md" color={colors.primary.zaloBlue} />
-            </button>
-
-            <button
-              style={depositButtonStyles}
-              onClick={() => onOrder?.(product.id)}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#0052CC'; }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = colors.primary.zaloBlue;
-              }}
-            >
-              Đặt cọc ngay
-            </button>
-          </div>
-        </div>
+        {/* Sticky Footer CTA */}
+        {renderStickyFooter(product)}
       </>
     );
   };
 
   return (
     <Page className="buyer-product-detail-screen">
-      {/* Header with back button */}
-      <div style={headerStyles}>
-        {onBack && (
-          <button
-            style={backButtonStyles}
-            onClick={onBack}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = colors.background.secondary;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = colors.background.primary;
-            }}
-            aria-label="Quay lại"
-          >
-            <Icon name="chevron-left" size="md" color={colors.text.primary} />
-          </button>
-        )}
-        {product && (
-          <Text
-            size="small"
-            style={{ margin: '0 auto', fontWeight: fontWeight.semibold, flex: 1, textAlign: 'center' }}
-          >
-            {product.name}
-          </Text>
-        )}
-      </div>
+      {/* Header */}
+      <BuyerHeader
+        title={product?.name ?? 'Chi tiết sản phẩm'}
+        showSearch={false}
+      />
 
       {renderContent()}
     </Page>

@@ -65,6 +65,11 @@ export interface UserProfileDto {
 export class AuthLoginDto {
   @IsString()
   zaloAccessToken: string;
+
+  /** Số điện thoại từ ZMP SDK (best-effort, FE gửi kèm nếu user đã cấp quyền) */
+  @IsOptional()
+  @IsString()
+  phoneNumber?: string;
 }
 
 /**

@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Post,
   Query,
   UseGuards,
@@ -28,7 +29,7 @@ export class FarmAlertsController {
 
   @Get('alerts')
   listAlerts(
-    @Param('farmId') farmId: string,
+    @Param('farmId', ParseUUIDPipe) farmId: string,
     @Query() query: AlertQueryDto,
   ): Promise<ListResponse<AlertDto>> {
     return this.alertsService.listAlerts(farmId, query);

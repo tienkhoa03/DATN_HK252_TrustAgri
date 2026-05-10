@@ -12,7 +12,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Page, Text, Spinner } from 'zmp-ui';
+import { Page, Text, Spinner, useNavigate } from 'zmp-ui';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
 import { Icon } from '../../../design-system/components/Icon';
@@ -348,6 +348,7 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
   traderName = 'Thương lái',
 }) => {
   const session = useAtomValue(authSessionAtom);
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>('my-farmers');
   const [selectedManagedFarm, setSelectedManagedFarm] = useState<ManagedFarmItem | null>(null);
 
@@ -885,6 +886,24 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
           <Text size="xSmall" style={{ color: colors.text.secondary }}>
             Hãy kết nối với nông dân để theo dõi vườn
           </Text>
+          <button
+            type="button"
+            style={{
+              marginTop: spacing.md,
+              padding: `${spacing.sm} ${spacing.lg}`,
+              backgroundColor: colors.primary.agriGreen,
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: 8,
+              fontSize: fontSize.body,
+              fontWeight: fontWeight.semibold,
+              cursor: 'pointer',
+              minHeight: 44,
+            }}
+            onClick={() => navigate('/trader/market?tab=supply')}
+          >
+            Tìm nông dân
+          </button>
         </div>
       ) : (
         managedFarms.map((item) => (

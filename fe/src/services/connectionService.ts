@@ -36,7 +36,7 @@ export interface ConnectionDto {
   toRole: 'farmer' | 'trader';
   farmId?: string;
   message?: string;
-  status: 'pending' | 'accepted' | 'rejected';
+  status: 'pending' | 'accepted' | 'rejected' | 'negotiating' | 'signed';
   createdAt: string;
   respondedAt?: string;
 }
@@ -122,7 +122,7 @@ export interface CreateConnectionDto {
 /**
  * Map ApiError code → thông báo tiếng Việt thân thiện cho màn kết nối.
  */
-export function toConnectionViMessage(err: unknown, context?: 'search' | 'list' | 'create' | 'respond'): string {
+export function toConnectionViMessage(err: unknown, context?: 'search' | 'list' | 'create' | 'respond' | 'negotiate' | 'sign'): string {
   if (err instanceof ApiError) {
     switch (err.code) {
       case 'UNAUTHORIZED':
@@ -158,6 +158,10 @@ export function toConnectionViMessage(err: unknown, context?: 'search' | 'list' 
       return 'Không thể gửi yêu cầu kết nối. Vui lòng thử lại.';
     case 'respond':
       return 'Không thể xử lý yêu cầu. Vui lòng thử lại.';
+    case 'negotiate':
+      return 'Không thể bắt đầu đàm phán. Vui lòng thử lại.';
+    case 'sign':
+      return 'Không thể xác nhận ký kết. Vui lòng thử lại.';
     default:
       return 'Đã xảy ra lỗi. Vui lòng thử lại.';
   }
@@ -260,6 +264,30 @@ export async function acceptConnection(connectionId: string): Promise<Connection
 export async function rejectConnection(connectionId: string): Promise<ConnectionDto> {
   const { data } = await apiClient.post<ConnectionDto>(
     `/connections/${connectionId}/reject`,
+    {},
+  );
+  return data;
+}
+
+/**
+ * POST /api/v1/connections/:id/negotiate
+ * Bắt đầu đàm phán hợp tác (accepted → negotiating).
+ */
+export async function negotiateConnection(connectionId: string): Promise<ConnectionDto> {
+  const { data } = await apiClient.post<ConnectionDto>(
+    `/connections/${connectionId}/negotiate`,
+    {},
+  );
+  return data;
+}
+
+/**
+ * POST /api/v1/connections/:id/sign
+ * Xác nhận đã ký hợp đồng (negotiating → signed).
+ */
+export async function signConnection(connectionId: string): Promise<ConnectionDto> {
+  const { data } = await apiClient.post<ConnectionDto>(
+    `/connections/${connectionId}/sign`,
     {},
   );
   return data;

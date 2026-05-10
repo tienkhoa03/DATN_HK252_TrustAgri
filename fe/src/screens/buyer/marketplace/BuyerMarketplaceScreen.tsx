@@ -1,14 +1,8 @@
 /**
- * Buyer Marketplace Home Screen
- * Trang chủ và Chợ Nông sản - Điểm chạm đầu tiên để tìm kiếm sản phẩm
+ * Buyer Marketplace / Discover Screen
+ * Tab "Khám phá" — tìm kiếm + bộ lọc + lưới sản phẩm
  *
- * Requirements: FR-U01, FR-U02, FR-G02, 20.1-20.4
- *
- * Features:
- * - Thanh tìm kiếm: Tìm theo tên nông sản hoặc tên Farm Lab
- * - Banner Tin tức: Slide chạy ngang hiển thị dự báo giá và tiêu điểm nông vụ
- * - Nút tác vụ nhanh: Nút Đăng nhu cầu mua (Floating Action Button)
- * - Danh sách Nông sản: Lưới 2 cột với thẻ sản phẩm
+ * Requirements: FR-U01, FR-U02, FR-G02, NFR-U01, NFR-U03
  */
 
 import React, { useState, useEffect } from 'react';
@@ -26,19 +20,21 @@ import {
   type ProductDto,
 } from '../../../services/marketplaceService';
 import { listNews, type NewsArticleDto } from '@/services/newsForecastService';
-import { getMe } from '@/services/authService';
-import { BuyerNotificationBell } from '../components/BuyerNotificationBell';
+import { BuyerHeader } from '../components/BuyerHeader';
 import { BuyerDashboardScreen } from '../dashboard';
+import { TrustBadgeGroup } from '../components/TrustBadgeGroup';
 
 const NEWS_LIMIT = 5;
 const PRODUCTS_PER_PAGE = 12;
+
+type FilterOption = 'Tất cả' | 'Có IoT' | 'VietGAP' | 'Hỗ trợ đặt cọc' | 'Sẵn hàng';
+const FILTER_OPTIONS: FilterOption[] = ['Tất cả', 'Có IoT', 'VietGAP', 'Hỗ trợ đặt cọc', 'Sẵn hàng'];
 
 export interface BuyerMarketplaceScreenProps {
   buyerName?: string;
   onProductPress?: (productId: string) => void;
   onPostBuyingRequest?: () => void;
 }
-
 
 // Skeleton card placeholder
 const SkeletonCard: React.FC = () => (
@@ -77,13 +73,11 @@ const SkeletonCard: React.FC = () => (
 );
 
 /**
- * Buyer Marketplace Home Screen Component
- * Requirements: FR-U01, FR-U02, FR-G02, 20.1-20.4
+ * Buyer Marketplace / Discover Screen
+ * Requirements: FR-U01, FR-U02, FR-G02, NFR-U01, NFR-U03
  */
 export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
-  buyerName: buyerNameProp,
   onProductPress,
-  onPostBuyingRequest,
 }) => {
   const openSnackbar = useStableOpenSnackbar();
   const [searchQuery, setSearchQuery] = useState('');
@@ -95,17 +89,10 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [buyerName, setBuyerName] = useState(buyerNameProp ?? '');
+  const [activeFilter, setActiveFilter] = useState<FilterOption>('Tất cả');
+  const [searchVisible, setSearchVisible] = useState(false);
 
-  // Load buyer profile name
-  useEffect(() => {
-    if (buyerNameProp) return;
-    getMe()
-      .then((profile) => setBuyerName(profile.displayName || 'Người mua'))
-      .catch(() => setBuyerName('Người mua'));
-  }, [buyerNameProp]);
-
-  // Load news from API
+  // Load news
   useEffect(() => {
     let cancelled = false;
     listNews({ limit: NEWS_LIMIT })
@@ -114,7 +101,7 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
     return () => { cancelled = true; };
   }, []);
 
-  // Load products page
+  // Load products
   useEffect(() => {
     let cancelled = false;
     if (productPage === 1) setLoading(true);
@@ -142,21 +129,40 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [productPage]);
 
-  // Client-side filter based on search query
-  const filteredProducts = products.filter(
-    (p) =>
-      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.cropType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (p.description ?? '').toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  // Client-side filter: search + active filter chip
+  const filteredProducts = (() => {
+    let list = products;
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.cropType.toLowerCase().includes(q) ||
+          (p.description ?? '').toLowerCase().includes(q),
+      );
+    }
+
+    switch (activeFilter) {
+      case 'Có IoT':
+        return list.filter((p) => (p as any).hasIotData ?? false);
+      case 'VietGAP':
+        return list.filter((p) =>
+          ((p as any).certifications as string[] | undefined)?.includes('VietGAP') ?? false,
+        );
+      case 'Hỗ trợ đặt cọc':
+        return list.filter((p) => (p as any).supportsDeposit ?? false);
+      case 'Sẵn hàng':
+        return list.filter(
+          (p) =>
+            (p as any).harvestStatus === 'available' || !(p as any).harvestStatus,
+        );
+      default:
+        return list;
+    }
+  })();
 
   // ── Styles ──────────────────────────────────────────────────────────────────
-
-  const headerStyles: React.CSSProperties = {
-    padding: spacing.md,
-    backgroundColor: colors.background.primary,
-    borderBottom: `1px solid ${colors.background.secondary}`,
-  };
 
   const searchBarStyles: React.CSSProperties = {
     padding: spacing.md,
@@ -182,11 +188,12 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
     backgroundColor: colors.background.secondary,
     border: 'none',
     borderRadius: '8px',
-    fontSize: fontSize.body,
+    fontSize: fontSize.caption,
+    outline: 'none',
   };
 
   const newsBannerStyles: React.CSSProperties = {
-    padding: spacing.md,
+    padding: `0 ${spacing.md} ${spacing.md}`,
     backgroundColor: colors.background.primary,
   };
 
@@ -215,6 +222,30 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
     cursor: 'pointer',
   });
 
+  const filterBarStyles: React.CSSProperties = {
+    display: 'flex',
+    gap: spacing.sm,
+    overflowX: 'auto',
+    padding: `0 ${spacing.md} ${spacing.sm}`,
+    scrollbarWidth: 'none',
+  };
+
+  const filterChipStyles = (active: boolean): React.CSSProperties => ({
+    flexShrink: 0,
+    minHeight: '44px',
+    padding: `0 ${spacing.md}`,
+    borderRadius: '22px',
+    border: 'none',
+    backgroundColor: active ? colors.primary.agriGreen : colors.background.secondary,
+    color: active ? colors.text.inverse : colors.text.primary,
+    fontSize: fontSize.caption,
+    fontWeight: active ? fontWeight.semibold : fontWeight.regular,
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+    display: 'flex',
+    alignItems: 'center',
+  });
+
   const productGridStyles: React.CSSProperties = {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
@@ -232,29 +263,34 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
     transition: 'transform 0.2s, box-shadow 0.2s',
   };
 
-  const productImageStyles: React.CSSProperties = {
+  const productImageContainerStyles: React.CSSProperties = {
+    position: 'relative',
     width: '100%',
     height: '120px',
+    backgroundColor: colors.background.secondary,
+  };
+
+  const productImageStyles: React.CSSProperties = {
+    width: '100%',
+    height: '100%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.background.secondary,
     fontSize: '48px',
+  };
+
+  const badgeOverlayStyles: React.CSSProperties = {
+    position: 'absolute',
+    top: spacing.xs,
+    left: spacing.xs,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
+    maxWidth: 'calc(100% - 8px)',
   };
 
   const productInfoStyles: React.CSSProperties = {
     padding: spacing.sm,
-  };
-
-  const standardBadgeStyles: React.CSSProperties = {
-    display: 'inline-block',
-    padding: `2px ${spacing.sm}`,
-    backgroundColor: colors.primary.agriGreen,
-    color: colors.text.inverse,
-    borderRadius: '4px',
-    fontSize: fontSize.small,
-    fontWeight: fontWeight.medium,
-    marginTop: spacing.xs,
   };
 
   const priceStyles: React.CSSProperties = {
@@ -264,41 +300,19 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
     marginTop: spacing.xs,
   };
 
-  const buttonStyles = (available: boolean): React.CSSProperties => ({
+  const viewDetailButtonStyles: React.CSSProperties = {
     width: '100%',
     padding: spacing.sm,
-    backgroundColor: available ? colors.primary.zaloBlue : colors.background.tertiary,
-    color: available ? colors.text.inverse : colors.text.disabled,
+    backgroundColor: colors.primary.agriGreen,
+    color: colors.text.inverse,
     border: 'none',
     borderRadius: '6px',
     fontSize: fontSize.caption,
     fontWeight: fontWeight.semibold,
-    cursor: available ? 'pointer' : 'not-allowed',
-    marginTop: spacing.sm,
-    transition: 'all 0.2s',
-  });
-
-  const fabStyles: React.CSSProperties = {
-    position: 'fixed',
-    bottom: spacing.lg,
-    right: spacing.lg,
-    width: '56px',
-    height: '56px',
-    borderRadius: '50%',
-    backgroundColor: colors.primary.agriGreen,
-    color: colors.text.inverse,
-    border: 'none',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
     cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 1000,
-    transition: 'transform 0.2s',
-  };
-
-  const contentStyles: React.CSSProperties = {
-    paddingBottom: spacing.xl,
+    marginTop: spacing.sm,
+    minHeight: '44px',
+    transition: 'all 0.2s',
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -336,15 +350,12 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
       );
     }
 
-    const available = (p: ProductDto) =>
-      p.status === 'active' && (p.stockQuantity === undefined || p.stockQuantity > 0);
-
     return (
       <div style={productGridStyles}>
         {filteredProducts.map((product) => {
-          const isAvailable = available(product);
+          const emoji = (product.images[0] as string | undefined) ?? cropEmoji(product.cropType);
           const std = standardLabel(product.standardCode);
-          const emoji = product.images[0] ?? cropEmoji(product.cropType);
+          const p = product as any;
           return (
             <div
               key={product.id}
@@ -359,38 +370,51 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
                 e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
               }}
             >
-              <div style={productImageStyles}>{emoji}</div>
+              <div style={productImageContainerStyles}>
+                <div style={productImageStyles}>{emoji}</div>
+                <div style={badgeOverlayStyles}>
+                  <TrustBadgeGroup
+                    certifications={p.certifications ?? (std ? [std] : [])}
+                    hasIot={p.hasIotData ?? false}
+                    supportsDeposit={p.supportsDeposit ?? false}
+                    maxVisible={2}
+                  />
+                </div>
+              </div>
 
               <div style={productInfoStyles}>
-                <Text.Title size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
+                <Text.Title size="small" style={{ margin: 0, fontWeight: fontWeight.semibold, fontSize: fontSize.caption }}>
                   {product.name}
                 </Text.Title>
-                <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                <Text size="small" style={{ color: colors.text.secondary, margin: 0, fontSize: '11px' }}>
                   {product.cropType}
                 </Text>
 
-                {std && <div style={standardBadgeStyles}>{std}</div>}
-
                 <div style={priceStyles}>
-                  {product.price.toLocaleString('vi-VN')} VNĐ/{product.unit}
+                  {product.price.toLocaleString('vi-VN')}
+                  <span style={{ fontSize: fontSize.caption, fontWeight: fontWeight.regular }}> VNĐ/{product.unit}</span>
                 </div>
 
+                {product.traderId && (
+                  <Text size="small" style={{ color: colors.text.secondary, margin: 0, fontSize: '11px' }}>
+                    Thương lái: {product.traderId.slice(0, 8)}
+                  </Text>
+                )}
+
                 <button
-                  style={buttonStyles(isAvailable)}
-                  disabled={!isAvailable}
+                  style={viewDetailButtonStyles}
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (isAvailable) onProductPress?.(product.id);
+                    onProductPress?.(product.id);
                   }}
                   onMouseEnter={(e) => {
-                    if (isAvailable) e.currentTarget.style.backgroundColor = colors.primary.zaloBlueDark;
+                    e.currentTarget.style.backgroundColor = colors.primary.agriGreenDark;
                   }}
                   onMouseLeave={(e) => {
-                    if (isAvailable)
-                      e.currentTarget.style.backgroundColor = colors.primary.zaloBlue;
+                    e.currentTarget.style.backgroundColor = colors.primary.agriGreen;
                   }}
                 >
-                  {isAvailable ? 'Mua ngay' : 'Hết hàng'}
+                  Xem chi tiết
                 </button>
               </div>
             </div>
@@ -401,40 +425,37 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
   };
 
   return (
-    <Page className="buyer-marketplace-screen">
-      <div style={contentStyles}>
-        {/* Header */}
-        <div style={{ ...headerStyles, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.sm }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-              Xin chào,
-            </Text>
-            <Text.Title size="normal" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
-              {buyerName}
-            </Text.Title>
-          </div>
-          <BuyerNotificationBell />
-        </div>
+    <Page className="buyer-discover-screen">
+      {/* Header — BuyerHeader with search icon */}
+      <BuyerHeader
+        title="Khám phá"
+        showSearch={true}
+        onSearchPress={() => setSearchVisible((v) => !v)}
+      />
 
+      <div style={{ paddingBottom: spacing.xl }}>
         <BuyerDashboardScreen />
 
-        {/* Search Bar */}
-        <div style={searchBarStyles}>
-          <div style={searchInputWrapperStyles}>
-            <div style={searchIconStyles}>
-              <Icon name="search" size="md" color={colors.text.secondary} />
+        {/* Search Bar — shown when search icon tapped */}
+        {searchVisible && (
+          <div style={searchBarStyles}>
+            <div style={searchInputWrapperStyles}>
+              <div style={searchIconStyles}>
+                <Icon name="search" size="md" color={colors.text.secondary} />
+              </div>
+              <input
+                type="text"
+                placeholder="Tìm nông sản..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={searchInputStyles}
+                autoFocus
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Tìm nông sản..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={searchInputStyles}
-            />
           </div>
-        </div>
+        )}
 
-        {/* News Banner — hiển thị khi có news từ API */}
+        {/* News Banner */}
         {newsItems.length > 0 && (
           <div style={newsBannerStyles}>
             <div
@@ -473,17 +494,33 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
           </div>
         )}
 
+        {/* Filter Chip Bar */}
+        <div style={filterBarStyles}>
+          {FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt}
+              style={filterChipStyles(activeFilter === opt)}
+              onClick={() => setActiveFilter(opt)}
+              type="button"
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+
         {/* Section title */}
-        <div style={{ padding: `${spacing.md} ${spacing.md} 0` }}>
+        <div style={{ padding: `0 ${spacing.md} 0` }}>
           <Text.Title size="small" style={{ margin: 0 }}>
-            {loading ? 'Đang tải...' : `Nông sản (${filteredProducts.length}${productTotal > products.length ? `/${productTotal}` : ''})`}
+            {loading
+              ? 'Đang tải...'
+              : `Nông sản (${filteredProducts.length}${productTotal > products.length ? `/${productTotal}` : ''})`}
           </Text.Title>
         </div>
 
         {/* Product Grid */}
         {renderProductGrid()}
 
-        {/* Xem thêm button */}
+        {/* Xem thêm */}
         {!loading && !error && products.length < productTotal && (
           <div style={{ display: 'flex', justifyContent: 'center', padding: `0 ${spacing.md} ${spacing.md}` }}>
             <button
@@ -506,20 +543,12 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
             </button>
           </div>
         )}
-
-        {/* Floating Action Button */}
-        <button
-          style={fabStyles}
-          onClick={onPostBuyingRequest}
-          onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.1)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
-          aria-label="Đăng nhu cầu mua"
-        >
-          <Icon name="plus-circle" size="lg" color={colors.text.inverse} />
-        </button>
       </div>
     </Page>
   );
 };
+
+// Alias — same component, used in routes as BuyerDiscoverScreen
+export const BuyerDiscoverScreen = BuyerMarketplaceScreen;
 
 export default BuyerMarketplaceScreen;

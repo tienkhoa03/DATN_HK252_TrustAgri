@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   UnauthorizedException,
   NotFoundException,
   ForbiddenException,
@@ -28,6 +29,8 @@ import { RedisService } from './redis.service';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectRepository(UserEntity)
     private readonly userRepo: Repository<UserEntity>,
@@ -37,7 +40,7 @@ export class AuthService {
     private readonly redisService: RedisService,
   ) {}
 
-  async login(zaloAccessToken: string): Promise<AuthLoginResponseDto> {
+  async login(zaloAccessToken: string, phoneNumber?: string): Promise<AuthLoginResponseDto> {
     // 1. Xác thực token với Zalo API
     const zaloUser = await this.zaloService.getUserInfo(zaloAccessToken);
 
@@ -52,7 +55,7 @@ export class AuthService {
         displayName: zaloUser.name,
         avatarUrl: zaloUser.picture?.data?.url ?? null,
         role: 'guest',
-        phone: null,
+        phone: phoneNumber ?? null,
         email: null,
         traderProfile: null,
         farmerProfile: null,
@@ -62,6 +65,10 @@ export class AuthService {
       user.displayName = zaloUser.name;
       if (zaloUser.picture?.data?.url) {
         user.avatarUrl = zaloUser.picture.data.url;
+      }
+      // Cập nhật phone nếu chưa có hoặc người dùng cấp quyền mới
+      if (phoneNumber && (!user.phone || user.phone !== phoneNumber)) {
+        user.phone = phoneNumber;
       }
     }
 
@@ -240,8 +247,14 @@ export class AuthService {
       throw new NotFoundException('Người dùng không tồn tại');
     }
 
-    if (dto.displayName !== undefined) user.displayName = dto.displayName;
-    if (dto.phone !== undefined) user.phone = dto.phone;
+    // displayName và phone được quản lý bởi Zalo SDK — không cho phép sửa trực tiếp
+    if (dto.displayName !== undefined) {
+      this.logger.warn(`updateMe userId=${userId}: displayName bị bỏ qua (quản lý bởi Zalo)`);
+    }
+    if (dto.phone !== undefined) {
+      this.logger.warn(`updateMe userId=${userId}: phone bị bỏ qua (quản lý bởi Zalo)`);
+    }
+
     if (dto.email !== undefined) user.email = dto.email;
     if (dto.avatarUrl !== undefined) user.avatarUrl = dto.avatarUrl;
     if (dto.traderProfile !== undefined) user.traderProfile = dto.traderProfile;
@@ -261,7 +274,10 @@ export class AuthService {
       phone: user.phone ?? undefined,
       email: user.email ?? undefined,
       avatarUrl: user.avatarUrl ?? undefined,
-      traderProfile: user.traderProfile ?? undefined,
+      // trustScore is intentionally omitted here; fetch from GET /traders/:id/trust-score (live AVG)
+      traderProfile: user.traderProfile
+        ? { ...user.traderProfile, trustScore: null as unknown as number }
+        : undefined,
       farmerProfile: user.farmerProfile ?? undefined,
       buyerProfile: user.buyerProfile ?? undefined,
       createdAt: user.createdAt.toISOString(),

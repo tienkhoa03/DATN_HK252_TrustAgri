@@ -7,6 +7,7 @@ export * from './dto/contract.dto';
 export * from './dto/monitoring.dto';
 export * from './dto/notification.dto';
 export * from './dto/iot-device.dto';
+export * from './dto/trader-review.dto';
 
 // ─── FILTERS ──────────────────────────────────────────────────────────────────
 export * from './filters/http-exception.filter';

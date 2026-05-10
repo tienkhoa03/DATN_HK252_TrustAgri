@@ -19,14 +19,15 @@
 import React, { useState, useEffect } from 'react';
 import { Page, Box, Text, Spinner } from 'zmp-ui';
 import { useNavigate } from 'zmp-ui';
-import { useSetAtom } from 'jotai';
+import { useSetAtom, useAtomValue } from 'jotai';
 import { useProfile } from '@/hooks/useProfile';
 import type { UserProfileDto, UserProfileUpdateDto } from '@/hooks/useProfile';
 import { primaryColors, functionalColors } from '@/design-system/tokens/colors';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
-import { authSessionAtom } from '@/state/authAtoms';
+import { authSessionAtom, currentRoleAtom } from '@/state/authAtoms';
 import * as authService from '@/services/authService';
 import { ApiError } from '@/api/errors';
+import { TraderProfileLayout } from './TraderProfileLayout';
 
 // ── Role metadata ─────────────────────────────────────────────────────────────
 
@@ -47,6 +48,7 @@ export function ProfileScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const setSession = useSetAtom(authSessionAtom);
   const navigate = useNavigate();
+  const currentRole = useAtomValue(currentRoleAtom);
 
   // Edit form state
   const [form, setForm] = useState<Partial<UserProfileUpdateDto & {
@@ -58,12 +60,10 @@ export function ProfileScreen() {
     buyerOrg: string;
   }>>({});
 
-  // Sync form when profile loads
+  // Sync form when profile loads (displayName/phone quản lý bởi Zalo — không edit)
   useEffect(() => {
     if (profile) {
       setForm({
-        displayName: profile.displayName,
-        phone: profile.phone ?? '',
         email: profile.email ?? '',
         // role-specific
         farmerRegion:    profile.farmerProfile?.region            ?? '',
@@ -87,10 +87,9 @@ export function ProfileScreen() {
 
   const handleSave = async () => {
     if (!profile) return;
+    // displayName và phone do Zalo quản lý — không gửi lên updateMe
     const patch: UserProfileUpdateDto = {
-      displayName: form.displayName,
-      phone:       form.phone || undefined,
-      email:       form.email || undefined,
+      email: form.email || undefined,
     };
 
     if (profile.role === 'farmer' && profile.farmerProfile) {
@@ -121,8 +120,6 @@ export function ProfileScreen() {
   const handleCancel = () => {
     if (profile) {
       setForm({
-        displayName:    profile.displayName,
-        phone:          profile.phone ?? '',
         email:          profile.email ?? '',
         farmerRegion:   profile.farmerProfile?.region ?? '',
         farmerExp:      String(profile.farmerProfile?.experienceYears ?? ''),
@@ -219,6 +216,19 @@ export function ProfileScreen() {
 
   const meta = ROLE_META[profile.role as Role] ?? ROLE_META.guest;
 
+  // Trader role: dedicated layout
+  if (currentRole === 'trader') {
+    return (
+      <Page style={{ background: functionalColors.neutralGray, minHeight: '100vh' }}>
+        <TraderProfileLayout
+          profile={profile}
+          updateProfile={updateProfile}
+          isSaving={isSaving}
+        />
+      </Page>
+    );
+  }
+
   return (
     <Page style={{ background: functionalColors.neutralGray, minHeight: '100vh' }}>
 
@@ -255,17 +265,8 @@ export function ProfileScreen() {
         <SectionCard title="Thông tin cơ bản" color={meta.color}>
           {isEditing ? (
             <>
-              <FormField
-                label="Tên hiển thị"
-                value={form.displayName ?? ''}
-                onChange={(v) => setForm((p) => ({ ...p, displayName: v }))}
-              />
-              <FormField
-                label="Số điện thoại"
-                value={form.phone ?? ''}
-                onChange={(v) => setForm((p) => ({ ...p, phone: v }))}
-                type="tel"
-              />
+              <ReadOnlyRow label="Tên hiển thị" value={profile.displayName} note="(quản lý bởi Zalo)" />
+              <ReadOnlyRow label="Số điện thoại" value={profile.phone ?? '—'} note="(quản lý bởi Zalo)" />
               <FormField
                 label="Email"
                 value={form.email ?? ''}
@@ -276,9 +277,10 @@ export function ProfileScreen() {
           ) : (
             <>
               <InfoRow label="Tên hiển thị" value={profile.displayName} />
-              {profile.phone && <InfoRow label="Số điện thoại" value={profile.phone} />}
-              {profile.email && <InfoRow label="Email" value={profile.email} />}
+              <InfoRow label="Số điện thoại" value={profile.phone ?? '—'} />
+              <InfoRow label="Email" value={profile.email ?? '—'} />
               <InfoRow label="Zalo ID" value={profile.zaloId} mono />
+              <InfoRow label="User ID" value={profile.userId} mono />
               <InfoRow label="Ngày tham gia" value={formatDate(profile.createdAt)} />
               <InfoRow label="Đăng nhập gần nhất" value={formatDateTime(profile.lastLogin)} isLast />
             </>
@@ -374,8 +376,7 @@ export function ProfileScreen() {
 
         {/* ── System info (non-editable) ──────────────────────────────── */}
         <SectionCard title="Thông tin tài khoản" color="#6B7280">
-          <InfoRow label="User ID"   value={profile.userId} mono />
-          <InfoRow label="Vai trò"   value={meta.label} highlight={meta.color} isLast />
+          <InfoRow label="Vai trò" value={meta.label} highlight={meta.color} isLast />
         </SectionCard>
 
         {/* ── Actions ─────────────────────────────────────────────────── */}

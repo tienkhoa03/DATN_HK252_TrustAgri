@@ -1,9 +1,10 @@
 import {
-  BadRequestException,
   Injectable,
   Logger,
   OnModuleDestroy,
   OnModuleInit,
+  ServiceUnavailableException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -157,6 +158,29 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
   }
 
   async getFarmerDashboard(
+    user: JwtPayload,
+    authorization?: string,
+  ): Promise<DashboardFarmerDto> {
+    try {
+      return await this.getFarmerDashboardInternal(user, authorization);
+    } catch (err) {
+      if (
+        err instanceof UnauthorizedException ||
+        err instanceof ServiceUnavailableException
+      ) {
+        throw err;
+      }
+      this.logger.error(
+        `getFarmerDashboard thất bại userId=${user.sub}: ${(err as Error).message}`,
+        (err as Error).stack,
+      );
+      throw new ServiceUnavailableException(
+        'Không thể tải dashboard lúc này, vui lòng thử lại',
+      );
+    }
+  }
+
+  private async getFarmerDashboardInternal(
     user: JwtPayload,
     authorization?: string,
   ): Promise<DashboardFarmerDto> {
@@ -327,9 +351,9 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
 
   private forwardAuth(
     authorization?: string,
-  ): Record<string, string> | undefined {
+  ): Record<string, string> {
     if (!authorization) {
-      throw new BadRequestException(
+      throw new UnauthorizedException(
         'Thiếu header Authorization để gọi farm-service/monitoring-service.',
       );
     }
@@ -362,16 +386,21 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
   ): Promise<string[]> {
     const base = farmBase.replace(/\/$/, '');
     const url = `${base}/api/v1/farms?ownerId=${encodeURIComponent(ownerId)}&limit=100`;
-    const res = await fetch(url, {
-      headers,
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok) {
-      this.logger.warn(`farm-service GET /farms ${res.status}`);
+    try {
+      const res = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) {
+        this.logger.warn(`farm-service GET /farms ${res.status}`);
+        return [];
+      }
+      const body = (await res.json()) as ListResponse<FarmDto>;
+      return body.items.map((f) => f.id);
+    } catch (err) {
+      this.logger.warn(`farm-service không phản hồi: ${(err as Error).message}`);
       return [];
     }
-    const body = (await res.json()) as ListResponse<FarmDto>;
-    return body.items.map((f) => f.id);
   }
 
   private async countCareLogsTotal(
@@ -445,15 +474,20 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
   ): Promise<number> {
     const base = monitoringBase.replace(/\/$/, '');
     const url = `${base}/api/v1/monitoring/farms/${farmId}/alerts?status=unacknowledged&page=1&limit=1`;
-    const res = await fetch(url, {
-      headers,
-      signal: AbortSignal.timeout(15_000),
-    });
-    if (!res.ok) {
-      this.logger.warn(`monitoring alerts ${res.status} farm=${farmId}`);
+    try {
+      const res = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) {
+        this.logger.warn(`monitoring alerts ${res.status} farm=${farmId}`);
+        return 0;
+      }
+      const body = (await res.json()) as ListResponse<{ id: string }>;
+      return body.total;
+    } catch (err) {
+      this.logger.warn(`monitoring-service không phản hồi: ${(err as Error).message}`);
       return 0;
     }
-    const body = (await res.json()) as ListResponse<{ id: string }>;
-    return body.total;
   }
 }

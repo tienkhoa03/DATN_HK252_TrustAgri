@@ -1,1 +1,0 @@
-export { FarmerFarmProfileScreen } from './FarmerFarmProfileScreen';

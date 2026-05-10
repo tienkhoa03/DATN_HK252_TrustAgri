@@ -7,7 +7,18 @@
       "Bash(npm run *)",
       "PowerShell(cd \"C:\\\\Users\\\\VivoBookS\\\\_code_\\\\_CapstoneProject\\\\trustagri\\\\fe\"; $result = npx tsc --noEmit 2>&1; $result | Where-Object { $_ -match \"TraderDashboard|BuyerMarketplace|BuyerDashboard|ConnectionStatus|EmptyState|newsForecast|dashboardService|FarmerAlertList|BuyerOrders|TraderTrading|FarmerContracts|BuyerTransaction\" } | Select-Object -First 40)",
       "PowerShell(cd \"C:\\\\Users\\\\VivoBookS\\\\_code_\\\\_CapstoneProject\\\\trustagri\\\\fe\"; $result = npx tsc --noEmit 2>&1; $result | Where-Object { $_ -match \"ConnectionStatusBanner|EmptyState|TraderDashboardScreen\\\\.tsx|BuyerMarketplaceScreen\\\\.tsx|BuyerDashboardScreen\\\\.tsx\" })",
-      "PowerShell(New-Item *)"
+      "PowerShell(New-Item *)",
+      "Bash(npx jest *)",
+      "Bash(dir /s /b \"C:\\\\Users\\\\VivoBookS\\\\_code_\\\\_CapstoneProject\\\\trustagri\\\\fe\\\\src\\\\tests\\\\*.spec.*\")",
+      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\VivoBookS\\\\_code_\\\\_CapstoneProject\\\\trustagri\\\\fe\\\\src\\\\screens\\\\farmer\\\\process\" -ErrorAction SilentlyContinue)",
+      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\VivoBookS\\\\_code_\\\\_CapstoneProject\\\\trustagri\\\\fe\\\\src\\\\screens\\\\farmer\\\\market-connect\" -ErrorAction SilentlyContinue)",
+      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\VivoBookS\\\\_code_\\\\_CapstoneProject\\\\trustagri\\\\fe\\\\src\\\\screens\\\\farmer\\\\contracts\" -ErrorAction SilentlyContinue)",
+      "Bash(Remove-Item -Recurse -Force \"C:\\\\Users\\\\VivoBookS\\\\_code_\\\\_CapstoneProject\\\\trustagri\\\\fe\\\\src\\\\screens\\\\farmer\\\\farm-profile\" -ErrorAction SilentlyContinue)",
+      "Bash(Write-Host \"Done\")",
+      "Bash(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\VivoBookS\\\\_code_\\\\_CapstoneProject\\\\trustagri\\\\fe\\\\src\\\\screens\\\\buyer\\\\orders-proposals\\\\components\")",
+      "Bash(Out-Null)",
+      "Bash(node scripts/check-bundle-size.js)",
+      "Bash(grep -E \"\\\\.tsx?$\")"
     ]
   }
 }

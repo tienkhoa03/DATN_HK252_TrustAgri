@@ -43,7 +43,7 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: AuthLoginDto): Promise<AuthLoginResponseDto> {
-    return this.authService.login(dto.zaloAccessToken);
+    return this.authService.login(dto.zaloAccessToken, dto.phoneNumber);
   }
 
   /**

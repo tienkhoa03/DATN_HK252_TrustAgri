@@ -32,6 +32,7 @@ import {
   type ListResponse,
 } from '@/services/contractService';
 import { BuyerNotificationBell } from '@/screens/buyer/components/BuyerNotificationBell';
+import { TraderReviewModal } from '@/components/buyer/TraderReviewModal';
 
 /** Chuỗi ngày từ input type=date → ISO đầu/cuối ngày (VN) cho query backend */
 function toApiDateRange(
@@ -116,6 +117,8 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
   const [orderError, setOrderError] = useState<string | null>(null);
   const [contractError, setContractError] = useState<string | null>(null);
 
+  const [reviewModal, setReviewModal] = useState<{ traderId: string; orderId: string } | null>(null);
+
   const appliedFilters = useMemo(
     () => toApiDateRange(draftFrom, draftTo),
     [draftFrom, draftTo],
@@ -127,8 +130,12 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
     setContractError(null);
 
     const range = appliedFilters;
-    const [oRes, cRes] = await Promise.allSettled([
-      listOrders({
+    // eslint-disable-next-line @typescript-eslint/comma-dangle
+    const settle = <T,>(p: Promise<T>) =>
+      p.then((v) => ({ ok: true as const, value: v })).catch((e) => ({ ok: false as const, reason: e }));
+
+    const [oRes, cRes] = await Promise.all([
+      settle(listOrders({
         buyerId: 'me',
         status: orderStatus,
         from: range.from,
@@ -136,8 +143,8 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
         page: orderPage,
         limit: PAGE_SIZE,
         includeSummary: true,
-      }),
-      listContracts({
+      })),
+      settle(listContracts({
         role: 'buyer',
         buyerId: 'me',
         status: contractStatus,
@@ -146,12 +153,12 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
         page: contractPage,
         limit: PAGE_SIZE,
         includeSummary: true,
-      }),
+      })),
     ]);
 
     const snackTexts: string[] = [];
 
-    if (oRes.status === 'fulfilled') {
+    if (oRes.ok) {
       setOrderData(oRes.value);
     } else {
       setOrderData(null);
@@ -160,7 +167,7 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
       snackTexts.push(msg);
     }
 
-    if (cRes.status === 'fulfilled') {
+    if (cRes.ok) {
       setContractData(cRes.value);
     } else {
       setContractData(null);
@@ -256,7 +263,7 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
       </div>
 
       <div style={{ padding: spacing.md }}>
-        <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: spacing.sm, display: 'block' }}>
+        <Text size="small" style={{ color: colors.text.secondary, marginBottom: spacing.sm, display: 'block' }}>
           Lọc theo khoảng thời gian (ngày tạo đơn / hợp đồng), trạng thái và phân trang. Dữ liệu từ API (JWT qua
           interceptor).
         </Text>
@@ -318,28 +325,28 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
         {/* KPI — includeSummary từ API */}
         {!loading && (orderData?.summary || contractData?.summary) && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm, marginBottom: spacing.md }}>
-            <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0, fontWeight: fontWeight.semibold }}>
+            <Text size="small" style={{ color: colors.text.secondary, margin: 0, fontWeight: fontWeight.semibold }}>
               Tóm tắt (includeSummary=true)
             </Text>
             <div style={{ display: 'flex', gap: spacing.sm }}>
               {orderData?.summary && (
                 <div style={kpiBox}>
-                  <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Đơn hàng hoàn tất</Text>
+                  <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>Đơn hàng hoàn tất</Text>
                   <Text size="small" style={{ fontWeight: fontWeight.bold, margin: '4px 0 0' }}>
                     {orderData.summary.completedCount} đơn
                   </Text>
-                  <Text size="xSmall" style={{ color: colors.primary.agriGreen, margin: '4px 0 0' }}>
+                  <Text size="small" style={{ color: colors.primary.agriGreen, margin: '4px 0 0' }}>
                     {formatVnd(orderData.summary.totalSpent)}
                   </Text>
                 </div>
               )}
               {contractData?.summary && (
                 <div style={kpiBox}>
-                  <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Hợp đồng hoàn tất</Text>
+                  <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>Hợp đồng hoàn tất</Text>
                   <Text size="small" style={{ fontWeight: fontWeight.bold, margin: '4px 0 0' }}>
                     {contractData.summary.completedCount} hợp đồng
                   </Text>
-                  <Text size="xSmall" style={{ color: colors.primary.zaloBlue, margin: '4px 0 0' }}>
+                  <Text size="small" style={{ color: colors.primary.zaloBlue, margin: '4px 0 0' }}>
                     {formatVnd(contractData.summary.totalSpent)}
                   </Text>
                 </div>
@@ -387,7 +394,7 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
 
         {tab === 'orders' && (
           <div style={{ marginBottom: spacing.md }}>
-            <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 6, display: 'block' }}>
+            <Text size="small" style={{ color: colors.text.secondary, marginBottom: 6, display: 'block' }}>
               Trạng thái đơn
             </Text>
             <select
@@ -415,7 +422,7 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
 
         {tab === 'contracts' && (
           <div style={{ marginBottom: spacing.md }}>
-            <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 6, display: 'block' }}>
+            <Text size="small" style={{ color: colors.text.secondary, marginBottom: 6, display: 'block' }}>
               Trạng thái hợp đồng
             </Text>
             <select
@@ -469,13 +476,13 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
                       <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
                         {traderDisplayName(order.traderId)}
                       </Text>
-                      <Text size="xSmall" style={{ color: colors.text.secondary, margin: '4px 0 0' }}>
+                      <Text size="small" style={{ color: colors.text.secondary, margin: '4px 0 0' }}>
                         {new Date(order.createdAt).toLocaleString('vi-VN')}
                       </Text>
                     </div>
                     <span
                       style={{
-                        fontSize: fontSize.xSmall,
+                        fontSize: fontSize.small,
                         fontWeight: fontWeight.semibold,
                         color: colors.primary.zaloBlue,
                         backgroundColor: `${colors.primary.zaloBlue}18`,
@@ -497,6 +504,27 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
                       {formatVnd(order.totalPrice)}
                     </Text>
                   </div>
+                  {order.status === 'completed' && (
+                    <div style={{ marginTop: spacing.sm }}>
+                      <button
+                        type="button"
+                        onClick={() => setReviewModal({ traderId: order.traderId, orderId: order.id })}
+                        style={{
+                          background: 'transparent',
+                          border: `1px solid ${colors.primary.zaloBlue}`,
+                          color: colors.primary.zaloBlue,
+                          borderRadius: 8,
+                          minHeight: 36,
+                          padding: `0 ${spacing.md}`,
+                          fontSize: 13,
+                          fontWeight: fontWeight.semibold,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Đánh giá thương lái
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -549,19 +577,19 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
                 <div key={c.id} style={cardStyle}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                      <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
                         {contractTypeLabelVi(c.contractType)}
                       </Text>
                       <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: '4px 0 0' }}>
                         {c.productId ? `Sản phẩm #${c.productId.slice(-6)}` : 'Hợp đồng'}
                       </Text>
-                      <Text size="xSmall" style={{ color: colors.text.secondary, margin: '4px 0 0' }}>
+                      <Text size="small" style={{ color: colors.text.secondary, margin: '4px 0 0' }}>
                         {new Date(c.createdAt).toLocaleString('vi-VN')}
                       </Text>
                     </div>
                     <span
                       style={{
-                        fontSize: fontSize.xSmall,
+                        fontSize: fontSize.small,
                         fontWeight: fontWeight.semibold,
                         color: colors.primary.agriGreen,
                         backgroundColor: `${colors.primary.agriGreen}20`,
@@ -580,7 +608,7 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
                       {formatVnd(c.totalPrice)}
                     </Text>
                   </div>
-                  <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.xs }}>
+                  <Text size="small" style={{ color: colors.text.secondary, marginTop: spacing.xs }}>
                     {c.startDate} → {c.endDate}
                   </Text>
                 </div>
@@ -622,6 +650,18 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
           </>
         )}
       </div>
+
+      {reviewModal && (
+        <TraderReviewModal
+          traderId={reviewModal.traderId}
+          orderId={reviewModal.orderId}
+          open={true}
+          onClose={() => setReviewModal(null)}
+          onSuccess={() => {
+            openSnackbar({ text: 'Đã gửi đánh giá thành công!', type: 'success' });
+          }}
+        />
+      )}
     </Page>
   );
 };

@@ -122,4 +122,32 @@ export class ConnectionsController {
   ): Promise<ConnectionDto> {
     return this.connectionsService.rejectConnection(id, user.sub);
   }
+
+  /**
+   * POST /api/v1/connections/:id/negotiate
+   * Bắt đầu đàm phán hợp tác (accepted → negotiating). Cả hai bên đều được phép.
+   */
+  @Post(':id/negotiate')
+  @HttpCode(HttpStatus.OK)
+  @Roles('farmer', 'trader')
+  negotiate(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<ConnectionDto> {
+    return this.connectionsService.negotiateConnection(id, user.sub);
+  }
+
+  /**
+   * POST /api/v1/connections/:id/sign
+   * Xác nhận đã ký hợp đồng (negotiating → signed). Cả hai bên đều được phép.
+   */
+  @Post(':id/sign')
+  @HttpCode(HttpStatus.OK)
+  @Roles('farmer', 'trader')
+  sign(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<ConnectionDto> {
+    return this.connectionsService.signConnection(id, user.sub);
+  }
 }

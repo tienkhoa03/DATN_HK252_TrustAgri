@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
 import {
   LatestSensorResponse,
   SensorHistoryQueryDto,
@@ -27,7 +27,7 @@ export class SensorsController {
    */
   @Get('latest')
   getLatest(
-    @Param('farmId') farmId: string,
+    @Param('farmId', ParseUUIDPipe) farmId: string,
   ): Promise<LatestSensorResponse> {
     return this.sensorsService.getLatest(farmId);
   }
@@ -39,7 +39,7 @@ export class SensorsController {
    */
   @Get('history')
   getHistory(
-    @Param('farmId') farmId: string,
+    @Param('farmId', ParseUUIDPipe) farmId: string,
     @Query() query: SensorHistoryQueryDto,
   ): Promise<SensorReadingDto[]> {
     return this.sensorsService.getHistory(farmId, query);

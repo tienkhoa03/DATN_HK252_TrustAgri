@@ -31,6 +31,21 @@ export class RequirePasswordLoginError extends Error {
  *  - `RequirePasswordLoginError` khi mode='password' → caller redirect /login.
  *  - `Error` khác (mạng/zalo SDK) → caller hiển thị snackbar + giữ trạng thái chưa login.
  */
+/** Lấy số điện thoại từ ZMP SDK (best-effort, fail-soft). */
+async function tryGetPhoneNumber(): Promise<string | undefined> {
+  try {
+    const { getPhoneNumber } = await import('zmp-sdk/apis');
+    // getPhoneNumber yêu cầu user cấp quyền; trả token hoặc plain number tuỳ phiên bản ZMP
+    const result = await getPhoneNumber({ success: () => {}, fail: () => {} });
+    // Một số phiên bản ZMP trả plain number trực tiếp (dev/staging)
+    const phone = (result as { phoneNumber?: string }).phoneNumber;
+    if (phone && /^\+?[0-9]{9,15}$/.test(phone)) return phone;
+  } catch {
+    // Không hỗ trợ hoặc user từ chối — bỏ qua
+  }
+  return undefined;
+}
+
 export async function bootstrapAuthSession(): Promise<AuthSession> {
   switch (ENV.AUTH_MODE) {
     case 'zalo-oauth': {
@@ -38,7 +53,9 @@ export async function bootstrapAuthSession(): Promise<AuthSession> {
       if (!zaloToken) {
         throw new Error('Không lấy được Zalo access token. Đảm bảo ứng dụng chạy trong Zalo Mini App.');
       }
-      return authService.login(zaloToken);
+      // Lấy phone best-effort (fail-soft — không block login nếu SDK không hỗ trợ)
+      const phoneNumber = await tryGetPhoneNumber();
+      return authService.login(zaloToken, phoneNumber);
     }
 
     case 'zalo-token': {

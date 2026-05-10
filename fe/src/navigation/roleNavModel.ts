@@ -9,26 +9,25 @@ export type RoleNavItem = {
 };
 
 const FARMER_TABS: RoleNavItem[] = [
-  { id: 'home', label: 'Tổng quan', path: '/farmer', icon: 'home' },
-  { id: 'farm', label: 'Vườn', path: '/farmer/farm', icon: 'farm' },
-  { id: 'process', label: 'Quy trình', path: '/farmer/process', icon: 'plant' },
-  { id: 'market', label: 'Kết nối', path: '/farmer/connect', icon: 'users' },
-  { id: 'me', label: 'Của tôi', path: '/farmer/me', icon: 'user' },
+  { id: 'home',    label: 'Tổng quan',   path: '/farmer',        icon: 'home' },
+  { id: 'garden',  label: 'Vườn trồng',  path: '/farmer/garden', icon: 'farm' },
+  { id: 'trade',   label: 'Giao thương', path: '/farmer/trade',  icon: 'shopping-cart' },
+  { id: 'profile', label: 'Hồ sơ',       path: '/farmer/me',     icon: 'user' },
 ];
 
 const BUYER_TABS: RoleNavItem[] = [
-  { id: 'shop', label: 'Chợ', path: '/buyer', icon: 'shopping-cart' },
-  { id: 'orders', label: 'Đơn hàng', path: '/buyer/orders', icon: 'package' },
-  { id: 'request', label: 'Nhu cầu', path: '/buyer/request', icon: 'plus-circle' },
-  { id: 'me', label: 'Tôi', path: '/buyer/me', icon: 'user' },
+  { id: 'discover',  label: 'Khám phá',   path: '/buyer',          icon: 'shopping-cart' },
+  { id: 'sourcing',  label: 'Nguồn hàng', path: '/buyer/sourcing', icon: 'plus-circle' },
+  { id: 'orders',    label: 'Đơn hàng',   path: '/buyer/orders',   icon: 'package' },
+  { id: 'live',      label: 'Trực tiếp',  path: '/buyer/live',     icon: 'eye' },
 ];
 
 const TRADER_TABS: RoleNavItem[] = [
-  { id: 'home', label: 'Tổng quan', path: '/trader', icon: 'home' },
-  { id: 'supply', label: 'Nguồn cung', path: '/trader/supply', icon: 'package' },
-  { id: 'trading', label: 'Sàn & kết nối', path: '/trader/trading', icon: 'trending-up' },
-  { id: 'library', label: 'Thư viện', path: '/trader/library', icon: 'book' },
-  { id: 'me', label: 'Tôi', path: '/trader/me', icon: 'user' },
+  { id: 'home',         label: 'Tổng quan',  path: '/trader',              icon: 'home' },
+  { id: 'market',       label: 'Thị trường', path: '/trader/market',       icon: 'shopping-cart' },
+  { id: 'transactions', label: 'Giao dịch',  path: '/trader/transactions', icon: 'package' },
+  { id: 'monitor',      label: 'Vùng trồng', path: '/trader/monitor',      icon: 'farm' },
+  { id: 'me',           label: 'Hồ sơ',      path: '/trader/me',           icon: 'user' },
 ];
 
 const GUEST_TABS: RoleNavItem[] = [
@@ -51,46 +50,61 @@ export function resolveActiveNavId(pathname: string, role: UserRole): string {
   if (!tabs.length) return '';
 
   if (role === 'farmer') {
-    if (pathname === '/farmer/me' || pathname.startsWith('/farmer/me/')) return 'me';
-    if (pathname.startsWith('/farmer/farm')) return 'farm';
-    if (pathname.startsWith('/farmer/process')) return 'process';
+    if (pathname === '/farmer/me' || pathname.startsWith('/farmer/me/')) return 'profile';
+    // Legacy: /farmer/farm* → profile tab
+    if (pathname.startsWith('/farmer/farm')) return 'profile';
+    if (pathname === '/farmer/garden' || pathname.startsWith('/farmer/garden/')) return 'garden';
+    // Legacy: /farmer/process* → garden tab
+    if (pathname.startsWith('/farmer/process')) return 'garden';
+    if (pathname === '/farmer/trade' || pathname.startsWith('/farmer/trade/')) return 'trade';
+    // Legacy: /farmer/connect* | /farmer/contracts* → trade tab
     if (
       pathname.startsWith('/farmer/connect') ||
       pathname.startsWith('/farmer/connections') ||
       pathname.startsWith('/farmer/contracts')
     ) {
-      return 'market';
+      return 'trade';
     }
     if (pathname === '/farmer' || pathname.startsWith('/farmer/alerts')) return 'home';
     return 'home';
   }
 
   if (role === 'buyer') {
-    if (pathname === '/buyer/me' || pathname.startsWith('/buyer/me/')) return 'me';
-    if (pathname.startsWith('/buyer/request')) return 'request';
+    if (pathname.startsWith('/buyer/sourcing') || pathname.startsWith('/buyer/request')) return 'sourcing';
     if (
       pathname.startsWith('/buyer/orders') ||
-      pathname.startsWith('/buyer/monitor') ||
       pathname.startsWith('/buyer/history')
     ) {
       return 'orders';
     }
-    if (pathname === '/buyer' || pathname.startsWith('/buyer/products')) return 'shop';
-    return 'shop';
+    if (pathname.startsWith('/buyer/live') || pathname.startsWith('/buyer/monitor')) return 'live';
+    if (pathname === '/buyer' || pathname.startsWith('/buyer/products')) return 'discover';
+    // /buyer/me → no tab highlight (accessed via header avatar)
+    return 'discover';
   }
 
   if (role === 'trader') {
     if (pathname === '/trader/me' || pathname.startsWith('/trader/me/')) return 'me';
-    if (pathname.startsWith('/trader/supply')) return 'supply';
-    if (pathname.startsWith('/trader/trading') || pathname.startsWith('/trader/connections')) {
-      return 'trading';
+    if (
+      pathname.startsWith('/trader/market') ||
+      pathname.startsWith('/trader/news') ||
+      pathname.startsWith('/trader/library')
+    ) {
+      return 'market';
     }
     if (
-      pathname.startsWith('/trader/library') ||
-      pathname.startsWith('/trader/standards') ||
-      pathname.startsWith('/trader/news')
+      pathname.startsWith('/trader/transactions') ||
+      pathname.startsWith('/trader/connections') ||
+      pathname.startsWith('/trader/trading')
     ) {
-      return 'library';
+      return 'transactions';
+    }
+    if (
+      pathname.startsWith('/trader/monitor') ||
+      pathname.startsWith('/trader/supply') ||
+      pathname.startsWith('/trader/standards')
+    ) {
+      return 'monitor';
     }
     if (pathname === '/trader' || pathname.startsWith('/trader/')) return 'home';
     return 'home';

@@ -5,6 +5,8 @@ import {
   ForbiddenException,
   ConflictException,
   BadRequestException,
+  OnModuleInit,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, FindOptionsWhere, Repository } from 'typeorm';
@@ -41,10 +43,12 @@ interface RawUserRow {
   buyer_profile: { organizationName?: string } | null;
   created_at: string;
   last_login: string | null;
+  // Computed live from trader_reviews aggregate (null when no reviews)
+  avg_rating: string | null;
 }
 
 @Injectable()
-export class ConnectionsService {
+export class ConnectionsService implements OnModuleInit {
   private readonly logger = new Logger(ConnectionsService.name);
 
   constructor(
@@ -54,6 +58,38 @@ export class ConnectionsService {
     private readonly publisher: ConnectionPublisherService,
   ) {}
 
+  async onModuleInit(): Promise<void> {
+    await this.ensureTraderReviewsTable();
+  }
+
+  // Đảm bảo bảng trader_reviews tồn tại trước khi searchTraders chạy raw SQL
+  private async ensureTraderReviewsTable(): Promise<void> {
+    try {
+      const [row] = await this.dataSource.query<[{ exists: boolean }]>(
+        `SELECT to_regclass('public.trader_reviews') IS NOT NULL AS exists`,
+      );
+      if (!row?.exists) {
+        this.logger.warn('trader_reviews table không tồn tại — tạo bảng tạm thời cho dev/staging');
+        await this.dataSource.query(`
+          CREATE TABLE IF NOT EXISTS trader_reviews (
+            id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            trader_id   TEXT NOT NULL,
+            buyer_id    TEXT NOT NULL,
+            order_id    UUID,
+            rating      INT NOT NULL CHECK (rating BETWEEN 1 AND 5),
+            comment     TEXT,
+            created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+            deleted_at  TIMESTAMPTZ
+          )
+        `);
+        this.logger.log('trader_reviews table đã được tạo');
+      }
+    } catch (err) {
+      this.logger.error(`ensureTraderReviewsTable thất bại: ${(err as Error).message}`);
+    }
+  }
+
   // ─── Search ──────────────────────────────────────────────────────────────────
 
   /**
@@ -61,6 +97,20 @@ export class ConnectionsService {
    * Tìm thương lái theo region, cropType (best-effort), trustScore tối thiểu.
    */
   async searchTraders(
+    query: SearchTraderQueryDto,
+  ): Promise<ListResponse<UserProfileDto>> {
+    try {
+      return await this.searchTradersInternal(query);
+    } catch (err) {
+      this.logger.error(
+        `searchTraders thất bại: ${(err as Error).message}`,
+        (err as Error).stack,
+      );
+      throw new ServiceUnavailableException('Không thể tìm kiếm thương lái lúc này, vui lòng thử lại');
+    }
+  }
+
+  private async searchTradersInternal(
     query: SearchTraderQueryDto,
   ): Promise<ListResponse<UserProfileDto>> {
     const page = query.page ?? 1;
@@ -77,9 +127,8 @@ export class ConnectionsService {
     }
 
     if (query.trustScore !== undefined) {
-      conditions.push(
-        `(u.trader_profile->>'trustScore')::numeric >= $${idx++}`,
-      );
+      // Filter by live-computed average rating (JOIN aggregate), not stale JSONB trustScore
+      conditions.push(`COALESCE(tr.avg_rating, 0) >= $${idx++}`);
       params.push(query.trustScore);
     }
 
@@ -95,21 +144,33 @@ export class ConnectionsService {
     }
 
     const whereClause = conditions.join(' AND ');
+    // Subquery aggregates trust score live; left join so traders with 0 reviews still appear
+    // Cast u.user_id (uuid type) to text to match trader_id (varchar) — PostgreSQL won't coerce implicitly
+    const trustJoin = `LEFT JOIN (
+      SELECT trader_id,
+             AVG(rating)::numeric AS avg_rating,
+             COUNT(*)             AS review_count
+      FROM trader_reviews
+      WHERE deleted_at IS NULL
+      GROUP BY trader_id
+    ) tr ON tr.trader_id = u.user_id::text`;
 
     const countParams = [...params];
     const [rows, countRows] = await Promise.all([
       this.dataSource.query<RawUserRow[]>(
         `SELECT u.user_id, u.zalo_id, u.role, u.display_name, u.phone, u.email,
                 u.avatar_url, u.trader_profile, u.farmer_profile, u.buyer_profile,
-                u.created_at, u.last_login
+                u.created_at, u.last_login,
+                tr.avg_rating
          FROM users u
+         ${trustJoin}
          WHERE ${whereClause}
-         ORDER BY (u.trader_profile->>'trustScore')::numeric DESC NULLS LAST
+         ORDER BY tr.avg_rating DESC NULLS LAST
          LIMIT $${idx} OFFSET $${idx + 1}`,
         [...params, limit, offset],
       ),
       this.dataSource.query<[{ count: string }]>(
-        `SELECT COUNT(*) as count FROM users u WHERE ${whereClause}`,
+        `SELECT COUNT(*) as count FROM users u ${trustJoin} WHERE ${whereClause}`,
         countParams,
       ),
     ]);
@@ -284,7 +345,7 @@ export class ConnectionsService {
         { from: userId, to: dto.toUserId },
       )
       .andWhere('c.status IN (:...statuses)', {
-        statuses: ['pending', 'accepted'],
+        statuses: ['pending', 'accepted', 'negotiating', 'signed'],
       })
       .getOne();
 
@@ -357,6 +418,59 @@ export class ConnectionsService {
     return dto;
   }
 
+  /**
+   * POST /api/v1/connections/:id/negotiate
+   * Bắt đầu đàm phán — chỉ thương lái gửi yêu cầu (fromUserId) hoặc nhận yêu cầu mới được accepted.
+   * Yêu cầu kết nối phải ở trạng thái accepted.
+   */
+  async negotiateConnection(
+    connectionId: string,
+    userId: string,
+  ): Promise<ConnectionDto> {
+    const connection = await this.requireConnection(connectionId);
+    this.ensureParticipant(connection, userId);
+
+    if (connection.status !== 'accepted') {
+      throw new ConflictException(
+        `Chỉ có thể bắt đầu đàm phán khi kết nối ở trạng thái "accepted", hiện tại: "${connection.status}"`,
+      );
+    }
+
+    connection.status = 'negotiating';
+    const saved = await this.connectionRepo.save(connection);
+    const dto = this.toDto(saved);
+
+    await this.publisher.publishConnectionUpdated(dto);
+    this.logger.log(`Connection negotiating: id=${saved.id} by userId=${userId}`);
+    return dto;
+  }
+
+  /**
+   * POST /api/v1/connections/:id/sign
+   * Xác nhận đã ký hợp đồng — chỉ trader có thể chuyển từ negotiating → signed.
+   */
+  async signConnection(
+    connectionId: string,
+    userId: string,
+  ): Promise<ConnectionDto> {
+    const connection = await this.requireConnection(connectionId);
+    this.ensureParticipant(connection, userId);
+
+    if (connection.status !== 'negotiating') {
+      throw new ConflictException(
+        `Chỉ có thể ký khi kết nối ở trạng thái "negotiating", hiện tại: "${connection.status}"`,
+      );
+    }
+
+    connection.status = 'signed';
+    const saved = await this.connectionRepo.save(connection);
+    const dto = this.toDto(saved);
+
+    await this.publisher.publishConnectionUpdated(dto);
+    this.logger.log(`Connection signed: id=${saved.id} by userId=${userId}`);
+    return dto;
+  }
+
   // ─── Private helpers ──────────────────────────────────────────────────────────
 
   private async requireConnection(id: string): Promise<ConnectionEntity> {
@@ -371,6 +485,14 @@ export class ConnectionsService {
     if (connection.toUserId !== userId) {
       throw new ForbiddenException(
         'Chỉ người nhận mới có thể chấp nhận hoặc từ chối yêu cầu kết nối',
+      );
+    }
+  }
+
+  private ensureParticipant(connection: ConnectionEntity, userId: string): void {
+    if (connection.fromUserId !== userId && connection.toUserId !== userId) {
+      throw new ForbiddenException(
+        'Chỉ người tham gia kết nối mới có thể thực hiện thao tác này',
       );
     }
   }
@@ -399,6 +521,16 @@ export class ConnectionsService {
   }
 
   private rowToUserProfileDto(row: RawUserRow): UserProfileDto {
+    const traderProfile = row.trader_profile
+      ? {
+          ...row.trader_profile,
+          // Source: live AVG from trader_reviews; null when no reviews yet
+          trustScore: row.avg_rating !== null && row.avg_rating !== undefined
+            ? parseFloat(Number(row.avg_rating).toFixed(1))
+            : 0,
+        }
+      : undefined;
+
     return {
       userId: row.user_id,
       zaloId: row.zalo_id,
@@ -407,7 +539,7 @@ export class ConnectionsService {
       phone: row.phone ?? undefined,
       email: row.email ?? undefined,
       avatarUrl: row.avatar_url ?? undefined,
-      traderProfile: row.trader_profile ?? undefined,
+      traderProfile,
       farmerProfile: row.farmer_profile ?? undefined,
       buyerProfile: row.buyer_profile ?? undefined,
       createdAt: row.created_at,

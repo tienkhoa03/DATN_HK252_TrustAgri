@@ -308,7 +308,7 @@ export interface ConnectionDto {
   toRole: 'farmer' | 'trader';
   farmId?: string;
   message?: string;
-  status: 'pending' | 'accepted' | 'rejected';
+  status: 'pending' | 'accepted' | 'rejected' | 'negotiating' | 'signed';
   createdAt: string;
   respondedAt?: string;
 }

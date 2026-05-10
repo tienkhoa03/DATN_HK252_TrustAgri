@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, type ComponentType, type PropsWithChildren } from "react";
 import { getSystemInfo } from "zmp-sdk";
 import { App, SnackbarProvider } from "zmp-ui";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TrustWebRouter } from "@/components/TrustWebRouter";
 import { AppProps } from "zmp-ui/app";
 import { AppRoutes } from "@/router/routes";
 import { bootstrapAuthSessionStorage } from "@/state/authSessionStorage";
+
+const queryClient = new QueryClient();
 
 /** Theme from Zalo host; safe fallback when opening the SPA outside ZMP (Docker/nginx, plain browser). */
 function resolveAppTheme(): AppProps["theme"] {
@@ -29,13 +32,15 @@ const Layout = () => {
   const SnackbarProviderComponent = SnackbarProvider as unknown as ComponentType<PropsWithChildren>;
 
   return (
-    <App theme={theme}>
-      <SnackbarProviderComponent>
-        <TrustWebRouter>
-          <AppRoutes />
-        </TrustWebRouter>
-      </SnackbarProviderComponent>
-    </App>
+    <QueryClientProvider client={queryClient}>
+      <App theme={theme}>
+        <SnackbarProviderComponent>
+          <TrustWebRouter>
+            <AppRoutes />
+          </TrustWebRouter>
+        </SnackbarProviderComponent>
+      </App>
+    </QueryClientProvider>
   );
 };
 export default Layout;

@@ -55,14 +55,18 @@ function counterpartLabel(conn: ConnectionDto, myRole: 'farmer' | 'trader', dire
 
 const STATUS_LABEL: Record<ConnectionDto['status'], string> = {
   pending: 'Chờ phản hồi',
-  accepted: 'Đã chấp nhận',
+  accepted: 'Đã kết nối',
   rejected: 'Đã từ chối',
+  negotiating: 'Đang đàm phán',
+  signed: 'Đã ký kết',
 };
 
 const STATUS_COLOR: Record<ConnectionDto['status'], string> = {
   pending: colors.functional.warningYellow,
   accepted: colors.primary.agriGreen,
   rejected: colors.functional.alertRed,
+  negotiating: colors.primary.zaloBlue,
+  signed: '#9B59B6',
 };
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -319,24 +323,26 @@ export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> =
                         )}
                         {isActionable && (
                           <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.md }}>
-                            <Button
-                              variant="primary"
-                              size="small"
-                              onClick={() => handleAccept(conn)}
-                              disabled={isPending}
-                              style={{ flex: 1 }}
-                            >
-                              ✓ Chấp nhận
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="small"
-                              onClick={() => handleReject(conn)}
-                              disabled={isPending}
-                              style={{ flex: 1 }}
-                            >
-                              ✕ Từ chối
-                            </Button>
+                            <div style={{ flex: 1 }}>
+                              <Button
+                                variant="primary"
+                                size="small"
+                                onClick={() => handleAccept(conn)}
+                                disabled={isPending}
+                              >
+                                ✓ Chấp nhận
+                              </Button>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <Button
+                                variant="outline"
+                                size="small"
+                                onClick={() => handleReject(conn)}
+                                disabled={isPending}
+                              >
+                                ✕ Từ chối
+                              </Button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -358,9 +364,11 @@ export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> =
             ) : (
               outgoing.map((conn) => {
                 const name = counterpartLabel(conn, role, 'outgoing');
+                const isClickable = role === 'trader' && (conn.status === 'accepted' || conn.status === 'negotiating' || conn.status === 'signed');
                 return (
                   <div
                     key={conn.id}
+                    onClick={isClickable ? () => navigate(`/trader/connections/${conn.id}`, { state: { connection: conn } }) : undefined}
                     style={{
                       padding: spacing.md,
                       backgroundColor: colors.background.primary,
@@ -368,6 +376,7 @@ export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> =
                       boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
                       marginBottom: spacing.md,
                       borderLeft: `3px solid ${STATUS_COLOR[conn.status]}`,
+                      cursor: isClickable ? 'pointer' : 'default',
                     }}
                   >
                     <div style={{ display: 'flex', gap: spacing.md }}>
@@ -396,9 +405,28 @@ export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> =
                           </Text>
                         )}
                         {conn.status === 'accepted' && (
-                          <Text size="xSmall" style={{ color: colors.primary.agriGreen, marginTop: spacing.xs }}>
-                            ✓ Kết nối thành công — bạn có thể đàm phán hợp tác
-                          </Text>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs }}>
+                            <Text size="xSmall" style={{ color: colors.primary.agriGreen }}>
+                              ✓ Kết nối thành công — nhấn để đàm phán
+                            </Text>
+                            {role === 'trader' && <Icon name="chevron-right" size="sm" color={colors.text.secondary} />}
+                          </div>
+                        )}
+                        {conn.status === 'negotiating' && (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs }}>
+                            <Text size="xSmall" style={{ color: colors.primary.zaloBlue }}>
+                              📋 Đang đàm phán — nhấn để xem chi tiết
+                            </Text>
+                            {role === 'trader' && <Icon name="chevron-right" size="sm" color={colors.text.secondary} />}
+                          </div>
+                        )}
+                        {conn.status === 'signed' && (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs }}>
+                            <Text size="xSmall" style={{ color: '#9B59B6' }}>
+                              ✍️ Đã ký kết hợp đồng
+                            </Text>
+                            {role === 'trader' && <Icon name="chevron-right" size="sm" color={colors.text.secondary} />}
+                          </div>
                         )}
                         {conn.status === 'rejected' && (
                           <Text size="xSmall" style={{ color: colors.functional.alertRed, marginTop: spacing.xs }}>

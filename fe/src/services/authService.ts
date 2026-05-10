@@ -100,14 +100,17 @@ export async function devLogin(secret: string, zaloId: string): Promise<AuthSess
   };
 }
 
-export async function login(zaloAccessToken: string): Promise<AuthSession> {
+export async function login(zaloAccessToken: string, phoneNumber?: string): Promise<AuthSession> {
+  const body: Record<string, string> = { zaloAccessToken };
+  if (phoneNumber) body.phoneNumber = phoneNumber;
+
   const { data } = await apiClient.post<{
     accessToken: string;
     refreshToken: string;
     userId: string;
     role: 'farmer' | 'trader' | 'buyer' | 'guest';
     expiresAt: string;
-  }>('/auth/login', { zaloAccessToken });
+  }>('/auth/login', body);
 
   return {
     accessToken: data.accessToken,
