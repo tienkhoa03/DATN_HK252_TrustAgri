@@ -1,21 +1,13 @@
 /**
- * FarmerFlowPanel — "Với Nông dân" flow
- * Tabs: Mới (pending connections) | Đàm phán (accepted connections + pending_change contracts) | Đã ký (active)
- * Requirements: FR-T08, FR-F03, US-T03
+ * FarmerFlowPanel — "Với Nông dân" flow (contract-centric)
+ * Tabs: Chờ ký (pending_signature) | Đã ký (active / pending_change) | Lịch sử (completed / cancelled)
+ * Requirements: FR-T08, US-T03
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { Text } from 'zmp-ui';
 import { StatusTabbedList } from '../components/StatusTabbedList';
-import { RequestCard } from '../components/RequestCard';
 import { ContractDetailModal } from '../components/ContractDetailModal';
 import { EmptyState } from '@/design-system/components/EmptyState/EmptyState';
-import {
-  listConnections,
-  acceptConnection,
-  rejectConnection,
-  toConnectionViMessage,
-  type ConnectionDto,
-} from '@/services/connectionService';
 import {
   listContracts,
   contractStatusLabelVi,
@@ -30,24 +22,16 @@ import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 
 const TABS = [
-  { id: 'new', label: 'Mới' },
-  { id: 'negotiating', label: 'Đàm phán' },
+  { id: 'waiting', label: 'Chờ ký' },
   { id: 'signed', label: 'Đã ký' },
+  { id: 'history', label: 'Lịch sử' },
 ];
 
 function initialTab(initialStatus?: string): string {
-  if (initialStatus === 'pending') return 'new';
-  if (initialStatus === 'negotiating') return 'negotiating';
+  if (initialStatus === 'waiting') return 'waiting';
   if (initialStatus === 'signed') return 'signed';
-  return 'new';
-}
-
-function relativeDate(iso: string): string {
-  if (!iso) return '';
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
-  if (diff === 0) return 'Hôm nay';
-  if (diff === 1) return '1 ngày trước';
-  return `${diff} ngày trước`;
+  if (initialStatus === 'history') return 'history';
+  return 'waiting';
 }
 
 interface Props {
@@ -58,141 +42,54 @@ export const FarmerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
   const openSnackbar = useStableOpenSnackbar();
   const [activeTab, setActiveTab] = useState(() => initialTab(initialStatus));
 
-  // --- "Mới" tab state ---
-  const [connections, setConnections] = useState<ConnectionDto[]>([]);
-  const [connLoading, setConnLoading] = useState(false);
-  const [connLoaded, setConnLoaded] = useState(false);
-  const [connPending, setConnPending] = useState<Record<string, boolean>>({});
-
-  // --- "Đàm phán" + "Đã ký" tab state ---
-  const [acceptedConnections, setAcceptedConnections] = useState<ConnectionDto[]>([]);
-  const [negotiatingContracts, setNegotiatingContracts] = useState<ContractDto[]>([]);
+  const [waitingContracts, setWaitingContracts] = useState<ContractDto[]>([]);
   const [signedContracts, setSignedContracts] = useState<ContractDto[]>([]);
-  const [contractsLoading, setContractsLoading] = useState(false);
-  const [contractsLoaded, setContractsLoaded] = useState(false);
+  const [historyContracts, setHistoryContracts] = useState<ContractDto[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [selectedContract, setSelectedContract] = useState<ContractDto | null>(null);
 
-  const loadConnections = useCallback(async () => {
-    if (connLoaded) return;
-    setConnLoading(true);
-    try {
-      const res = await listConnections({ role: 'incoming', status: 'pending' });
-      setConnections(res.items);
-      setConnLoaded(true);
-    } catch (err) {
-      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'list'), duration: 3500, icon: true });
-    } finally {
-      setConnLoading(false);
-    }
-  }, [connLoaded, openSnackbar]);
-
   const loadContracts = useCallback(async () => {
-    if (contractsLoaded) return;
-    setContractsLoading(true);
+    if (loaded) return;
+    setLoading(true);
     try {
-      const [negRes, signedRes, acceptedRes] = await Promise.all([
-        listContracts({ role: 'trader', status: 'pending_change', limit: 50 }),
+      const [waitRes, activeRes, pendChangeRes, completedRes, cancelledRes] = await Promise.all([
+        listContracts({ role: 'trader', status: 'pending_signature', limit: 50 }),
         listContracts({ role: 'trader', status: 'active', limit: 50 }),
-        // Load kết nối đã accepted (cả hai chiều) chưa có contract → hiện ở "Đàm phán"
-        listConnections({ status: 'accepted', limit: 50 }),
+        listContracts({ role: 'trader', status: 'pending_change', limit: 50 }),
+        listContracts({ role: 'trader', status: 'completed', limit: 30 }),
+        listContracts({ role: 'trader', status: 'cancelled', limit: 30 }),
       ]);
-      setNegotiatingContracts(negRes.items.filter((c) => !!c.partyFarmerId));
-      setSignedContracts(signedRes.items.filter((c) => !!c.partyFarmerId));
-      // Lọc chỉ kết nối trader ↔ farmer (bỏ qua trader ↔ buyer)
-      setAcceptedConnections(
-        acceptedRes.items.filter(
-          (conn) =>
-            (conn.fromRole === 'farmer' && conn.toRole === 'trader') ||
-            (conn.fromRole === 'trader' && conn.toRole === 'farmer'),
-        ),
-      );
-      setContractsLoaded(true);
+      const isFarmer = (c: ContractDto) => !!c.partyFarmerId;
+      setWaitingContracts(waitRes.items.filter(isFarmer));
+      setSignedContracts([
+        ...activeRes.items.filter(isFarmer),
+        ...pendChangeRes.items.filter(isFarmer),
+      ]);
+      setHistoryContracts([
+        ...completedRes.items.filter(isFarmer),
+        ...cancelledRes.items.filter(isFarmer),
+      ]);
+      setLoaded(true);
     } catch (err) {
       openSnackbar({ type: 'error', text: toContractViMessage(err, 'list'), duration: 3500, icon: true });
     } finally {
-      setContractsLoading(false);
+      setLoading(false);
     }
-  }, [contractsLoaded, openSnackbar]);
+  }, [loaded, openSnackbar]);
 
   useEffect(() => {
-    if (activeTab === 'new') void loadConnections();
-    if (activeTab === 'negotiating' || activeTab === 'signed') void loadContracts();
-  }, [activeTab, loadConnections, loadContracts]);
+    void loadContracts();
+  }, [loadContracts]);
 
-  const handleAccept = async (conn: ConnectionDto) => {
-    setConnPending((p) => ({ ...p, [conn.id]: true }));
-    try {
-      await acceptConnection(conn.id);
-      setConnections((prev) => prev.filter((c) => c.id !== conn.id));
-      openSnackbar({ type: 'success', text: 'Đã chấp nhận yêu cầu kết nối.', duration: 3000, icon: true });
-    } catch (err) {
-      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'respond'), duration: 3000, icon: true });
-    } finally {
-      setConnPending((p) => { const n = { ...p }; delete n[conn.id]; return n; });
-    }
-  };
-
-  const handleReject = async (conn: ConnectionDto) => {
-    setConnPending((p) => ({ ...p, [conn.id]: true }));
-    try {
-      await rejectConnection(conn.id);
-      setConnections((prev) => prev.filter((c) => c.id !== conn.id));
-      openSnackbar({ type: 'success', text: 'Đã từ chối yêu cầu kết nối.', duration: 3000, icon: true });
-    } catch (err) {
-      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'respond'), duration: 3000, icon: true });
-    } finally {
-      setConnPending((p) => { const n = { ...p }; delete n[conn.id]; return n; });
-    }
-  };
-
-  const renderNewTab = () => {
-    if (connLoading) return <SkeletonList />;
-    if (connections.length === 0) {
-      return <EmptyState icon="🤝" title="Không có yêu cầu mới" description="Các yêu cầu kết nối từ nông dân sẽ hiện ở đây" />;
+  const renderContractList = (contracts: ContractDto[], emptyTitle: string, emptyDesc: string) => {
+    if (loading) return <SkeletonList />;
+    if (contracts.length === 0) {
+      return <EmptyState icon="📄" title={emptyTitle} description={emptyDesc} />;
     }
     return (
       <div>
-        {connections.map((conn) => (
-          <RequestCard
-            key={conn.id}
-            title={`Nông dân (...${conn.fromUserId.slice(-4)})`}
-            subtitle={conn.message}
-            meta={relativeDate(conn.createdAt)}
-            isLoading={!!connPending[conn.id]}
-            onAccept={() => void handleAccept(conn)}
-            onReject={() => void handleReject(conn)}
-          />
-        ))}
-      </div>
-    );
-  };
-
-  const renderNegotiatingTab = () => {
-    if (contractsLoading) return <SkeletonList />;
-    const hasContent = acceptedConnections.length > 0 || negotiatingContracts.length > 0;
-    if (!hasContent) {
-      return <EmptyState icon="🤝" title="Chưa có kết nối đang đàm phán" description="Kết nối đã được chấp nhận và hợp đồng đang thương lượng sẽ hiện ở đây" />;
-    }
-    return (
-      <div>
-        {acceptedConnections.map((conn) => (
-          <ConnectionAcceptedCard key={conn.id} connection={conn} />
-        ))}
-        {negotiatingContracts.map((c) => (
-          <ContractInfoCard key={c.id} contract={c} onTap={() => setSelectedContract(c)} />
-        ))}
-      </div>
-    );
-  };
-
-  const renderSignedTab = () => {
-    if (contractsLoading) return <SkeletonList />;
-    if (signedContracts.length === 0) {
-      return <EmptyState icon="📄" title="Chưa có hợp đồng đã ký" description="Hợp đồng bao tiêu đã ký với nông dân sẽ hiển thị tại đây" />;
-    }
-    return (
-      <div>
-        {signedContracts.map((c) => (
+        {contracts.map((c) => (
           <ContractInfoCard key={c.id} contract={c} onTap={() => setSelectedContract(c)} />
         ))}
       </div>
@@ -202,9 +99,24 @@ export const FarmerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
   return (
     <>
       <StatusTabbedList tabs={TABS} activeId={activeTab} onTabChange={setActiveTab}>
-        {activeTab === 'new' && renderNewTab()}
-        {activeTab === 'negotiating' && renderNegotiatingTab()}
-        {activeTab === 'signed' && renderSignedTab()}
+        {activeTab === 'waiting' &&
+          renderContractList(
+            waitingContracts,
+            'Chưa có hợp đồng chờ ký',
+            'Hợp đồng cần ký với nông dân sẽ hiển thị tại đây',
+          )}
+        {activeTab === 'signed' &&
+          renderContractList(
+            signedContracts,
+            'Chưa có hợp đồng đã ký',
+            'Hợp đồng bao tiêu đã ký với nông dân sẽ hiển thị tại đây',
+          )}
+        {activeTab === 'history' &&
+          renderContractList(
+            historyContracts,
+            'Chưa có lịch sử',
+            'Hợp đồng đã hoàn thành hoặc đã hủy sẽ hiển thị tại đây',
+          )}
       </StatusTabbedList>
 
       {selectedContract && (
@@ -212,13 +124,24 @@ export const FarmerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
           contract={selectedContract}
           visible
           onClose={() => setSelectedContract(null)}
+          onSigned={(updated) => {
+            setSelectedContract(updated);
+            if (updated.status === 'active') {
+              setWaitingContracts((prev) => prev.filter((c) => c.id !== updated.id));
+              setSignedContracts((prev) => [updated, ...prev.filter((c) => c.id !== updated.id)]);
+            } else {
+              setWaitingContracts((prev) =>
+                prev.map((c) => (c.id === updated.id ? updated : c)),
+              );
+            }
+          }}
         />
       )}
     </>
   );
 };
 
-// ── Shared sub-components ──────────────────────────────────────────────────────
+// ── Sub-components ─────────────────────────────────────────────────────────────
 
 const SkeletonList: React.FC = () => (
   <div>
@@ -236,53 +159,6 @@ const SkeletonList: React.FC = () => (
   </div>
 );
 
-const ConnectionAcceptedCard: React.FC<{ connection: ConnectionDto }> = ({ connection }) => {
-  const farmerUserId =
-    connection.fromRole === 'farmer' ? connection.fromUserId : connection.toUserId;
-
-  return (
-    <div
-      style={{
-        backgroundColor: colors.background.primary,
-        borderRadius: '8px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-        marginBottom: spacing.md,
-        padding: spacing.md,
-        minHeight: '44px',
-        borderLeft: `3px solid ${colors.primary.agriGreen}`,
-      }}
-    >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div style={{ flex: 1 }}>
-          <Text size="xSmall" style={{ color: colors.text.secondary, display: 'block', fontSize: fontSize.caption }}>
-            Kết nối nông dân
-          </Text>
-          <Text.Title size="small" style={{ margin: `${spacing.xs} 0` }}>
-            Nông dân (...{farmerUserId.slice(-4)})
-          </Text.Title>
-          <Text size="xSmall" style={{ color: colors.text.secondary, fontSize: fontSize.caption }}>
-            Kết nối từ {relativeDate(connection.createdAt)}
-          </Text>
-        </div>
-        <span
-          style={{
-            padding: `${spacing.xs} ${spacing.sm}`,
-            backgroundColor: `${colors.primary.agriGreen}18`,
-            color: colors.primary.agriGreen,
-            borderRadius: '6px',
-            fontSize: fontSize.caption,
-            fontWeight: fontWeight.semibold,
-            whiteSpace: 'nowrap',
-            marginLeft: spacing.sm,
-          }}
-        >
-          Đã kết nối
-        </span>
-      </div>
-    </div>
-  );
-};
-
 const ContractInfoCard: React.FC<{ contract: ContractDto; onTap: () => void }> = ({
   contract,
   onTap,
@@ -290,6 +166,8 @@ const ContractInfoCard: React.FC<{ contract: ContractDto; onTap: () => void }> =
   const statusColor =
     contract.status === 'active'
       ? colors.primary.agriGreen
+      : contract.status === 'pending_signature'
+      ? colors.primary.zaloBlue
       : contract.status === 'pending_change'
       ? colors.functional.warningYellow
       : colors.text.secondary;

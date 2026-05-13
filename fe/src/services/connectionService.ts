@@ -7,6 +7,7 @@
  *   GET  /api/v1/farmers/search              → ListResponse<FarmerSearchResultDto>
  *   GET  /api/v1/connections                 → ListResponse<ConnectionDto>
  *   POST /api/v1/connections                 → ConnectionDto
+ *   DELETE /api/v1/connections/:id           → { success: true } (thu hồi pending, chỉ người gửi)
  *   POST /api/v1/connections/:id/accept      → ConnectionDto
  *   POST /api/v1/connections/:id/reject      → ConnectionDto
  *
@@ -122,7 +123,7 @@ export interface CreateConnectionDto {
 /**
  * Map ApiError code → thông báo tiếng Việt thân thiện cho màn kết nối.
  */
-export function toConnectionViMessage(err: unknown, context?: 'search' | 'list' | 'create' | 'respond' | 'negotiate' | 'sign'): string {
+export function toConnectionViMessage(err: unknown, context?: 'search' | 'list' | 'create' | 'respond' | 'negotiate' | 'sign' | 'cancel'): string {
   if (err instanceof ApiError) {
     switch (err.code) {
       case 'UNAUTHORIZED':
@@ -162,6 +163,8 @@ export function toConnectionViMessage(err: unknown, context?: 'search' | 'list' 
       return 'Không thể bắt đầu đàm phán. Vui lòng thử lại.';
     case 'sign':
       return 'Không thể xác nhận ký kết. Vui lòng thử lại.';
+    case 'cancel':
+      return 'Không thể hủy yêu cầu kết nối. Vui lòng thử lại.';
     default:
       return 'Đã xảy ra lỗi. Vui lòng thử lại.';
   }
@@ -282,13 +285,11 @@ export async function negotiateConnection(connectionId: string): Promise<Connect
 }
 
 /**
- * POST /api/v1/connections/:id/sign
- * Xác nhận đã ký hợp đồng (negotiating → signed).
+ * DELETE /api/v1/connections/:id
+ * Hủy yêu cầu kết nối đang pending (người gửi hủy lại).
+ * Chỉ hoạt động khi status = 'pending'; 403 nếu không phải người gửi.
  */
-export async function signConnection(connectionId: string): Promise<ConnectionDto> {
-  const { data } = await apiClient.post<ConnectionDto>(
-    `/connections/${connectionId}/sign`,
-    {},
-  );
+export async function cancelConnection(connectionId: string): Promise<{ success: boolean }> {
+  const { data } = await apiClient.delete<{ success: boolean }>(`/connections/${connectionId}`);
   return data;
 }

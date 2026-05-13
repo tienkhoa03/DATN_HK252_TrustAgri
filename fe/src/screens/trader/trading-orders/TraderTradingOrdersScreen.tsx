@@ -10,7 +10,7 @@
  * - Tab Quản lý Đơn hàng (Orders): orderService (Axios), Accept/Reject
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Page, Text } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { EmptyState } from '../../../design-system/components/EmptyState';
@@ -62,6 +62,13 @@ import {
 } from '../../../services/contractService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { ContractChangeRequestsPanel } from '@/screens/shared/contract-change-requests';
+import { useAtomValue } from 'jotai';
+import { authSessionAtom } from '@/state/authAtoms';
+import {
+  listTraderLinkedContractFarms,
+  getFarm,
+  type FarmDto,
+} from '@/services/farmService';
 
 export interface TraderTradingOrdersScreenProps {
   traderId?: string;
@@ -114,6 +121,8 @@ const SkeletonCard: React.FC = () => (
 
 interface ProductFormProps {
   initial?: Partial<CreateProductDto & { status: 'active' | 'inactive' }>;
+  farms: FarmDto[];
+  isEditing: boolean;
   onSave: (data: CreateProductDto) => void;
   onCancel: () => void;
   saving: boolean;
@@ -126,6 +135,8 @@ const CROP_OPTIONS = Object.entries(CROP_LABELS).map(([value, label]) => ({
 
 const ProductForm: React.FC<ProductFormProps> = ({
   initial,
+  farms,
+  isEditing,
   onSave,
   onCancel,
   saving,
@@ -136,6 +147,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
   const [unit, setUnit] = useState(initial?.unit ?? 'kg');
   const [stock, setStock] = useState(initial?.stockQuantity?.toString() ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
+  const [farmId, setFarmId] = useState(initial?.farmId ?? '');
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -222,6 +234,35 @@ const ProductForm: React.FC<ProductFormProps> = ({
           ))}
         </select>
 
+        <label style={labelStyle}>Vườn trồng{!isEditing ? ' *' : ''}</label>
+        {isEditing ? (
+          <div style={{ ...inputStyle, backgroundColor: colors.background.secondary, color: colors.text.secondary }}>
+            {initial?.farmId
+              ? (farms.find((f) => f.id === initial.farmId)?.name ?? `Vườn #${String(initial.farmId).slice(0, 8)}…`)
+              : '—'}
+          </div>
+        ) : (
+          <select
+            style={{ ...inputStyle }}
+            value={farmId}
+            onChange={(e) => setFarmId(e.target.value)}
+            disabled={farms.length === 0}
+          >
+            {farms.length === 0 ? (
+              <option value="">Chưa có vườn (cần hợp đồng nông dân đã ký)</option>
+            ) : (
+              <>
+                <option value="">— Chọn vườn —</option>
+                {farms.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name} ({f.location.province})
+                  </option>
+                ))}
+              </>
+            )}
+          </select>
+        )}
+
         <div style={{ display: 'flex', gap: spacing.sm }}>
           <div style={{ flex: 2 }}>
             <label style={labelStyle}>Giá (VNĐ) *</label>
@@ -291,6 +332,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
             disabled={saving}
             onClick={() => {
               if (!name.trim() || !price) return;
+              if (!isEditing && (!farmId || farms.length === 0)) return;
               onSave({
                 name: name.trim(),
                 cropType,
@@ -298,6 +340,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
                 price: parseFloat(price),
                 stockQuantity: stock ? parseInt(stock, 10) : undefined,
                 description: description.trim() || undefined,
+                farmId: isEditing ? (initial?.farmId ?? undefined) : farmId,
               });
             }}
           >
@@ -320,6 +363,7 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
   traderName = 'Thương lái',
 }) => {
   const openSnackbar = useStableOpenSnackbar();
+  const session = useAtomValue(authSessionAtom);
   const [activeTab, setActiveTab] = useState<TabType>('my-products');
   const [selectedOrder, setSelectedOrder] = useState<OrderDto | null>(null);
 
@@ -353,7 +397,12 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
   const [proposingFor, setProposingFor] = useState<BuyingRequestDto | null>(null);
   const [proposalPrice, setProposalPrice] = useState('');
   const [proposalNote, setProposalNote] = useState('');
+  const [proposalFarmId, setProposalFarmId] = useState('');
   const [proposalSaving, setProposalSaving] = useState(false);
+
+  const [availableFarms, setAvailableFarms] = useState<FarmDto[]>([]);
+  const [linkedFarmsLoading, setLinkedFarmsLoading] = useState(true);
+  const [extraFarm, setExtraFarm] = useState<FarmDto | null>(null);
 
   // Form state
   const [showForm, setShowForm] = useState(false);
@@ -384,6 +433,65 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
     loadProducts();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [traderId]);
+
+  const loadAvailableFarms = useCallback(async () => {
+    if (!session?.accessToken) {
+      setAvailableFarms([]);
+      setLinkedFarmsLoading(false);
+      return;
+    }
+    setLinkedFarmsLoading(true);
+    try {
+      const res = await listTraderLinkedContractFarms({
+        accessToken: session.accessToken,
+      });
+      setAvailableFarms(res.items);
+    } catch {
+      setAvailableFarms([]);
+      openSnackbar({
+        type: 'error',
+        text: 'Không tải được danh sách vườn theo hợp đồng.',
+        duration: 4000,
+        icon: true,
+      });
+    } finally {
+      setLinkedFarmsLoading(false);
+    }
+  }, [session?.accessToken, openSnackbar]);
+
+  useEffect(() => {
+    void loadAvailableFarms();
+  }, [loadAvailableFarms]);
+
+  useEffect(() => {
+    const fid = editingProduct?.farmId;
+    if (!fid) {
+      setExtraFarm(null);
+      return;
+    }
+    if (availableFarms.some((f) => f.id === fid)) {
+      setExtraFarm(null);
+      return;
+    }
+    let cancelled = false;
+    void getFarm(fid)
+      .then((f) => {
+        if (!cancelled) setExtraFarm(f);
+      })
+      .catch(() => {
+        if (!cancelled) setExtraFarm(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editingProduct?.farmId, availableFarms]);
+
+  const farmsForForm = useMemo(() => {
+    if (extraFarm && !availableFarms.some((f) => f.id === extraFarm.id)) {
+      return [...availableFarms, extraFarm];
+    }
+    return availableFarms;
+  }, [availableFarms, extraFarm]);
 
   // Load open buying requests
   const loadBuyingRequests = useCallback(() => {
@@ -486,10 +594,15 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
 
   const handleSendProposal = async () => {
     if (!proposingFor || !proposalPrice) return;
+    if (!proposalFarmId || availableFarms.length === 0) {
+      openSnackbar({ type: 'error', text: 'Vui lòng chọn vườn cung cấp từ hợp đồng đã ký.', duration: 4000, icon: true });
+      return;
+    }
     setProposalSaving(true);
     try {
       await createProposal({
         buyingRequestId: proposingFor.id,
+        farmId: proposalFarmId,
         price: parseFloat(proposalPrice),
         quantity: proposingFor.quantity,
         standardCode: proposingFor.qualityStandardCode,
@@ -499,6 +612,7 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
       setProposingFor(null);
       setProposalPrice('');
       setProposalNote('');
+      setProposalFarmId('');
     } catch (err) {
       openSnackbar({ type: 'error', text: toProposalViMessage(err, 'create'), duration: 4000, icon: true });
     } finally {
@@ -507,6 +621,10 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
   };
 
   const handleSaveProduct = async (data: CreateProductDto) => {
+    if (!editingProduct && !data.farmId) {
+      openSnackbar({ type: 'error', text: 'Vui lòng chọn vườn từ hợp đồng đã ký với nông dân.', duration: 4000, icon: true });
+      return;
+    }
     setFormSaving(true);
     try {
       if (editingProduct) {
@@ -840,6 +958,19 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
         <button
           style={fabStyles}
           onClick={() => {
+            if (linkedFarmsLoading) {
+              openSnackbar({ type: 'info', text: 'Đang tải danh sách vườn theo hợp đồng...', duration: 2500, icon: true });
+              return;
+            }
+            if (availableFarms.length === 0) {
+              openSnackbar({
+                type: 'info',
+                text: 'Cần ít nhất một hợp đồng nông dân–thương lái đã ký (có vườn) để đăng tin bán.',
+                duration: 4500,
+                icon: true,
+              });
+              return;
+            }
             setEditingProduct(null);
             setShowForm(true);
           }}
@@ -991,6 +1122,17 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
                 </div>
               </div>
 
+              {req.description?.trim() && (
+                <div style={{ marginBottom: spacing.sm }}>
+                  <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 4 }}>
+                    Mô tả nhu cầu
+                  </Text>
+                  <Text size="small" style={{ margin: 0, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+                    {req.description.trim()}
+                  </Text>
+                </div>
+              )}
+
               {/* Deposit badge */}
               {req.depositOffered && (
                 <div
@@ -1016,8 +1158,23 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
                 <button
                   style={actionButtonStyles(true)}
                   onClick={() => {
+                    if (linkedFarmsLoading) {
+                      openSnackbar({ type: 'info', text: 'Đang tải danh sách vườn theo hợp đồng...', duration: 2500, icon: true });
+                      return;
+                    }
+                    if (availableFarms.length === 0) {
+                      openSnackbar({
+                        type: 'info',
+                        text: 'Bạn cần ít nhất một hợp đồng nông dân–thương lái đã ký (có vườn) để gửi đề xuất.',
+                        duration: 4500,
+                        icon: true,
+                      });
+                      return;
+                    }
                     setProposingFor(req);
                     setProposalPrice(req.expectedPrice?.toString() ?? '');
+                    setProposalNote('');
+                    setProposalFarmId(availableFarms[0]?.id ?? '');
                   }}
                 >
                   Gửi đề xuất
@@ -1452,6 +1609,37 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
             </div>
 
             <label style={{ fontSize: fontSize.caption, fontWeight: fontWeight.medium, color: colors.text.secondary, display: 'block', marginBottom: '4px' }}>
+              Vườn cung cấp *
+            </label>
+            <select
+              style={{
+                width: '100%',
+                padding: spacing.sm,
+                border: `1px solid ${colors.background.tertiary}`,
+                borderRadius: '6px',
+                fontSize: fontSize.body,
+                marginBottom: spacing.sm,
+                boxSizing: 'border-box',
+              }}
+              value={proposalFarmId}
+              onChange={(e) => setProposalFarmId(e.target.value)}
+              disabled={availableFarms.length === 0}
+            >
+              {availableFarms.length === 0 ? (
+                <option value="">Chưa có vườn hợp đồng đã ký</option>
+              ) : (
+                <>
+                  <option value="">— Chọn vườn —</option>
+                  {availableFarms.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name} ({f.location.province})
+                    </option>
+                  ))}
+                </>
+              )}
+            </select>
+
+            <label style={{ fontSize: fontSize.caption, fontWeight: fontWeight.medium, color: colors.text.secondary, display: 'block', marginBottom: '4px' }}>
               Giá đề xuất (₫/{proposingFor.unit}) *
             </label>
             <input
@@ -1515,10 +1703,10 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
                   borderRadius: '8px',
                   fontSize: fontSize.body,
                   fontWeight: fontWeight.semibold,
-                  cursor: proposalSaving || !proposalPrice ? 'not-allowed' : 'pointer',
-                  opacity: !proposalPrice ? 0.6 : 1,
+                  cursor: proposalSaving || !proposalPrice || !proposalFarmId || availableFarms.length === 0 ? 'not-allowed' : 'pointer',
+                  opacity: !proposalPrice || !proposalFarmId || availableFarms.length === 0 ? 0.6 : 1,
                 }}
-                disabled={proposalSaving || !proposalPrice}
+                disabled={proposalSaving || !proposalPrice || !proposalFarmId || availableFarms.length === 0}
                 onClick={handleSendProposal}
               >
                 {proposalSaving ? 'Đang gửi...' : 'Gửi đề xuất'}
@@ -1540,9 +1728,12 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
                   unit: editingProduct.unit,
                   stockQuantity: editingProduct.stockQuantity,
                   description: editingProduct.description,
+                  farmId: editingProduct.farmId,
                 }
               : undefined
           }
+          farms={farmsForForm}
+          isEditing={!!editingProduct}
           onSave={handleSaveProduct}
           onCancel={() => {
             setShowForm(false);

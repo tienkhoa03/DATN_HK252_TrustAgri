@@ -17,6 +17,7 @@ export interface ProposalDto {
   id: string;
   buyingRequestId: string;
   traderId: string;
+  farmId?: string;
   price: number;
   quantity: number;
   standardCode?: string;
@@ -41,6 +42,7 @@ export interface ListProposalsParams {
 
 export interface CreateProposalDto {
   buyingRequestId: string;
+  farmId: string;
   price: number;
   quantity: number;
   standardCode?: string;

@@ -29,9 +29,13 @@ export interface ContractDto {
   deposit?: number;
   startDate: string;
   endDate: string;
-  status: 'active' | 'pending_change' | 'completed' | 'cancelled';
+  status: 'pending_signature' | 'active' | 'pending_change' | 'completed' | 'cancelled';
   terms: string;
+  farmerSignedAt?: string;
+  traderSignedAt?: string;
+  buyerSignedAt?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export interface ContractAuditLogDto {
@@ -105,7 +109,7 @@ export interface ListContractsParams {
   role?: ContractRoleFilter;
   /** `me` = partyBuyerId = user hiện tại (role buyer) */
   buyerId?: string;
-  status?: ContractDto['status'] | 'all';
+  status?: ContractDto['status'] | 'all' | 'pending_signature';
   from?: string;
   to?: string;
   page?: number;
@@ -141,6 +145,8 @@ function normalizeContract(raw: ContractDto): ContractDto {
 
 export function contractStatusLabelVi(status: ContractDto['status']): string {
   switch (status) {
+    case 'pending_signature':
+      return 'Chờ ký';
     case 'active':
       return 'Đang thực hiện';
     case 'pending_change':
@@ -261,4 +267,27 @@ export async function listContractAuditLogs(contractId: string): Promise<Contrac
 export async function getContractCompliance(contractId: string): Promise<ComplianceDto> {
   const { data } = await apiClient.get<unknown>(`/contracts/${contractId}/compliance`);
   return normalizeComplianceDto(data);
+}
+
+/** PATCH /api/v1/contracts/:id/sign — ký hợp đồng (farmer/trader/buyer). */
+export async function signContract(contractId: string): Promise<ContractDto> {
+  const { data } = await apiClient.patch<ContractDto>(`/contracts/${contractId}/sign`);
+  return normalizeContract(data);
+}
+
+/** Kiểm tra user (theo userId + role) đã ký hợp đồng chưa. */
+export function hasUserSigned(contract: ContractDto, userId: string, role: 'farmer' | 'trader' | 'buyer'): boolean {
+  if (role === 'farmer') return contract.farmerSignedAt != null;
+  if (role === 'trader') return contract.traderSignedAt != null;
+  if (role === 'buyer') return contract.buyerSignedAt != null;
+  return false;
+}
+
+/** Kiểm tra user có phải là bên trong hợp đồng và được phép ký không. */
+export function canUserSign(contract: ContractDto, userId: string, role: 'farmer' | 'trader' | 'buyer'): boolean {
+  if (contract.status !== 'pending_signature') return false;
+  if (role === 'farmer') return contract.partyFarmerId === userId && !contract.farmerSignedAt;
+  if (role === 'trader') return contract.partyTraderId === userId && !contract.traderSignedAt;
+  if (role === 'buyer') return contract.partyBuyerId === userId && !contract.buyerSignedAt;
+  return false;
 }

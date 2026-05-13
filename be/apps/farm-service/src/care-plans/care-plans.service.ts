@@ -156,6 +156,7 @@ export class CarePlansService {
       deviation: false,
       syncStatus: 'synced',
       clientRecordId: null,
+      performedBy: userId,
     });
 
     const saved = await this.careLogRepo.save(log);

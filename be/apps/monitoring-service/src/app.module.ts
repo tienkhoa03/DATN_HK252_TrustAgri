@@ -43,6 +43,7 @@ import { DevicesModule } from './devices/devices.module';
     PassportModule.register({ defaultStrategy: 'jwt' }),
 
     JwtModule.registerAsync({
+      global: true,
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
         secret: config.getOrThrow<string>('JWT_SECRET'),

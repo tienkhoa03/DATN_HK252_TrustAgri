@@ -87,6 +87,7 @@ export class StandardsService {
       code: dto.code,
       name: dto.name,
       description: dto.description,
+      cropType: dto.cropType ?? null,
       ownerTraderId: traderId,
     });
     const saved = await this.standardRepo.save(standard);
@@ -134,6 +135,8 @@ export class StandardsService {
 
     if (dto.name !== undefined) standard.name = dto.name;
     if (dto.description !== undefined) standard.description = dto.description;
+    if (dto.cropType !== undefined) standard.cropType = dto.cropType ?? null;
+    standard.version += 1;
 
     await this.standardRepo.save(standard);
 
@@ -196,9 +199,12 @@ export class StandardsService {
       code: standard.code,
       name: standard.name,
       description: standard.description,
+      cropType: standard.cropType ?? undefined,
+      version: standard.version,
       ownerTraderId: standard.ownerTraderId ?? undefined,
       steps,
       createdAt: standard.createdAt.toISOString(),
+      updatedAt: standard.updatedAt.toISOString(),
     };
   }
 }

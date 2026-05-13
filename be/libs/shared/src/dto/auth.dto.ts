@@ -60,6 +60,15 @@ export interface UserProfileDto {
 }
 
 /**
+ * GET /api/v1/auth/users/:userId — chỉ trả các trường hiển thị công khai (không có phone/email/zaloId).
+ */
+export interface UserPublicSummaryDto {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string;
+}
+
+/**
  * Request body cho POST /api/v1/auth/login
  */
 export class AuthLoginDto {

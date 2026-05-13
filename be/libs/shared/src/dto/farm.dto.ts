@@ -134,6 +134,7 @@ export interface CareLogDto {
   action: string;
   notes?: string;
   performedAt: string;
+  performedBy?: string;
   evidences: EvidenceDto[];
   deviation?: boolean;
   syncStatus: 'synced' | 'pending' | 'conflict';
@@ -208,9 +209,12 @@ export interface StandardDto {
   code: string;
   name: string;
   description: string;
+  cropType?: string;
+  version: number;
   ownerTraderId?: string;
   steps: StandardStepDto[];
   createdAt: string;
+  updatedAt: string;
 }
 
 export class CreateStandardStepDto {
@@ -243,6 +247,10 @@ export class CreateStandardDto {
   description: string;
 
   @IsOptional()
+  @IsString()
+  cropType?: string;
+
+  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateStandardStepDto)
@@ -257,6 +265,10 @@ export class UpdateStandardDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  cropType?: string;
 
   @IsOptional()
   @IsArray()

@@ -19,8 +19,8 @@ export class ContractQueryDto extends PaginationQueryDto {
   buyerId?: string;
 
   @IsOptional()
-  @IsIn(['active', 'pending_change', 'completed', 'cancelled'])
-  status?: 'active' | 'pending_change' | 'completed' | 'cancelled';
+  @IsIn(['pending_signature', 'active', 'pending_change', 'completed', 'cancelled'])
+  status?: 'pending_signature' | 'active' | 'pending_change' | 'completed' | 'cancelled';
 
   /** ISO datetime — lọc theo createdAt từ */
   @IsOptional()

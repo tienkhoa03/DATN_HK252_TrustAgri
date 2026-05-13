@@ -172,6 +172,20 @@ export async function updateMe(patch: UserProfileUpdateDto): Promise<UserProfile
  *
  * Giới hạn: 200KB sau khi base64 (≈ 150KB ảnh gốc) để tránh DB bloat.
  */
+/**
+ * GET /api/v1/auth/users/:userId
+ * Tra cứu tên hiển thị của user theo ID (công khai trong hệ thống).
+ * Trả null nếu không tìm thấy hoặc lỗi (graceful fallback).
+ */
+export async function getUserById(userId: string): Promise<{ userId: string; displayName: string; avatarUrl?: string } | null> {
+  try {
+    const { data } = await apiClient.get<{ userId: string; displayName: string; avatarUrl?: string }>(`/auth/users/${userId}`);
+    return data;
+  } catch {
+    return null;
+  }
+}
+
 export async function uploadAvatar(blob: Blob): Promise<UserProfileDto> {
   const MAX_BYTES = 200 * 1024;
   if (blob.size > MAX_BYTES) {

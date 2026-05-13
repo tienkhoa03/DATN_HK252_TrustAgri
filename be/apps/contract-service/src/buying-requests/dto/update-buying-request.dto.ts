@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsNumber, IsIn, Min } from 'class-validator';
+import { IsOptional, IsString, IsNumber, IsIn, Min, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class UpdateBuyingRequestDto {
@@ -35,6 +35,11 @@ export class UpdateBuyingRequestDto {
   @IsOptional()
   @IsString()
   deliveryDate?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string;
 
   @IsOptional()
   @IsIn(['open', 'matched', 'closed'])

@@ -3,6 +3,8 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  UpdateDateColumn,
+  DeleteDateColumn,
 } from 'typeorm';
 
 export type UserRole = 'farmer' | 'trader' | 'buyer' | 'guest' | 'admin';
@@ -55,6 +57,12 @@ export class UserEntity {
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at', nullable: true })
+  deletedAt: Date | null;
 
   @Column({ name: 'last_login', type: 'timestamptz', nullable: true })
   lastLogin: Date | null;

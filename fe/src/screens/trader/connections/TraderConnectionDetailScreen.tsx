@@ -8,7 +8,7 @@
  *       hoặc fetch lại từ listConnections khi cần.
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Page, Text, useNavigate, useParams } from 'zmp-ui';
 import { useLocation } from 'react-router-dom';
 import { Icon } from '../../../design-system/components/Icon';
@@ -16,13 +16,9 @@ import { Button } from '../../../design-system/components/Button';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
-import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
-import {
-  negotiateConnection,
-  signConnection,
-  toConnectionViMessage,
-} from '@/services/connectionService';
 import type { ConnectionDto } from '@/services/connectionService';
+import { CreateFarmerContractModal } from '../transactions/components/CreateFarmerContractModal';
+import type { ContractDto } from '@/services/contractService';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -144,40 +140,23 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
   const navigate = useNavigate();
   const params = useParams<{ id?: string }>();
   const location = useLocation();
-  const openSnackbar = useStableOpenSnackbar();
-
   // Ưu tiên prop, rồi đến navigation state (khi navigate từ ConnectionRequestsScreen)
   const stateConnection = (location.state as { connection?: ConnectionDto } | null)?.connection;
   const [connection, setConnection] = useState<ConnectionDto | null>(connectionProp ?? stateConnection ?? null);
-  const [isActing, setIsActing] = useState(false);
+  const [showCreateContract, setShowCreateContract] = useState(false);
 
-  const handleNegotiate = useCallback(async () => {
-    if (!connection) return;
-    setIsActing(true);
-    try {
-      const updated = await negotiateConnection(connection.id);
-      setConnection(updated);
-      openSnackbar({ type: 'success', text: 'Đã bắt đầu quá trình đàm phán.', duration: 3000, icon: true });
-    } catch (err) {
-      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'negotiate'), duration: 3500, icon: true });
-    } finally {
-      setIsActing(false);
-    }
-  }, [connection, openSnackbar]);
+  const farmerUserId = connection
+    ? (connection.fromRole === 'farmer' ? connection.fromUserId : connection.toUserId)
+    : '';
 
-  const handleSign = useCallback(async () => {
-    if (!connection) return;
-    setIsActing(true);
-    try {
-      const updated = await signConnection(connection.id);
-      setConnection(updated);
-      openSnackbar({ type: 'success', text: 'Đã xác nhận ký kết hợp đồng thành công!', duration: 3500, icon: true });
-    } catch (err) {
-      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'sign'), duration: 3500, icon: true });
-    } finally {
-      setIsActing(false);
+  const handleContractCreated = (contract: ContractDto) => {
+    setShowCreateContract(false);
+    // Optionally move connection to negotiating visually
+    if (connection && connection.status === 'accepted') {
+      setConnection({ ...connection, status: 'negotiating' });
     }
-  }, [connection, openSnackbar]);
+    void contract; // used by caller via onCreated if needed
+  };
 
   if (!connection) {
     return (
@@ -401,7 +380,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
               </Text>
             </div>
             <Text size="xSmall" style={{ color: colors.text.secondary }}>
-              Bạn có thể bắt đầu quá trình đàm phán điều khoản hợp tác với nông dân này.
+              Tạo hợp đồng bao tiêu để chính thức hóa điều khoản hợp tác với nông dân này.
             </Text>
           </div>
         )}
@@ -423,7 +402,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
               </Text>
             </div>
             <Text size="xSmall" style={{ color: colors.text.secondary }}>
-              Sau khi hai bên thống nhất điều khoản, hãy xác nhận ký kết hợp đồng.
+              Đã có hợp đồng đang chờ ký. Bạn có thể tạo thêm hợp đồng bao tiêu cho mùa vụ mới.
             </Text>
           </div>
         )}
@@ -451,7 +430,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
         )}
       </div>
 
-      {/* Sticky action bar */}
+      {/* Sticky action bar — tạo hợp đồng khi accepted hoặc negotiating */}
       {(connection.status === 'accepted' || connection.status === 'negotiating') && (
         <div
           style={{
@@ -465,47 +444,34 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
             boxShadow: '0 -4px 12px rgba(0,0,0,0.08)',
           }}
         >
-          {connection.status === 'accepted' && (
-            <button
-              onClick={handleNegotiate}
-              disabled={isActing}
-              style={{
-                width: '100%',
-                padding: `${spacing.md} ${spacing.lg}`,
-                backgroundColor: isActing ? `${colors.primary.agriGreen}80` : colors.primary.agriGreen,
-                color: '#fff',
-                border: 'none',
-                borderRadius: 12,
-                fontSize: fontSize.body,
-                fontWeight: fontWeight.semibold,
-                cursor: isActing ? 'not-allowed' : 'pointer',
-                minHeight: 44,
-              }}
-            >
-              {isActing ? 'Đang xử lý...' : '🤝 Bắt đầu đàm phán'}
-            </button>
-          )}
-          {connection.status === 'negotiating' && (
-            <button
-              onClick={handleSign}
-              disabled={isActing}
-              style={{
-                width: '100%',
-                padding: `${spacing.md} ${spacing.lg}`,
-                backgroundColor: isActing ? '#9B59B680' : '#9B59B6',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 12,
-                fontSize: fontSize.body,
-                fontWeight: fontWeight.semibold,
-                cursor: isActing ? 'not-allowed' : 'pointer',
-                minHeight: 44,
-              }}
-            >
-              {isActing ? 'Đang xử lý...' : '✍️ Xác nhận đã ký hợp đồng'}
-            </button>
-          )}
+          <button
+            onClick={() => setShowCreateContract(true)}
+            style={{
+              width: '100%',
+              padding: `${spacing.md} ${spacing.lg}`,
+              backgroundColor: colors.primary.agriGreen,
+              color: '#fff',
+              border: 'none',
+              borderRadius: 12,
+              fontSize: fontSize.body,
+              fontWeight: fontWeight.semibold,
+              cursor: 'pointer',
+              minHeight: 44,
+            }}
+          >
+            📄 Tạo hợp đồng bao tiêu
+          </button>
         </div>
+      )}
+
+      {showCreateContract && (
+        <CreateFarmerContractModal
+          visible
+          farmerUserId={farmerUserId}
+          farmId={connection.farmId ?? null}
+          onClose={() => setShowCreateContract(false)}
+          onCreated={handleContractCreated}
+        />
       )}
     </Page>
   );

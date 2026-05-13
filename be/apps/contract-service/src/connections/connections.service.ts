@@ -446,29 +446,74 @@ export class ConnectionsService implements OnModuleInit {
   }
 
   /**
-   * POST /api/v1/connections/:id/sign
-   * Xác nhận đã ký hợp đồng — chỉ trader có thể chuyển từ negotiating → signed.
+   * Tự động đặt kết nối farmer↔trader thành 'signed' khi hợp đồng farmer_trader trở thành active.
+   * Không throw nếu không tìm thấy kết nối — chỉ log cảnh báo.
    */
-  async signConnection(
-    connectionId: string,
-    userId: string,
-  ): Promise<ConnectionDto> {
-    const connection = await this.requireConnection(connectionId);
-    this.ensureParticipant(connection, userId);
+  async markConnectionSignedByContract(
+    farmerId: string,
+    traderId: string,
+    farmId: string | null,
+  ): Promise<void> {
+    // Tìm kết nối chưa ký giữa farmer và trader theo cả hai chiều
+    const qb = this.connectionRepo
+      .createQueryBuilder('c')
+      .where(
+        '((c.fromUserId = :farmerId AND c.toUserId = :traderId) OR (c.fromUserId = :traderId AND c.toUserId = :farmerId))',
+        { farmerId, traderId },
+      )
+      .andWhere('c.status IN (:...statuses)', {
+        statuses: ['accepted', 'negotiating'],
+      })
+      .andWhere('c.deletedAt IS NULL');
 
-    if (connection.status !== 'negotiating') {
-      throw new ConflictException(
-        `Chỉ có thể ký khi kết nối ở trạng thái "negotiating", hiện tại: "${connection.status}"`,
+    const candidates = await qb.getMany();
+
+    if (candidates.length === 0) {
+      this.logger.warn(
+        `markConnectionSignedByContract: không tìm thấy kết nối accepted/negotiating giữa farmer=${farmerId} trader=${traderId}`,
       );
+      return;
     }
+
+    // Ưu tiên kết nối khớp farmId nếu có; nếu không, lấy kết nối đầu tiên
+    const connection =
+      (farmId !== null && candidates.find((c) => c.farmId === farmId)) ||
+      candidates[0];
 
     connection.status = 'signed';
     const saved = await this.connectionRepo.save(connection);
     const dto = this.toDto(saved);
 
     await this.publisher.publishConnectionUpdated(dto);
-    this.logger.log(`Connection signed: id=${saved.id} by userId=${userId}`);
-    return dto;
+    this.logger.log(
+      `Connection auto-signed by contract: id=${saved.id} farmer=${farmerId} trader=${traderId}`,
+    );
+  }
+
+  /**
+   * DELETE /api/v1/connections/:id
+   * Thu hồi yêu cầu đang pending — chỉ người gửi; xóa mềm để có thể gửi lại sau.
+   */
+  async deleteConnection(
+    connectionId: string,
+    userId: string,
+  ): Promise<{ success: boolean }> {
+    const connection = await this.requireConnection(connectionId);
+    if (connection.fromUserId !== userId) {
+      throw new ForbiddenException(
+        'Chỉ người gửi yêu cầu mới có thể thu hồi',
+      );
+    }
+    if (connection.status !== 'pending') {
+      throw new ConflictException(
+        'Chỉ có thể hủy yêu cầu đang chờ phản hồi (pending)',
+      );
+    }
+    await this.connectionRepo.softDelete(connectionId);
+    this.logger.log(
+      `Connection withdrawn (soft-deleted): id=${connectionId} by=${userId}`,
+    );
+    return { success: true };
   }
 
   // ─── Private helpers ──────────────────────────────────────────────────────────

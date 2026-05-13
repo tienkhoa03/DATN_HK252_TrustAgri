@@ -3,7 +3,10 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
+  Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder } from 'typeorm';
 import {
@@ -12,18 +15,110 @@ import {
   ListResponse,
   JwtPayload,
   BuyerTransactionSummaryDto,
+  FarmDto,
 } from '@trustagri/shared';
 import { ContractEntity } from './entities/contract.entity';
 import { ContractQueryDto } from './dto/contract-query.dto';
 import { ContractAuditService } from './contract-audit.service';
+import { ConnectionsService } from '../connections/connections.service';
 
 @Injectable()
 export class ContractsService {
+  private readonly logger = new Logger(ContractsService.name);
+
   constructor(
     @InjectRepository(ContractEntity)
     private readonly contractRepo: Repository<ContractEntity>,
     private readonly contractAudit: ContractAuditService,
+    private readonly config: ConfigService,
+    private readonly connectionsService: ConnectionsService,
   ) {}
+
+  /**
+   * Vườn có hợp đồng farmer_trader trạng thái active (đã ký, đang hiệu lực) với thương lái.
+   */
+  async assertTraderFarmLinked(traderId: string, farmId: string): Promise<void> {
+    const ok = await this.contractRepo.exists({
+      where: {
+        partyTraderId: traderId,
+        farmId,
+        contractType: 'farmer_trader',
+        status: 'active',
+      },
+    });
+    if (!ok) {
+      throw new BadRequestException(
+        'Vườn không thuộc hợp đồng nông dân–thương lái đã ký (đang hiệu lực) của bạn.',
+      );
+    }
+  }
+
+  /**
+   * Danh sách vườn từ farm-service — chỉ các farmId có hợp đồng active với trader.
+   */
+  async listTraderLinkedFarms(
+    traderId: string,
+    authorization?: string,
+  ): Promise<FarmDto[]> {
+    const rows = await this.contractRepo
+      .createQueryBuilder('c')
+      .select('c.farmId', 'farmId')
+      .distinct(true)
+      .where('c.partyTraderId = :tid', { tid: traderId })
+      .andWhere('c.contractType = :ctype', { ctype: 'farmer_trader' })
+      .andWhere('c.status = :st', { st: 'active' })
+      .andWhere('c.farmId IS NOT NULL')
+      .andWhere('c.deletedAt IS NULL')
+      .getRawMany();
+
+    const farmIds = rows
+      .map((r: { farmId?: string }) => r.farmId)
+      .filter((id): id is string => Boolean(id));
+
+    if (farmIds.length === 0) {
+      return [];
+    }
+
+    const farmBase = this.config.get<string>(
+      'FARM_SERVICE_URL',
+      'http://farm-service:3003',
+    );
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+    };
+    if (authorization) {
+      headers.Authorization = authorization;
+    }
+
+    const results = await Promise.all(
+      farmIds.map((id) => this.fetchFarmJson(farmBase, id, headers)),
+    );
+    return results.filter((f): f is FarmDto => f !== null);
+  }
+
+  private async fetchFarmJson(
+    farmBase: string,
+    farmId: string,
+    headers: Record<string, string>,
+  ): Promise<FarmDto | null> {
+    const url = `${farmBase.replace(/\/$/, '')}/api/v1/farms/${farmId}`;
+    try {
+      const res = await fetch(url, {
+        headers,
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) {
+        this.logger.warn(`farm-service GET /farms/${farmId} → ${res.status}`);
+        return null;
+      }
+      return (await res.json()) as FarmDto;
+    } catch (err) {
+      this.logger.warn(
+        `farm-service không đọc được vườn ${farmId}: ${(err as Error).message}`,
+      );
+      return null;
+    }
+  }
 
   async list(
     query: ContractQueryDto,
@@ -202,10 +297,13 @@ export class ContractsService {
       deposit: dto.deposit ?? null,
       startDate: dto.startDate,
       endDate: dto.endDate,
-      status: 'active',
+      status: 'pending_signature',
       terms: dto.terms,
       orderId: null,
       proposalId: null,
+      farmerSignedAt: null,
+      traderSignedAt: null,
+      buyerSignedAt: null,
     });
 
     const saved = await this.contractRepo.save(entity);
@@ -246,6 +344,88 @@ export class ContractsService {
     throw new ForbiddenException('Không có quyền xem hợp đồng này');
   }
 
+  /**
+   * POST /contracts/:id/sign — bên liên quan ký hợp đồng.
+   * Khi cả 2 bên ký xong, status chuyển pending_signature → active.
+   */
+  async sign(id: string, user: JwtPayload): Promise<ContractDto> {
+    const entity = await this.contractRepo.findOne({ where: { id } });
+    if (!entity) {
+      throw new NotFoundException('Hợp đồng không tồn tại');
+    }
+    this.assertCanAccessContract(entity, user);
+
+    if (entity.status !== 'pending_signature') {
+      throw new ConflictException('Hợp đồng không ở trạng thái chờ ký');
+    }
+
+    const now = new Date();
+
+    if (user.role === 'farmer') {
+      if (entity.partyFarmerId !== user.sub) {
+        throw new ForbiddenException('Bạn không phải nông dân trong hợp đồng này');
+      }
+      if (entity.farmerSignedAt) {
+        throw new ConflictException('Bạn đã ký hợp đồng này rồi');
+      }
+      entity.farmerSignedAt = now;
+    } else if (user.role === 'trader') {
+      if (entity.partyTraderId !== user.sub) {
+        throw new ForbiddenException('Bạn không phải thương lái trong hợp đồng này');
+      }
+      if (entity.traderSignedAt) {
+        throw new ConflictException('Bạn đã ký hợp đồng này rồi');
+      }
+      entity.traderSignedAt = now;
+    } else if (user.role === 'buyer') {
+      if (entity.partyBuyerId !== user.sub) {
+        throw new ForbiddenException('Bạn không phải người mua trong hợp đồng này');
+      }
+      if (entity.buyerSignedAt) {
+        throw new ConflictException('Bạn đã ký hợp đồng này rồi');
+      }
+      entity.buyerSignedAt = now;
+    } else {
+      throw new ForbiddenException('Vai trò không được phép ký hợp đồng');
+    }
+
+    // Khi cả 2 bên ký xong → chuyển sang active
+    const bothSigned =
+      entity.contractType === 'farmer_trader'
+        ? entity.farmerSignedAt != null && entity.traderSignedAt != null
+        : entity.traderSignedAt != null && entity.buyerSignedAt != null;
+
+    const previousStatus = entity.status;
+    if (bothSigned) {
+      entity.status = 'active';
+    }
+
+    const saved = await this.contractRepo.save(entity);
+
+    if (saved.status !== previousStatus) {
+      await this.contractAudit.logStatusChange(saved.id, previousStatus, saved.status, user.sub);
+    }
+
+    this.logger.log(`Contract ${id} signed by ${user.sub} (${user.role}); both_signed=${bothSigned}`);
+
+    // Khi cả hai bên ký xong hợp đồng farmer_trader → tự động đánh dấu kết nối là 'signed'
+    if (bothSigned && entity.contractType === 'farmer_trader') {
+      await this.connectionsService
+        .markConnectionSignedByContract(
+          entity.partyFarmerId ?? '',
+          entity.partyTraderId,
+          entity.farmId ?? null,
+        )
+        .catch((err) =>
+          this.logger.warn(
+            `markConnectionSignedByContract failed: ${(err as Error).message}`,
+          ),
+        );
+    }
+
+    return this.toDto(saved);
+  }
+
   async listAuditLogs(contractId: string, user: JwtPayload): Promise<ContractAuditLogEntryDto[]> {
     await this.getById(contractId, user);
     const rows = await this.contractAudit.findByContractId(contractId);
@@ -277,7 +457,11 @@ export class ContractsService {
       endDate: entity.endDate,
       status: entity.status,
       terms: entity.terms,
+      farmerSignedAt: entity.farmerSignedAt?.toISOString(),
+      traderSignedAt: entity.traderSignedAt?.toISOString(),
+      buyerSignedAt: entity.buyerSignedAt?.toISOString(),
       createdAt: entity.createdAt.toISOString(),
+      updatedAt: entity.updatedAt.toISOString(),
     };
   }
 }

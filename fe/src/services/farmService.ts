@@ -61,6 +61,21 @@ export interface ListFarmsRequestOptions {
   accessToken?: string;
 }
 
+/**
+ * GET /api/v1/contracts/linked-farms (trader)
+ * Vườn có hợp đồng nông dân–thương lái trạng thái đang hiệu lực (đã ký) với chính mình.
+ */
+export async function listTraderLinkedContractFarms(
+  options: ListFarmsRequestOptions = {},
+): Promise<ListResponse<FarmDto>> {
+  const { data } = await apiClient.get<ListResponse<FarmDto>>('/contracts/linked-farms', {
+    headers: options.accessToken
+      ? { Authorization: `Bearer ${options.accessToken}` }
+      : undefined,
+  });
+  return data;
+}
+
 export type CreateFarmDto = Pick<FarmDto, 'name' | 'location' | 'area' | 'cropType' | 'standardId' | 'plantingDate'>;
 export type UpdateFarmDto = Partial<CreateFarmDto>;
 

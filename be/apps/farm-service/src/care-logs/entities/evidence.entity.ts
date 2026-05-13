@@ -8,7 +8,6 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { CareLogEntity } from './care-log.entity';
-import { FarmEntity } from '../../farms/entities/farm.entity';
 
 @Entity('evidences')
 export class EvidenceEntity {
@@ -22,14 +21,6 @@ export class EvidenceEntity {
   @ManyToOne(() => CareLogEntity, (cl) => cl.evidences, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'care_log_id' })
   careLog: CareLogEntity;
-
-  @Index('idx_evidences_farm_id')
-  @Column({ name: 'farm_id' })
-  farmId: string;
-
-  @ManyToOne(() => FarmEntity, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'farm_id' })
-  farm: FarmEntity;
 
   @Column({ name: 'file_url', type: 'text' })
   fileUrl: string;

@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -10,6 +11,7 @@ import { ProductDto, CreateProductDto, ListResponse } from '@trustagri/shared';
 import { ProductEntity } from './entities/product.entity';
 import { ProductQueryDto } from './dto/product-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { ContractsService } from '../contracts/contracts.service';
 
 @Injectable()
 export class ProductsService {
@@ -18,6 +20,7 @@ export class ProductsService {
   constructor(
     @InjectRepository(ProductEntity)
     private readonly productRepo: Repository<ProductEntity>,
+    private readonly contractsService: ContractsService,
   ) {}
 
   /**
@@ -98,9 +101,17 @@ export class ProductsService {
     dto: CreateProductDto,
     traderId: string,
   ): Promise<ProductDto> {
+    const farmId = dto.farmId?.trim();
+    if (!farmId) {
+      throw new BadRequestException(
+        'Vui lòng chọn vườn từ hợp đồng nông dân–thương lái đã ký (đang hiệu lực).',
+      );
+    }
+    await this.contractsService.assertTraderFarmLinked(traderId, farmId);
+
     const entity = this.productRepo.create({
       traderId,
-      farmId: dto.farmId ?? null,
+      farmId,
       name: dto.name,
       cropType: dto.cropType,
       unit: dto.unit,
@@ -130,7 +141,16 @@ export class ProductsService {
     const product = await this.requireProduct(id);
     this.ensureOwner(product, traderId);
 
-    if (dto.farmId !== undefined) product.farmId = dto.farmId ?? null;
+    if (dto.farmId !== undefined) {
+      const nextFarm = dto.farmId?.trim();
+      if (!nextFarm) {
+        throw new BadRequestException(
+          'Sản phẩm phải gắn vườn từ hợp đồng đã ký (đang hiệu lực).',
+        );
+      }
+      await this.contractsService.assertTraderFarmLinked(traderId, nextFarm);
+      product.farmId = nextFarm;
+    }
     if (dto.name !== undefined) product.name = dto.name;
     if (dto.cropType !== undefined) product.cropType = dto.cropType;
     if (dto.unit !== undefined) product.unit = dto.unit;

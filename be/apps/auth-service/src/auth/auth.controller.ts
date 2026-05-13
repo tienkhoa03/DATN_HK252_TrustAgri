@@ -3,6 +3,8 @@ import {
   Post,
   Get,
   Put,
+  Param,
+  ParseUUIDPipe,
   Body,
   Headers,
   HttpCode,
@@ -20,6 +22,7 @@ import {
   AuthVerifyResponseDto,
   UserProfileDto,
   UserProfileUpdateDto,
+  UserPublicSummaryDto,
   Public,
   CurrentUser,
   JwtPayload,
@@ -117,6 +120,18 @@ export class AuthController {
   @Get('me')
   getMe(@CurrentUser() user: JwtPayload): Promise<UserProfileDto> {
     return this.authService.getMe(user.sub);
+  }
+
+  /**
+   * GET /api/v1/auth/users/:userId
+   * Tra cứu tên hiển thị (và avatar nếu có) theo UUID — không yêu cầu JWT.
+   */
+  @Get('users/:userId')
+  @Public()
+  getUserById(
+    @Param('userId', new ParseUUIDPipe()) userId: string,
+  ): Promise<UserPublicSummaryDto> {
+    return this.authService.getUserPublicById(userId);
   }
 
   /**

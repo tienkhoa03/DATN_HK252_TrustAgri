@@ -94,6 +94,7 @@ export class BuyingRequestsService {
       expectedPrice: dto.expectedPrice ?? null,
       depositOffered: dto.depositOffered ?? null,
       deliveryDate: dto.deliveryDate,
+      description: dto.description?.trim() ? dto.description.trim() : null,
       status: 'open',
     });
 
@@ -126,6 +127,9 @@ export class BuyingRequestsService {
     if (dto.depositOffered !== undefined)
       entity.depositOffered = dto.depositOffered ?? null;
     if (dto.deliveryDate !== undefined) entity.deliveryDate = dto.deliveryDate;
+    if (dto.description !== undefined) {
+      entity.description = dto.description?.trim() ? dto.description.trim() : null;
+    }
     if (dto.status !== undefined) entity.status = dto.status;
 
     const saved = await this.buyingRequestRepo.save(entity);
@@ -182,6 +186,7 @@ export class BuyingRequestsService {
           ? Number(entity.depositOffered)
           : undefined,
       deliveryDate: entity.deliveryDate,
+      description: entity.description ?? undefined,
       status: entity.status,
       createdAt: entity.createdAt.toISOString(),
     };

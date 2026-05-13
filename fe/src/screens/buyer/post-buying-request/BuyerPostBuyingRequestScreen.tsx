@@ -53,6 +53,7 @@ interface FormData {
   depositOffered: string;
   qualityStandardCode: string;
   deliveryDate: string;
+  description: string;
 }
 
 const EMPTY_FORM: FormData = {
@@ -63,6 +64,7 @@ const EMPTY_FORM: FormData = {
   depositOffered: '',
   qualityStandardCode: '',
   deliveryDate: '',
+  description: '',
 };
 
 type Step = 1 | 2 | 3 | 4;
@@ -223,6 +225,25 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onEdit, onCancel, ca
         </div>
       </div>
 
+      {request.description?.trim() && (
+        <div
+          style={{
+            marginBottom: spacing.sm,
+            padding: spacing.sm,
+            backgroundColor: colors.background.primary,
+            borderRadius: '8px',
+            border: `1px solid ${colors.background.tertiary}`,
+          }}
+        >
+          <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: spacing.xs }}>
+            Mô tả nhu cầu
+          </Text>
+          <Text size="small" style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.45 }}>
+            {request.description.trim()}
+          </Text>
+        </div>
+      )}
+
       {/* Actions — only for open requests */}
       {request.status === 'open' && (
         <div style={{ display: 'flex', gap: spacing.sm }}>
@@ -331,6 +352,7 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
       depositOffered: req.depositOffered !== undefined ? String(req.depositOffered) : '',
       qualityStandardCode: req.qualityStandardCode ?? '',
       deliveryDate: deliveryDateValue,
+      description: req.description ?? '',
     });
     setCurrentStep(1);
     setViewMode('form');
@@ -398,6 +420,7 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
       expectedPrice: formData.expectedPrice ? parseFloat(formData.expectedPrice) : undefined,
       depositOffered: formData.depositOffered ? parseFloat(formData.depositOffered) : undefined,
       deliveryDate: new Date(formData.deliveryDate).toISOString(),
+      description: formData.description.trim(),
     };
 
     try {
@@ -691,6 +714,18 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
             <Text size="xSmall" style={{ color: colors.text.secondary }}>
               💡 Yêu cầu tiêu chuẩn giúp đảm bảo chất lượng nông sản
             </Text>
+
+            <label style={{ ...labelStyle, marginTop: spacing.md }}>Mô tả nhu cầu (tùy chọn)</label>
+            <textarea
+              style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' }}
+              placeholder="Ví dụ: kích cỡ, độ chín, nguồn gốc mong muốn, thời điểm nhận hàng..."
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              maxLength={2000}
+            />
+            <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.xs }}>
+              {formData.description.length}/2000
+            </Text>
           </div>
         );
       }
@@ -728,6 +763,7 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
                 { label: 'Số lượng', value: `${formData.quantity} ${formData.unit}` },
                 { label: 'Giá kỳ vọng', value: formData.expectedPrice ? `${parseInt(formData.expectedPrice, 10).toLocaleString('vi-VN')} VNĐ/${formData.unit}` : '—' },
                 { label: 'Tiêu chuẩn', value: stdName ?? 'Không yêu cầu' },
+                { label: 'Mô tả', value: formData.description.trim() ? formData.description.trim().slice(0, 120) + (formData.description.trim().length > 120 ? '…' : '') : '—' },
               ].map(({ label, value }) => (
                 <div
                   key={label}

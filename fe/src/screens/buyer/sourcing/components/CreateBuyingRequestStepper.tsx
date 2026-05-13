@@ -204,7 +204,7 @@ function renderStep2(
       </div>
 
       <div style={fieldGroupStyles}>
-        <label style={labelStyles}>Yêu cầu khác</label>
+        <label style={labelStyles}>Mô tả nhu cầu (tùy chọn)</label>
         <textarea
           style={{
             ...inputStyles,
@@ -212,8 +212,9 @@ function renderStep2(
             padding: spacing.md,
             resize: 'vertical',
           }}
-          placeholder="Ghi chú thêm về yêu cầu chất lượng..."
+          placeholder="Chi tiết về chất lượng, số lượng từng đợt, thời gian nhận hàng..."
           value={state.notes}
+          maxLength={2000}
           onChange={(e) => setState((s) => ({ ...s, notes: e.target.value }))}
         />
       </div>
@@ -317,6 +318,7 @@ export const CreateBuyingRequestStepper: React.FC<CreateBuyingRequestStepperProp
       expectedPrice: state.expectedPrice ? parseFloat(state.expectedPrice) : undefined,
       depositOffered: state.depositAmount ? parseFloat(state.depositAmount) : undefined,
       deliveryDate: state.deliveryDate,
+      description: state.notes.trim() || undefined,
     };
 
     try {

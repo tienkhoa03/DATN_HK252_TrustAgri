@@ -5,6 +5,8 @@ import {
   IsArray,
   IsIn,
   IsObject,
+  IsUUID,
+  MaxLength,
 } from 'class-validator';
 
 // ─── PRODUCT ───────────────────────────────────────────────────────────────────
@@ -77,6 +79,7 @@ export interface BuyingRequestDto {
   expectedPrice?: number;
   depositOffered?: number;
   deliveryDate: string;
+  description?: string;
   status: 'open' | 'matched' | 'closed';
   createdAt: string;
 }
@@ -105,6 +108,11 @@ export class CreateBuyingRequestDto {
 
   @IsString()
   deliveryDate: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  description?: string;
 }
 
 // ─── ORDER ─────────────────────────────────────────────────────────────────────
@@ -150,6 +158,7 @@ export interface ProposalDto {
   id: string;
   buyingRequestId: string;
   traderId: string;
+  farmId?: string;
   price: number;
   quantity: number;
   standardCode?: string;
@@ -161,6 +170,9 @@ export interface ProposalDto {
 export class CreateProposalDto {
   @IsString()
   buyingRequestId: string;
+
+  @IsUUID('4')
+  farmId: string;
 
   @IsNumber()
   price: number;
@@ -197,9 +209,16 @@ export interface ContractDto {
   deposit?: number;
   startDate: string;
   endDate: string;
-  status: 'active' | 'pending_change' | 'completed' | 'cancelled';
+  status: 'pending_signature' | 'active' | 'pending_change' | 'in_settlement' | 'completed' | 'cancelled';
   terms: string;
+  /** ISO timestamp — nông dân đã ký (farmer_trader contracts). */
+  farmerSignedAt?: string;
+  /** ISO timestamp — thương lái đã ký. */
+  traderSignedAt?: string;
+  /** ISO timestamp — người mua đã ký (trader_buyer contracts). */
+  buyerSignedAt?: string;
   createdAt: string;
+  updatedAt: string;
 }
 
 export class CreateContractDto {

@@ -22,6 +22,7 @@ import {
   JwtPayload,
   UserProfileDto,
   UserProfileUpdateDto,
+  UserPublicSummaryDto,
 } from '@trustagri/shared';
 import { UserEntity } from './entities/user.entity';
 import { ZaloService } from './zalo.service';
@@ -239,6 +240,21 @@ export class AuthService {
       throw new NotFoundException('Người dùng không tồn tại');
     }
     return this.mapToProfileDto(user);
+  }
+
+  async getUserPublicById(userId: string): Promise<UserPublicSummaryDto> {
+    const user = await this.userRepo.findOne({
+      where: { userId },
+      select: ['userId', 'displayName', 'avatarUrl'],
+    });
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+    return {
+      userId: user.userId,
+      displayName: user.displayName,
+      ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
+    };
   }
 
   async updateMe(userId: string, dto: UserProfileUpdateDto): Promise<UserProfileDto> {

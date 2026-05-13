@@ -434,6 +434,7 @@ export class ContractChangeRequestsService {
       status: entity.status,
       terms: entity.terms,
       createdAt: entity.createdAt.toISOString(),
+      updatedAt: entity.updatedAt.toISOString(),
     };
   }
 

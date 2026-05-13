@@ -1,9 +1,12 @@
 /**
  * MarketplaceSupplyPanel — "Nguồn cung" tab inside TraderMarketplaceScreen.
- * Migrated from TraderSupplyMonitorScreen tab: search-supply.
- * Adds new "certification" filter.
- *
  * Requirements: FR-T07, FR-T08, US-T04
+ *
+ * Changes:
+ * - Search only triggers on button click (not on each dropdown change)
+ * - Removed Google Maps placeholder
+ * - Pending connections show "Hủy yêu cầu" button; accepted connections stay unchanged
+ * - Trạng thái kết nối theo farmId (ConnectionDto.farmId), không gộp theo ownerId
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -17,7 +20,13 @@ import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import { listFarms } from '@/services/farmService';
 import type { FarmDto } from '@/services/farmService';
 import { ApiError } from '@/api/errors';
-import { createConnection, listConnections, toConnectionViMessage, searchFarmers } from '@/services/connectionService';
+import {
+  createConnection,
+  cancelConnection,
+  listConnections,
+  toConnectionViMessage,
+  searchFarmers,
+} from '@/services/connectionService';
 import type { FarmerSearchResultDto } from '@/services/connectionService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 
@@ -56,6 +65,13 @@ const CERTIFICATION_OPTIONS = [
   { value: 'globalgap', label: 'GlobalGAP' },
   { value: 'organic', label: 'Hữu cơ' },
 ];
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+interface ConnectionInfo {
+  status: 'pending' | 'accepted';
+  connectionId: string;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -107,24 +123,33 @@ export const MarketplaceSupplyPanel: React.FC = () => {
   const openSnackbar = useStableOpenSnackbar();
   const session = useAtomValue(authSessionAtom);
 
+  // UI-only filter state (dropdowns / keyword input — does NOT trigger search)
   const [searchKeyword, setSearchKeyword] = useState('');
   const [filter, setFilter] = useState({ cropType: 'all', region: 'all', certification: 'all' });
+
+  // Results state
   const [farms, setFarms] = useState<FarmDto[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFarm, setSelectedFarm] = useState<FarmDto | null>(null);
   const [farmerNames, setFarmerNames] = useState<Record<string, string>>({});
 
+  // Autocomplete suggestions
   const [suggestions, setSuggestions] = useState<FarmDto[]>([]);
   const [isSuggestLoading, setIsSuggestLoading] = useState(false);
-  const [connectionStatusMap, setConnectionStatusMap] = useState<Record<string, 'pending' | 'accepted'>>({});
+
+  // Connection status: keyed by farmId (ConnectionDto.farmId) → { status, connectionId }
+  const [connectionStatusMap, setConnectionStatusMap] = useState<Record<string, ConnectionInfo>>({});
+  const [cancellingFarmId, setCancellingFarmId] = useState<string | null>(null);
 
   const inFlightRef = useRef(false);
   const loadedKeyRef = useRef<string | null>(null);
   const warnedRef = useRef(false);
   const suggestTimerRef = useRef<number | null>(null);
 
-  const loadFarms = useCallback(async () => {
+  // ── Core search function (imperative, called explicitly) ──────────────────
+
+  const doSearch = useCallback(async (params: { cropType: string; region: string; certification: string; keyword: string }) => {
     if (!session?.accessToken) {
       setFarms([]);
       setTotal(0);
@@ -135,7 +160,7 @@ export const MarketplaceSupplyPanel: React.FC = () => {
       return;
     }
     warnedRef.current = false;
-    const key = [session.userId, filter.cropType, filter.region, filter.certification, searchKeyword.trim()].join('|');
+    const key = [session.userId, params.cropType, params.region, params.certification, params.keyword.trim()].join('|');
     if (loadedKeyRef.current === key) return;
     if (inFlightRef.current) return;
 
@@ -143,13 +168,12 @@ export const MarketplaceSupplyPanel: React.FC = () => {
     setIsLoading(true);
     setSelectedFarm(null);
     try {
-      // certifications is not in ListFarmsParams; spread via unknown cast so Axios forwards it as query param without modifying farmService.ts
-      const extraParams = filter.certification !== 'all' ? { certifications: filter.certification } : {};
+      const extraParams = params.certification !== 'all' ? { certifications: params.certification } : {};
       const res = await listFarms(
         {
-          keyword: searchKeyword.trim() || undefined,
-          cropType: filter.cropType !== 'all' ? filter.cropType : undefined,
-          region: filter.region !== 'all' ? filter.region : undefined,
+          keyword: params.keyword.trim() || undefined,
+          cropType: params.cropType !== 'all' ? params.cropType : undefined,
+          region: params.region !== 'all' ? params.region : undefined,
           page: 1,
           limit: 20,
           ...(extraParams as object),
@@ -168,13 +192,16 @@ export const MarketplaceSupplyPanel: React.FC = () => {
       setIsLoading(false);
       inFlightRef.current = false;
     }
-  }, [filter.cropType, filter.region, filter.certification, searchKeyword, session?.accessToken, session?.userId, openSnackbar]);
+  }, [session?.accessToken, session?.userId, openSnackbar]);
 
   const loadSuggestions = useCallback(async (kw: string) => {
     if (!session?.accessToken || !kw.trim()) { setSuggestions([]); return; }
     setIsSuggestLoading(true);
     try {
-      const res = await listFarms({ keyword: kw.trim(), cropType: filter.cropType !== 'all' ? filter.cropType : undefined, region: filter.region !== 'all' ? filter.region : undefined, page: 1, limit: 5 }, { accessToken: session.accessToken });
+      const res = await listFarms(
+        { keyword: kw.trim(), cropType: filter.cropType !== 'all' ? filter.cropType : undefined, region: filter.region !== 'all' ? filter.region : undefined, page: 1, limit: 5 },
+        { accessToken: session.accessToken },
+      );
       setSuggestions(res.items);
     } catch { setSuggestions([]); }
     finally { setIsSuggestLoading(false); }
@@ -194,23 +221,28 @@ export const MarketplaceSupplyPanel: React.FC = () => {
     if (!session?.accessToken) return;
     try {
       const res = await listConnections({ limit: 100 });
-      const map: Record<string, 'pending' | 'accepted'> = {};
+      const map: Record<string, ConnectionInfo> = {};
       res.items.forEach((conn) => {
-        if (conn.status === 'rejected') return;
-        // Xác định userId của nông dân trong kết nối (bất kể chiều nào)
-        const farmerId = conn.fromRole === 'farmer' ? conn.fromUserId : conn.toUserId;
-        // accepted ưu tiên cao hơn pending
-        if (!map[farmerId] || conn.status === 'accepted') {
-          map[farmerId] = conn.status;
+        if (conn.status === 'rejected' || !conn.farmId) return;
+        const farmId = conn.farmId;
+        // accepted takes priority over pending
+        if (!map[farmId] || conn.status === 'accepted') {
+          map[farmId] = { status: conn.status as 'pending' | 'accepted', connectionId: conn.id };
         }
       });
       setConnectionStatusMap(map);
     } catch { /* ignore — không block UI */ }
   }, [session?.accessToken]);
 
-  // Initial load
-  useEffect(() => { void loadFarms(); }, [loadFarms]);
-  useEffect(() => { loadedKeyRef.current = null; }, [session?.userId]);
+  // Auto-load on mount / session change
+  useEffect(() => {
+    if (session?.userId) {
+      loadedKeyRef.current = null;
+      void doSearch({ cropType: 'all', region: 'all', certification: 'all', keyword: '' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.userId]);
+
   useEffect(() => { void loadFarmerNames(); }, [loadFarmerNames]);
   useEffect(() => { void loadExistingConnections(); }, [loadExistingConnections]);
 
@@ -221,13 +253,39 @@ export const MarketplaceSupplyPanel: React.FC = () => {
     return () => { if (suggestTimerRef.current) window.clearTimeout(suggestTimerRef.current); };
   }, [loadSuggestions, searchKeyword]);
 
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+
+  const handleSearch = () => {
+    loadedKeyRef.current = null;
+    void doSearch({ cropType: filter.cropType, region: filter.region, certification: filter.certification, keyword: searchKeyword.trim() });
+  };
+
   const handleSendConnectionRequest = async (farmOwnerId: string, farmId: string) => {
     try {
-      await createConnection({ toUserId: farmOwnerId, farmId });
-      setConnectionStatusMap((prev) => ({ ...prev, [farmOwnerId]: 'pending' }));
+      const conn = await createConnection({ toUserId: farmOwnerId, farmId });
+      setConnectionStatusMap((prev) => ({ ...prev, [farmId]: { status: 'pending', connectionId: conn.id } }));
       openSnackbar({ type: 'success', text: 'Đã gửi yêu cầu kết nối tới nông dân.', duration: 3000, icon: true });
     } catch (err) {
       openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'create'), duration: 3000, icon: true });
+    }
+  };
+
+  const handleCancelConnectionRequest = async (farmId: string) => {
+    const info = connectionStatusMap[farmId];
+    if (!info || info.status !== 'pending') return;
+    setCancellingFarmId(farmId);
+    try {
+      await cancelConnection(info.connectionId);
+      setConnectionStatusMap((prev) => {
+        const next = { ...prev };
+        delete next[farmId];
+        return next;
+      });
+      openSnackbar({ type: 'success', text: 'Đã hủy yêu cầu kết nối.', duration: 3000, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'cancel'), duration: 3000, icon: true });
+    } finally {
+      setCancellingFarmId(null);
     }
   };
 
@@ -282,6 +340,7 @@ export const MarketplaceSupplyPanel: React.FC = () => {
           <input
             value={searchKeyword}
             onChange={(e) => setSearchKeyword(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { setSuggestions([]); handleSearch(); } }}
             placeholder="Nhập tên vườn…"
             style={{ width: '100%', padding: `${spacing.sm} ${spacing.md}`, borderRadius: 10, border: `1px solid ${colors.background.tertiary}`, fontSize: fontSize.body, boxSizing: 'border-box' }}
           />
@@ -295,7 +354,13 @@ export const MarketplaceSupplyPanel: React.FC = () => {
               ) : (
                 suggestions.map((f) => (
                   <button key={f.id} type="button" style={{ width: '100%', textAlign: 'left', padding: `${spacing.sm} ${spacing.md}`, background: 'transparent', border: 'none', cursor: 'pointer' }}
-                    onClick={() => { setSearchKeyword(f.name); setSuggestions([]); loadedKeyRef.current = null; void loadFarms(); }}>
+                    onClick={() => {
+                      const kw = f.name;
+                      setSearchKeyword(kw);
+                      setSuggestions([]);
+                      loadedKeyRef.current = null;
+                      void doSearch({ cropType: filter.cropType, region: filter.region, certification: filter.certification, keyword: kw });
+                    }}>
                     <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>{f.name}</Text>
                     <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>{f.location?.province ? `${f.location.province} • ${cropLabel(f.cropType)}` : cropLabel(f.cropType)}</Text>
                   </button>
@@ -323,17 +388,10 @@ export const MarketplaceSupplyPanel: React.FC = () => {
         <button
           type="button"
           style={{ width: '100%', padding: spacing.md, backgroundColor: colors.primary.agriGreen, color: '#ffffff', border: 'none', borderRadius: 8, fontSize: fontSize.body, fontWeight: fontWeight.semibold, cursor: 'pointer', minHeight: 44 }}
-          onClick={() => { loadedKeyRef.current = null; void loadFarms(); }}
+          onClick={handleSearch}
         >
           Tìm kiếm
         </button>
-      </div>
-
-      {/* Map placeholder */}
-      <div style={{ padding: spacing.lg, backgroundColor: colors.background.secondary, borderRadius: 10, textAlign: 'center', marginBottom: spacing.md }}>
-        <Icon name="map" size="lg" color={colors.text.secondary} />
-        <Text size="small" style={{ color: colors.text.secondary, marginTop: spacing.sm }}>Bản đồ số hiển thị vị trí Farm Lab</Text>
-        <Text size="xSmall" style={{ color: colors.text.secondary }}>(Tích hợp Google Maps — Phase 8)</Text>
       </div>
 
       {/* Loading skeleton */}
@@ -349,7 +407,7 @@ export const MarketplaceSupplyPanel: React.FC = () => {
         <div style={{ textAlign: 'center', padding: `${spacing.xl} ${spacing.md}` }}>
           <Icon name="farm" size="lg" color={colors.text.secondary} />
           <Text size="small" style={{ color: colors.text.secondary, marginTop: spacing.md }}>Không tìm thấy vườn phù hợp</Text>
-          <Text size="xSmall" style={{ color: colors.text.secondary }}>Hãy thử điều chỉnh bộ lọc</Text>
+          <Text size="xSmall" style={{ color: colors.text.secondary }}>Hãy thử điều chỉnh bộ lọc hoặc nhấn Tìm kiếm</Text>
         </div>
       )}
 
@@ -358,89 +416,93 @@ export const MarketplaceSupplyPanel: React.FC = () => {
         <>
           <Text.Title size="small" style={{ marginBottom: spacing.md }}>Kết quả ({total})</Text.Title>
 
-          {farms.map((farm) => (
-            <div key={farm.id} style={farmCardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', cursor: 'pointer' }} onClick={() => setSelectedFarm(selectedFarm?.id === farm.id ? null : farm)}>
-                <div style={{ flex: 1 }}>
-                  <Text.Title size="small" style={{ margin: 0 }}>{farm.name}</Text.Title>
-                  <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                    {farm.location.province} • {farm.location.district}
-                  </Text>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: spacing.xs }}>
-                  <span style={{ padding: `2px ${spacing.sm}`, backgroundColor: `${colors.primary.agriGreen}18`, borderRadius: 99, fontSize: fontSize.caption, fontWeight: fontWeight.semibold, color: colors.primary.agriGreen }}>
-                    {cropLabel(farm.cropType)}
-                  </span>
-                  {farm.standardId && (
-                    <span style={{ padding: `2px ${spacing.sm}`, backgroundColor: `${colors.primary.zaloBlue}14`, borderRadius: 99, fontSize: fontSize.small, color: colors.primary.zaloBlue }}>
-                      Có tiêu chuẩn
+          {farms.map((farm) => {
+            const connInfo = connectionStatusMap[farm.id];
+            const isCancelling = cancellingFarmId === farm.id;
+
+            return (
+              <div key={farm.id} style={farmCardStyle}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', cursor: 'pointer' }} onClick={() => setSelectedFarm(selectedFarm?.id === farm.id ? null : farm)}>
+                  <div style={{ flex: 1 }}>
+                    <Text.Title size="small" style={{ margin: 0 }}>{farm.name}</Text.Title>
+                    <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                      {farm.location.province} • {farm.location.district}
+                    </Text>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: spacing.xs }}>
+                    <span style={{ padding: `2px ${spacing.sm}`, backgroundColor: `${colors.primary.agriGreen}18`, borderRadius: 99, fontSize: fontSize.caption, fontWeight: fontWeight.semibold, color: colors.primary.agriGreen }}>
+                      {cropLabel(farm.cropType)}
                     </span>
-                  )}
-                </div>
-              </div>
-
-              <div style={{ marginTop: spacing.sm, display: 'flex', gap: spacing.md }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs }}>
-                  <Icon name="crop" size="sm" color={colors.text.secondary} />
-                  <Text size="xSmall" style={{ color: colors.text.secondary }}>{areaDisplay(farm.area)}</Text>
-                </div>
-              </div>
-
-              {/* Expanded detail */}
-              {selectedFarm?.id === farm.id && (
-                <div style={{ marginTop: spacing.md, padding: spacing.md, backgroundColor: colors.background.secondary, borderRadius: 10, border: `1px solid ${colors.background.tertiary}` }}>
-                  <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.sm }}>Chi tiết vườn</Text.Title>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: spacing.sm }}>
-                      <Icon name="users" size="sm" color={colors.text.secondary} />
-                      <div>
-                        <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Nông dân</Text>
-                        <Text size="small" style={{ margin: 0 }}>{farmerNames[farm.ownerId] ?? `…${farm.ownerId.slice(-6)}`}</Text>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: spacing.sm }}>
-                      <Icon name="map-pin" size="sm" color={colors.primary.zaloBlue} />
-                      <div>
-                        <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Địa chỉ</Text>
-                        <Text size="small" style={{ margin: 0 }}>{farm.location.addressLine}, {farm.location.district}, {farm.location.province}</Text>
-                      </div>
-                    </div>
-                    {farm.location.lat && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                        <Icon name="map" size="sm" color={colors.text.secondary} />
-                        <Text size="xSmall" style={{ color: colors.text.secondary }}>Tọa độ: {farm.location.lat.toFixed(4)}, {farm.location.lng?.toFixed(4)}</Text>
-                      </div>
-                    )}
                     {farm.standardId && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                        <Icon name="check" size="sm" color={colors.primary.agriGreen} />
-                        <Text size="xSmall" style={{ color: colors.primary.agriGreen }}>Tiêu chuẩn: {farm.standardId}</Text>
-                      </div>
+                      <span style={{ padding: `2px ${spacing.sm}`, backgroundColor: `${colors.primary.zaloBlue}14`, borderRadius: 99, fontSize: fontSize.small, color: colors.primary.zaloBlue }}>
+                        Có tiêu chuẩn
+                      </span>
                     )}
                   </div>
                 </div>
-              )}
 
-              {/* Connect button / status badge */}
-              {connectionStatusMap[farm.ownerId] === 'accepted' ? (
-                <div style={{ ...connectBtnStyle, backgroundColor: `${colors.primary.agriGreen}18`, color: colors.primary.agriGreen, cursor: 'default' }}>
-                  <Icon name="check" size="sm" color={colors.primary.agriGreen} />
-                  Đã kết nối
+                <div style={{ marginTop: spacing.sm, display: 'flex', gap: spacing.md }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs }}>
+                    <Icon name="crop" size="sm" color={colors.text.secondary} />
+                    <Text size="xSmall" style={{ color: colors.text.secondary }}>{areaDisplay(farm.area)}</Text>
+                  </div>
                 </div>
-              ) : connectionStatusMap[farm.ownerId] === 'pending' ? (
-                <div style={{ ...connectBtnStyle, backgroundColor: `${colors.primary.zaloBlue}10`, color: colors.primary.zaloBlue, cursor: 'default' }}>
-                  <Icon name="clock" size="sm" color={colors.primary.zaloBlue} />
-                  Đã gửi yêu cầu
-                </div>
-              ) : (
-                <button style={connectBtnStyle} type="button" onClick={() => void handleSendConnectionRequest(farm.ownerId, farm.id)}>
-                  <Icon name="users" size="sm" color={colors.primary.zaloBlue} />
-                  Gửi yêu cầu kết nối
-                </button>
-              )}
-            </div>
-          ))}
+
+                {/* Expanded detail */}
+                {selectedFarm?.id === farm.id && (
+                  <div style={{ marginTop: spacing.md, padding: spacing.md, backgroundColor: colors.background.secondary, borderRadius: 10, border: `1px solid ${colors.background.tertiary}` }}>
+                    <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.sm }}>Chi tiết vườn</Text.Title>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: spacing.sm }}>
+                        <Icon name="users" size="sm" color={colors.text.secondary} />
+                        <div>
+                          <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Nông dân</Text>
+                          <Text size="small" style={{ margin: 0 }}>{farmerNames[farm.ownerId] ?? `…${farm.ownerId.slice(-6)}`}</Text>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: spacing.sm }}>
+                        <Icon name="map-pin" size="sm" color={colors.primary.zaloBlue} />
+                        <div>
+                          <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Địa chỉ</Text>
+                          <Text size="small" style={{ margin: 0 }}>{farm.location.addressLine}, {farm.location.district}, {farm.location.province}</Text>
+                        </div>
+                      </div>
+                      {farm.standardId && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+                          <Icon name="check" size="sm" color={colors.primary.agriGreen} />
+                          <Text size="xSmall" style={{ color: colors.primary.agriGreen }}>Tiêu chuẩn: {farm.standardId}</Text>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Connection button / status */}
+                {connInfo?.status === 'accepted' ? (
+                  <div style={{ ...connectBtnStyle, backgroundColor: `${colors.primary.agriGreen}18`, color: colors.primary.agriGreen, cursor: 'default' }}>
+                    <Icon name="check" size="sm" color={colors.primary.agriGreen} />
+                    Đã kết nối
+                  </div>
+                ) : connInfo?.status === 'pending' ? (
+                  <button
+                    style={{ ...connectBtnStyle, backgroundColor: `${colors.functional.alertRed}10`, color: colors.functional.alertRed, cursor: isCancelling ? 'not-allowed' : 'pointer' }}
+                    type="button"
+                    disabled={isCancelling}
+                    onClick={() => void handleCancelConnectionRequest(farm.id)}
+                  >
+                    <Icon name="close" size="sm" color={isCancelling ? colors.text.secondary : colors.functional.alertRed} />
+                    {isCancelling ? 'Đang hủy...' : 'Hủy yêu cầu'}
+                  </button>
+                ) : (
+                  <button style={connectBtnStyle} type="button" onClick={() => void handleSendConnectionRequest(farm.ownerId, farm.id)}>
+                    <Icon name="users" size="sm" color={colors.primary.zaloBlue} />
+                    Gửi yêu cầu kết nối
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </>
       )}
     </div>

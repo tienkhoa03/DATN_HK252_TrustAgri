@@ -60,6 +60,10 @@ export class BuyingRequestEntity {
   @Column({ name: 'delivery_date', type: 'date' })
   deliveryDate: string;
 
+  /** Mô tả chi tiết nhu cầu mua (người mua nhập, trader đọc) */
+  @Column({ type: 'text', nullable: true })
+  description: string | null;
+
   @Index('idx_buying_requests_status')
   @Column({ type: 'varchar', length: 20, default: 'open' })
   status: BuyingRequestStatus;

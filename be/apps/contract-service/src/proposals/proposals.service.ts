@@ -13,6 +13,7 @@ import { ProposalQueryDto } from './dto/proposal-query.dto';
 import { BuyingRequestEntity } from '../buying-requests/entities/buying-request.entity';
 import { ContractEntity } from '../contracts/entities/contract.entity';
 import { ContractAuditService } from '../contracts/contract-audit.service';
+import { ContractsService } from '../contracts/contracts.service';
 
 @Injectable()
 export class ProposalsService {
@@ -26,6 +27,7 @@ export class ProposalsService {
     @InjectRepository(ContractEntity)
     private readonly contractRepo: Repository<ContractEntity>,
     private readonly contractAudit: ContractAuditService,
+    private readonly contractsService: ContractsService,
   ) {}
 
   /**
@@ -93,9 +95,12 @@ export class ProposalsService {
       );
     }
 
+    await this.contractsService.assertTraderFarmLinked(traderId, dto.farmId);
+
     const entity = this.proposalRepo.create({
       buyingRequestId: dto.buyingRequestId,
       traderId,
+      farmId: dto.farmId,
       price: dto.price,
       quantity: dto.quantity,
       standardCode: dto.standardCode ?? null,
@@ -201,14 +206,14 @@ export class ProposalsService {
       partyFarmerId: null,
       productId: null,
       standardId: null,
-      farmId: null,
+      farmId: proposal.farmId,
       quantity: proposal.quantity,
       unit: buyingRequest.unit,
       totalPrice,
       deposit: buyingRequest.depositOffered,
       startDate: today.toISOString().split('T')[0],
       endDate: endDate.toISOString().split('T')[0],
-      status: 'active',
+      status: 'pending_signature',
       terms: `Hợp đồng được tạo tự động từ đề xuất #${proposal.id}`,
       orderId: null,
       proposalId: proposal.id,
@@ -224,6 +229,7 @@ export class ProposalsService {
       id: entity.id,
       buyingRequestId: entity.buyingRequestId,
       traderId: entity.traderId,
+      farmId: entity.farmId ?? undefined,
       price: Number(entity.price),
       quantity: Number(entity.quantity),
       standardCode: entity.standardCode ?? undefined,

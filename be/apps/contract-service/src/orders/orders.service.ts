@@ -298,7 +298,7 @@ export class OrdersService {
       deposit: order.deposit,
       startDate: today.toISOString().split('T')[0],
       endDate: endDate.toISOString().split('T')[0],
-      status: 'active',
+      status: 'pending_signature',
       terms: `Hợp đồng được tạo tự động từ đơn hàng #${order.id}`,
       orderId: order.id,
       proposalId: null,

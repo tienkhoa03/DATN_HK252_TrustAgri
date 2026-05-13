@@ -201,6 +201,23 @@ export const SourcingListPanel: React.FC<SourcingListPanelProps> = ({
               </div>
             </div>
 
+            {req.description?.trim() && (
+              <Text
+                style={{
+                  fontSize: fontSize.caption,
+                  color: colors.text.primary,
+                  margin: `0 0 ${spacing.sm} 0`,
+                  lineHeight: 1.45,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 3,
+                  WebkitBoxOrient: 'vertical' as const,
+                  overflow: 'hidden',
+                }}
+              >
+                {req.description.trim()}
+              </Text>
+            )}
+
             {(req.proposalCount ?? 0) > 0 && (
               <div style={{
                 display: 'inline-flex',

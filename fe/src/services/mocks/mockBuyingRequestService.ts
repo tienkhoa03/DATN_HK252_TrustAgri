@@ -27,6 +27,7 @@ export interface BuyingRequestDto {
   expectedPrice?: number;
   depositOffered?: number;
   deliveryDate: string;   // ISO-8601 date string
+  description?: string;
   status: 'open' | 'matched' | 'closed';
   createdAt: string;      // ISO-8601
 }
@@ -54,10 +55,11 @@ export interface CreateBuyingRequestDto {
   expectedPrice?: number;
   depositOffered?: number;
   deliveryDate: string;
+  description?: string;
 }
 
 export type UpdateBuyingRequestDto = Partial<
-  Pick<BuyingRequestDto, 'quantity' | 'unit' | 'qualityStandardCode' | 'expectedPrice' | 'depositOffered' | 'deliveryDate'>
+  Pick<BuyingRequestDto, 'quantity' | 'unit' | 'qualityStandardCode' | 'expectedPrice' | 'depositOffered' | 'deliveryDate' | 'description'>
 >;
 
 // ── Mock buyer display names (lookup helper, không thuộc hợp đồng backend) ────
@@ -119,6 +121,7 @@ let MOCK_BUYING_REQUESTS: BuyingRequestDto[] = [
     expectedPrice: 115000,
     depositOffered: 5000000,
     deliveryDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    description: 'Ưu tiên trái cân nặng từ 2,5kg, vỏ xanh, độ chín 80–85%.',
     status: 'open',
     createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
   },
@@ -251,6 +254,7 @@ export async function createBuyingRequest(
     expectedPrice: body.expectedPrice,
     depositOffered: body.depositOffered,
     deliveryDate: body.deliveryDate,
+    description: body.description,
     status: 'open',
     createdAt: new Date().toISOString(),
   };

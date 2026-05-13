@@ -9,11 +9,13 @@ import {
   HttpStatus,
   ParseUUIDPipe,
   Headers,
+  Patch,
 } from '@nestjs/common';
 import {
   ContractDto,
   ComplianceDto,
   CreateContractDto,
+  FarmDto,
   ListResponse,
   CurrentUser,
   JwtPayload,
@@ -46,6 +48,26 @@ export class ContractsController {
     @CurrentUser() user: JwtPayload,
   ): Promise<ListResponse<ContractDto>> {
     return this.contractsService.list(query, user);
+  }
+
+  /**
+   * GET /api/v1/contracts/linked-farms
+   * Vườn có hợp đồng farmer_trader active với thương lái đang đăng nhập.
+   */
+  @Get('linked-farms')
+  @Roles('trader')
+  listLinkedFarms(
+    @CurrentUser() user: JwtPayload,
+    @Headers('authorization') authorization?: string,
+  ): Promise<ListResponse<FarmDto>> {
+    return this.contractsService
+      .listTraderLinkedFarms(user.sub, authorization)
+      .then((items) => ({
+        items,
+        page: 1,
+        limit: items.length > 0 ? items.length : 20,
+        total: items.length,
+      }));
   }
 
   @Get(':id/audit-logs')
@@ -84,5 +106,19 @@ export class ContractsController {
     @CurrentUser() user: JwtPayload,
   ): Promise<ContractDto> {
     return this.contractsService.create(dto, user);
+  }
+
+  /**
+   * PATCH /api/v1/contracts/:id/sign
+   * Bên liên quan ký hợp đồng. Khi cả 2 bên ký, status → active.
+   */
+  @Patch(':id/sign')
+  @HttpCode(HttpStatus.OK)
+  @Roles('farmer', 'trader', 'buyer')
+  signContract(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<ContractDto> {
+    return this.contractsService.sign(id, user);
   }
 }

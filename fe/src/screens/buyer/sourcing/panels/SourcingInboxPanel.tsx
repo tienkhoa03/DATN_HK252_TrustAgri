@@ -159,6 +159,11 @@ export const SourcingInboxPanel: React.FC<SourcingInboxPanelProps> = ({
                 ? ` · Giá kỳ vọng: ${request.expectedPrice.toLocaleString('vi-VN')} VNĐ`
                 : ''}
             </Text>
+            {request.description?.trim() && (
+              <Text style={{ fontSize: fontSize.caption, color: colors.text.primary, margin: `${spacing.sm} 0 0`, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+                {request.description.trim()}
+              </Text>
+            )}
           </div>
         )}
 

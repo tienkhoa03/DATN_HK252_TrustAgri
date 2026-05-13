@@ -57,6 +57,11 @@ export class CareLogEntity {
   @Column({ name: 'client_record_id', nullable: true, type: 'varchar', unique: true })
   clientRecordId: string | null;
 
+  /** Cross-service FK → users.user_id (auth-service) — ai thực hiện hành động */
+  @Index('idx_care_logs_performed_by')
+  @Column({ name: 'performed_by', nullable: true, type: 'varchar' })
+  performedBy: string | null;
+
   @OneToMany(() => EvidenceEntity, (e) => e.careLog, { cascade: true, eager: false })
   evidences: EvidenceEntity[];
 

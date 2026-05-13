@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   Query,
@@ -59,10 +60,11 @@ export class SearchController {
 
 /**
  * Quản lý kết nối nông dân – thương lái.
- * GET  /api/v1/connections
- * POST /api/v1/connections
- * POST /api/v1/connections/:id/accept
- * POST /api/v1/connections/:id/reject
+ * GET    /api/v1/connections
+ * POST   /api/v1/connections
+ * DELETE /api/v1/connections/:id
+ * POST   /api/v1/connections/:id/accept
+ * POST   /api/v1/connections/:id/reject
  */
 @Controller('connections')
 export class ConnectionsController {
@@ -93,6 +95,20 @@ export class ConnectionsController {
   ): Promise<ConnectionDto> {
     const role = user.role as 'farmer' | 'trader';
     return this.connectionsService.createConnection(dto, user.sub, role);
+  }
+
+  /**
+   * DELETE /api/v1/connections/:id
+   * Thu hồi yêu cầu kết nối đang pending — chỉ người gửi (fromUserId).
+   */
+  @Delete(':id')
+  @HttpCode(HttpStatus.OK)
+  @Roles('farmer', 'trader')
+  remove(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<{ success: boolean }> {
+    return this.connectionsService.deleteConnection(id, user.sub);
   }
 
   /**
@@ -135,19 +151,5 @@ export class ConnectionsController {
     @CurrentUser() user: JwtPayload,
   ): Promise<ConnectionDto> {
     return this.connectionsService.negotiateConnection(id, user.sub);
-  }
-
-  /**
-   * POST /api/v1/connections/:id/sign
-   * Xác nhận đã ký hợp đồng (negotiating → signed). Cả hai bên đều được phép.
-   */
-  @Post(':id/sign')
-  @HttpCode(HttpStatus.OK)
-  @Roles('farmer', 'trader')
-  sign(
-    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-    @CurrentUser() user: JwtPayload,
-  ): Promise<ConnectionDto> {
-    return this.connectionsService.signConnection(id, user.sub);
   }
 }

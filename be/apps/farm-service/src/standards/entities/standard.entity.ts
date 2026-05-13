@@ -6,6 +6,7 @@ import {
   Index,
   OneToMany,
   PrimaryGeneratedColumn,
+  UpdateDateColumn,
 } from 'typeorm';
 import { StandardStepEntity } from './standard-step.entity';
 
@@ -22,6 +23,15 @@ export class StandardEntity {
 
   @Column({ type: 'text' })
   description: string;
+
+  /** Loại cây trồng — dùng để lọc tiêu chuẩn phù hợp (VD: 'vegetable', 'rice', 'fruit') */
+  @Index('idx_standards_crop_type')
+  @Column({ name: 'crop_type', nullable: true, type: 'varchar', length: 128 })
+  cropType: string | null;
+
+  /** Phiên bản tiêu chuẩn — tăng dần mỗi lần cập nhật nội dung */
+  @Column({ type: 'int', default: 1 })
+  version: number;
 
   /**
    * Cross-service FK → users.user_id (auth-service).
@@ -40,6 +50,9 @@ export class StandardEntity {
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
+
+  @UpdateDateColumn({ name: 'updated_at' })
+  updatedAt: Date;
 
   @DeleteDateColumn({ name: 'deleted_at', nullable: true })
   deletedAt: Date | null;

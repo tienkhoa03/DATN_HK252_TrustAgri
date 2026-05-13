@@ -2,6 +2,7 @@ import {
   Check,
   Column,
   CreateDateColumn,
+  DeleteDateColumn,
   Entity,
   Index,
   JoinColumn,
@@ -13,7 +14,13 @@ import { OrderEntity } from '../../orders/entities/order.entity';
 import { ProposalEntity } from '../../proposals/entities/proposal.entity';
 import { ProductEntity } from '../../products/entities/product.entity';
 
-export type ContractStatus = 'active' | 'pending_change' | 'completed' | 'cancelled';
+export type ContractStatus =
+  | 'pending_signature'
+  | 'active'
+  | 'pending_change'
+  | 'in_settlement'
+  | 'completed'
+  | 'cancelled';
 export type ContractType = 'farmer_trader' | 'trader_buyer';
 
 @Entity('contracts')
@@ -21,7 +28,7 @@ export type ContractType = 'farmer_trader' | 'trader_buyer';
 @Check('"total_price" >= 0')
 @Check('"deposit" IS NULL OR "deposit" >= 0')
 @Check('"deposit" IS NULL OR "deposit" <= "total_price"')
-@Check(`"status" IN ('active', 'pending_change', 'completed', 'cancelled')`)
+@Check(`"status" IN ('pending_signature', 'active', 'pending_change', 'in_settlement', 'completed', 'cancelled')`)
 @Check(`"contract_type" IN ('farmer_trader', 'trader_buyer')`)
 @Check('"end_date" >= "start_date"')
 export class ContractEntity {
@@ -116,9 +123,24 @@ export class ContractEntity {
   @JoinColumn({ name: 'proposal_id' })
   proposal: ProposalEntity | null;
 
+  /** Nông dân đã ký (farmer_trader contracts). */
+  @Column({ name: 'farmer_signed_at', type: 'timestamptz', nullable: true })
+  farmerSignedAt: Date | null;
+
+  /** Thương lái đã ký (cả farmer_trader và trader_buyer). */
+  @Column({ name: 'trader_signed_at', type: 'timestamptz', nullable: true })
+  traderSignedAt: Date | null;
+
+  /** Người mua đã ký (trader_buyer contracts). */
+  @Column({ name: 'buyer_signed_at', type: 'timestamptz', nullable: true })
+  buyerSignedAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
+
+  @DeleteDateColumn({ name: 'deleted_at', nullable: true })
+  deletedAt: Date | null;
 }

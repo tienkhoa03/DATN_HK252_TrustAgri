@@ -368,16 +368,16 @@ export function TraderFarmMonitoringScreen() {
               description={
                 alertFilter
                   ? 'Tất cả vườn đang trong tình trạng tốt.'
-                  : 'Khi bạn có hợp đồng với nông dân, vườn sẽ hiển thị tại đây.'
+                  : 'Khi bạn có hợp đồng đã ký kết với nông dân, vườn sẽ hiển thị tại đây.'
               }
-              cta={
-                alertFilter
-                  ? undefined
-                  : {
-                      label: 'Tìm nông dân',
-                      onClick: () => navigate('/trader/supply'),
-                    }
-              }
+              // cta={
+              //   alertFilter
+              //     ? undefined
+              //     : {
+              //         label: 'Tìm nông dân',
+              //         onClick: () => navigate('/trader/supply'),
+              //       }
+              // }
             />
           )}
 

@@ -36,6 +36,11 @@ export class ProposalEntity {
   @Column({ name: 'trader_id' })
   traderId: string;
 
+  /** Cross-service FK → farms.id — vườn cung cấp theo hợp đồng đã ký */
+  @Index('idx_proposals_farm_id')
+  @Column({ name: 'farm_id', nullable: true, type: 'varchar' })
+  farmId: string | null;
+
   @Column({ type: 'numeric', precision: 15, scale: 2 })
   price: number;
 

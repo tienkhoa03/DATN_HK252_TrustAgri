@@ -5,6 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import { Text } from 'zmp-ui';
 import { EmptyState } from '@/design-system/components/EmptyState';
+import { ContractDetailModal } from '@/screens/trader/transactions/components/ContractDetailModal';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
@@ -28,7 +29,7 @@ const PILL_LABELS: Record<PillKey, string> = {
 function filterContracts(contracts: ContractDto[], pill: PillKey): ContractDto[] {
   switch (pill) {
     case 'pending':
-      return contracts.filter((c) => c.status === 'pending_change');
+      return contracts.filter((c) => c.status === 'pending_change' || c.status === 'pending_signature');
     case 'active':
       return contracts.filter((c) => c.status === 'active');
     case 'history':
@@ -48,6 +49,7 @@ export const ContractsTab: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [activePill, setActivePill] = useState<PillKey>('active');
   const [diffModal, setDiffModal] = useState<{ open: boolean; contract?: ContractDto }>({ open: false });
+  const [detailModal, setDetailModal] = useState<ContractDto | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,6 +64,11 @@ export const ContractsTab: React.FC = () => {
       });
     return () => { cancelled = true; };
   }, [openSnackbar]);
+
+  const handleContractUpdated = (updated: ContractDto) => {
+    setContracts((prev) => prev.map((c) => c.id === updated.id ? updated : c));
+    setDetailModal(updated);
+  };
 
   const visible = filterContracts(contracts, activePill);
 
@@ -130,20 +137,29 @@ export const ContractsTab: React.FC = () => {
 
       {!loading && visible.map((contract) => {
         const isPendingChange = contract.status === 'pending_change';
+        const isPendingSignature = contract.status === 'pending_signature';
+        const isClickable = isPendingChange || isPendingSignature;
+
         return (
           <button
             key={contract.id}
             type="button"
-            onClick={() => isPendingChange ? setDiffModal({ open: true, contract }) : undefined}
+            onClick={() => {
+              if (isPendingChange) setDiffModal({ open: true, contract });
+              else if (isPendingSignature) setDetailModal(contract);
+            }}
             style={{
               display: 'block',
               width: '100%',
               margin: `0 ${spacing.md} ${spacing.sm}`,
               padding: spacing.md,
               backgroundColor: colors.background.primary,
-              border: `1px solid ${isPendingChange ? colors.functional.warningYellow : colors.background.secondary}`,
+              border: `1px solid ${
+                isPendingSignature ? colors.primary.zaloBlue
+                : isPendingChange ? colors.functional.warningYellow
+                : colors.background.secondary}`,
               borderRadius: 10,
-              cursor: isPendingChange ? 'pointer' : 'default',
+              cursor: isClickable ? 'pointer' : 'default',
               textAlign: 'left',
               boxSizing: 'border-box',
               maxWidth: `calc(100% - ${spacing.xl})`,
@@ -156,9 +172,10 @@ export const ContractsTab: React.FC = () => {
               <span style={{
                 fontSize: fontSize.small,
                 fontWeight: fontWeight.medium,
-                color: isPendingChange ? colors.functional.warningYellow
+                color: isPendingSignature ? colors.primary.zaloBlue
+                  : isPendingChange ? colors.functional.warningYellow
                   : contract.status === 'active' ? colors.primary.agriGreen
-                    : colors.text.secondary,
+                  : colors.text.secondary,
               }}>
                 {contractStatusLabelVi(contract.status)}
               </span>
@@ -169,6 +186,11 @@ export const ContractsTab: React.FC = () => {
             <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
               Đến: {new Date(contract.endDate).toLocaleDateString('vi-VN')}
             </Text>
+            {isPendingSignature && (
+              <div style={{ marginTop: spacing.xs, fontSize: fontSize.small, color: colors.primary.zaloBlue, fontWeight: fontWeight.medium }}>
+                Nhấn để ký hợp đồng →
+              </div>
+            )}
             {isPendingChange && (
               <div style={{ marginTop: spacing.xs, fontSize: fontSize.small, color: colors.functional.warningYellow, fontWeight: fontWeight.medium }}>
                 Nhấn để xem yêu cầu thay đổi →
@@ -178,7 +200,17 @@ export const ContractsTab: React.FC = () => {
         );
       })}
 
-      {/* Diff modal */}
+      {/* Contract detail modal with sign button */}
+      {detailModal && (
+        <ContractDetailModal
+          visible
+          contract={detailModal}
+          onClose={() => setDetailModal(null)}
+          onSigned={handleContractUpdated}
+        />
+      )}
+
+      {/* Diff modal for pending_change */}
       {diffModal.open && diffModal.contract && (
         <ContractDiffModal
           open={diffModal.open}

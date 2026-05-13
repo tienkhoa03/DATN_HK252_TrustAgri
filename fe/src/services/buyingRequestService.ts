@@ -30,6 +30,7 @@ import { ApiError } from '@/api/errors';
 export interface BuyingRequestDto {
   id: string;
   buyerId: string;
+  buyerName?: string;      // tên người mua (nếu backend trả về hoặc đã resolve)
   cropType: string;
   quantity: number;
   unit: string;
@@ -37,6 +38,7 @@ export interface BuyingRequestDto {
   expectedPrice?: number;
   depositOffered?: number;
   deliveryDate: string;   // ISO-8601
+  description?: string;   // mô tả yêu cầu sản phẩm
   status: 'open' | 'matched' | 'closed';
   createdAt: string;      // ISO-8601
 }
@@ -66,17 +68,20 @@ export interface CreateBuyingRequestDto {
   expectedPrice?: number;
   depositOffered?: number;
   deliveryDate: string;   // ISO-8601
+  description?: string;
 }
 
 export type UpdateBuyingRequestDto = Partial<
   Pick<
     BuyingRequestDto,
+    | 'cropType'
     | 'quantity'
     | 'unit'
     | 'qualityStandardCode'
     | 'expectedPrice'
     | 'depositOffered'
     | 'deliveryDate'
+    | 'description'
   >
 >;
 

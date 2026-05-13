@@ -1,6 +1,6 @@
 /**
- * BuyerFlowPanel — "Với Người mua" flow
- * Tabs: Mới (pending orders) | Đàm phán (pending_change contracts) | Đã ký (active)
+ * BuyerFlowPanel — "Với Người mua" flow (contract-centric)
+ * Tabs: Đơn hàng (pending orders) | Chờ ký (pending_signature) | Đã ký (active / pending_change) | Lịch sử
  * Requirements: FR-T03, FR-T04, FR-T05, US-T03
  */
 import React, { useState, useEffect, useCallback } from 'react';
@@ -33,16 +33,18 @@ import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 
 const TABS = [
-  { id: 'new', label: 'Mới' },
-  { id: 'negotiating', label: 'Đàm phán' },
+  { id: 'orders', label: 'Đơn hàng' },
+  { id: 'waiting', label: 'Chờ ký' },
   { id: 'signed', label: 'Đã ký' },
+  { id: 'history', label: 'Lịch sử' },
 ];
 
 function initialTab(initialStatus?: string): string {
-  if (initialStatus === 'pending') return 'new';
-  if (initialStatus === 'negotiating') return 'negotiating';
+  if (initialStatus === 'orders') return 'orders';
+  if (initialStatus === 'waiting') return 'waiting';
   if (initialStatus === 'signed') return 'signed';
-  return 'new';
+  if (initialStatus === 'history') return 'history';
+  return 'orders';
 }
 
 interface Props {
@@ -53,15 +55,16 @@ export const BuyerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
   const openSnackbar = useStableOpenSnackbar();
   const [activeTab, setActiveTab] = useState(() => initialTab(initialStatus));
 
-  // --- "Mới" tab: pending orders ---
+  // "Đơn hàng" tab state
   const [orders, setOrders] = useState<OrderDto[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersLoaded, setOrdersLoaded] = useState(false);
   const [orderPending, setOrderPending] = useState<Record<string, boolean>>({});
 
-  // --- Contract tabs ---
-  const [negotiatingContracts, setNegotiatingContracts] = useState<ContractDto[]>([]);
+  // Contract tabs state
+  const [waitingContracts, setWaitingContracts] = useState<ContractDto[]>([]);
   const [signedContracts, setSignedContracts] = useState<ContractDto[]>([]);
+  const [historyContracts, setHistoryContracts] = useState<ContractDto[]>([]);
   const [contractsLoading, setContractsLoading] = useState(false);
   const [contractsLoaded, setContractsLoaded] = useState(false);
   const [selectedContract, setSelectedContract] = useState<ContractDto | null>(null);
@@ -84,13 +87,23 @@ export const BuyerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
     if (contractsLoaded) return;
     setContractsLoading(true);
     try {
-      const [negRes, signedRes] = await Promise.all([
-        listContracts({ role: 'trader', status: 'pending_change', limit: 50 }),
+      const [waitRes, activeRes, pendChangeRes, completedRes, cancelledRes] = await Promise.all([
+        listContracts({ role: 'trader', status: 'pending_signature', limit: 50 }),
         listContracts({ role: 'trader', status: 'active', limit: 50 }),
+        listContracts({ role: 'trader', status: 'pending_change', limit: 50 }),
+        listContracts({ role: 'trader', status: 'completed', limit: 30 }),
+        listContracts({ role: 'trader', status: 'cancelled', limit: 30 }),
       ]);
-      // Filter to buyer contracts only (have partyBuyerId)
-      setNegotiatingContracts(negRes.items.filter((c) => !!c.partyBuyerId));
-      setSignedContracts(signedRes.items.filter((c) => !!c.partyBuyerId));
+      const isBuyer = (c: ContractDto) => !!c.partyBuyerId;
+      setWaitingContracts(waitRes.items.filter(isBuyer));
+      setSignedContracts([
+        ...activeRes.items.filter(isBuyer),
+        ...pendChangeRes.items.filter(isBuyer),
+      ]);
+      setHistoryContracts([
+        ...completedRes.items.filter(isBuyer),
+        ...cancelledRes.items.filter(isBuyer),
+      ]);
       setContractsLoaded(true);
     } catch (err) {
       openSnackbar({ type: 'error', text: toContractViMessage(err, 'list'), duration: 3500, icon: true });
@@ -100,8 +113,8 @@ export const BuyerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
   }, [contractsLoaded, openSnackbar]);
 
   useEffect(() => {
-    if (activeTab === 'new') void loadOrders();
-    if (activeTab === 'negotiating' || activeTab === 'signed') void loadContracts();
+    if (activeTab === 'orders') void loadOrders();
+    else void loadContracts();
   }, [activeTab, loadOrders, loadContracts]);
 
   const handleAcceptOrder = async (order: OrderDto) => {
@@ -130,10 +143,16 @@ export const BuyerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
     }
   };
 
-  const renderNewTab = () => {
+  const renderOrdersTab = () => {
     if (ordersLoading) return <SkeletonList />;
     if (orders.length === 0) {
-      return <EmptyState icon="🛒" title="Không có đơn hàng mới" description="Đơn hàng chờ xác nhận từ người mua sẽ hiện ở đây" />;
+      return (
+        <EmptyState
+          icon="🛒"
+          title="Không có đơn hàng mới"
+          description="Đơn hàng chờ xác nhận từ người mua sẽ hiện ở đây"
+        />
+      );
     }
     return (
       <div>
@@ -152,19 +171,15 @@ export const BuyerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
     );
   };
 
-  const renderContractList = (contracts: ContractDto[]) => {
+  const renderContractList = (contracts: ContractDto[], emptyTitle: string, emptyDesc: string) => {
     if (contractsLoading) return <SkeletonList />;
     if (contracts.length === 0) {
-      return <EmptyState icon="📄" title="Chưa có hợp đồng" description="Hợp đồng với người mua sẽ hiển thị tại đây" />;
+      return <EmptyState icon="📄" title={emptyTitle} description={emptyDesc} />;
     }
     return (
       <div>
         {contracts.map((c) => (
-          <BuyerContractInfoCard
-            key={c.id}
-            contract={c}
-            onTap={() => setSelectedContract(c)}
-          />
+          <BuyerContractInfoCard key={c.id} contract={c} onTap={() => setSelectedContract(c)} />
         ))}
       </div>
     );
@@ -173,9 +188,25 @@ export const BuyerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
   return (
     <>
       <StatusTabbedList tabs={TABS} activeId={activeTab} onTabChange={setActiveTab}>
-        {activeTab === 'new' && renderNewTab()}
-        {activeTab === 'negotiating' && renderContractList(negotiatingContracts)}
-        {activeTab === 'signed' && renderContractList(signedContracts)}
+        {activeTab === 'orders' && renderOrdersTab()}
+        {activeTab === 'waiting' &&
+          renderContractList(
+            waitingContracts,
+            'Chưa có hợp đồng chờ ký',
+            'Hợp đồng cần ký với người mua sẽ hiển thị tại đây',
+          )}
+        {activeTab === 'signed' &&
+          renderContractList(
+            signedContracts,
+            'Chưa có hợp đồng đã ký',
+            'Hợp đồng đã ký với người mua sẽ hiển thị tại đây',
+          )}
+        {activeTab === 'history' &&
+          renderContractList(
+            historyContracts,
+            'Chưa có lịch sử',
+            'Hợp đồng đã hoàn thành hoặc đã hủy sẽ hiển thị tại đây',
+          )}
       </StatusTabbedList>
 
       {selectedContract && (
@@ -183,13 +214,24 @@ export const BuyerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
           contract={selectedContract}
           visible
           onClose={() => setSelectedContract(null)}
+          onSigned={(updated) => {
+            setSelectedContract(updated);
+            if (updated.status === 'active') {
+              setWaitingContracts((prev) => prev.filter((c) => c.id !== updated.id));
+              setSignedContracts((prev) => [updated, ...prev.filter((c) => c.id !== updated.id)]);
+            } else {
+              setWaitingContracts((prev) =>
+                prev.map((c) => (c.id === updated.id ? updated : c)),
+              );
+            }
+          }}
         />
       )}
     </>
   );
 };
 
-// ── Shared sub-components ──────────────────────────────────────────────────────
+// ── Sub-components ─────────────────────────────────────────────────────────────
 
 const SkeletonList: React.FC = () => (
   <div>
@@ -214,6 +256,8 @@ const BuyerContractInfoCard: React.FC<{ contract: ContractDto; onTap: () => void
   const statusColor =
     contract.status === 'active'
       ? colors.primary.agriGreen
+      : contract.status === 'pending_signature'
+      ? colors.primary.zaloBlue
       : contract.status === 'pending_change'
       ? colors.functional.warningYellow
       : colors.text.secondary;

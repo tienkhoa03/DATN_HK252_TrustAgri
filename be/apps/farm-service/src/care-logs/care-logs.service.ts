@@ -83,6 +83,7 @@ export class CareLogsService {
       deviation,
       syncStatus: 'synced',
       clientRecordId: dto.clientRecordId ?? null,
+      performedBy: userId,
     });
 
     const saved = await this.careLogRepo.save(entity);
@@ -154,6 +155,7 @@ export class CareLogsService {
           deviation,
           syncStatus: 'synced',
           clientRecordId,
+          performedBy: userId,
         });
 
         const saved = await this.careLogRepo.save(entity);
@@ -189,7 +191,6 @@ export class CareLogsService {
 
     const entity = this.evidenceRepo.create({
       careLogId: dto.careLogId,
-      farmId,
       fileUrl: dto.fileUrl,
       mimeType: dto.mimeType,
       capturedAt: new Date(dto.capturedAt),
@@ -259,6 +260,7 @@ export class CareLogsService {
       action: entity.action,
       notes: entity.notes ?? undefined,
       performedAt: entity.performedAt.toISOString(),
+      performedBy: entity.performedBy ?? undefined,
       evidences: (entity.evidences ?? []).map((e) => this.toEvidenceDto(e)),
       deviation: entity.deviation ?? undefined,
       syncStatus: entity.syncStatus,

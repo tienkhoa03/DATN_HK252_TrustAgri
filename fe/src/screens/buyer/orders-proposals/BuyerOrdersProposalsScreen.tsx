@@ -43,11 +43,15 @@ import {
 } from '../../../services/buyingRequestService';
 import {
   listContracts,
+  signContract,
   contractStatusLabelVi,
   contractTypeLabelVi,
   toContractViMessage,
+  canUserSign,
   type ContractDto,
 } from '../../../services/contractService';
+import { useAtomValue } from 'jotai';
+import { authSessionAtom } from '@/state/authAtoms';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { ContractChangeRequestsPanel } from '@/screens/shared/contract-change-requests';
 import { BuyerNotificationBell } from '@/screens/buyer/components/BuyerNotificationBell';
@@ -106,6 +110,7 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
   buyerName = 'Người mua',
 }) => {
   const openSnackbar = useStableOpenSnackbar();
+  const session = useAtomValue(authSessionAtom);
   const [activeTab, setActiveTab] = useState<TabType>('proposals');
 
   // Proposals state
@@ -239,6 +244,23 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
       openSnackbar({ type: 'success', text: 'Đã hủy đơn hàng.', duration: 3000, icon: true });
     } catch (err) {
       openSnackbar({ type: 'error', text: toOrderViMessage(err, 'cancel'), duration: 4000, icon: true });
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleSignContract = async (id: string) => {
+    setActionId(id);
+    try {
+      const updated = await signContract(id);
+      setContractItems((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      const msg =
+        updated.status === 'active'
+          ? 'Cả hai bên đã ký — hợp đồng có hiệu lực!'
+          : 'Đã ký thành công. Đang chờ thương lái ký.';
+      openSnackbar({ type: 'success', text: msg, duration: 4000, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toContractViMessage(err, 'get'), duration: 3500, icon: true });
     } finally {
       setActionId(null);
     }
@@ -633,11 +655,13 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
     const contractStatusColor = (s: ContractDto['status']) =>
       s === 'active'
         ? colors.primary.agriGreen
-        : s === 'pending_change'
-          ? colors.functional.warningYellow
-          : s === 'completed'
-            ? colors.primary.zaloBlue
-            : colors.text.secondary;
+        : s === 'pending_signature'
+          ? colors.primary.zaloBlue
+          : s === 'pending_change'
+            ? colors.functional.warningYellow
+            : s === 'completed'
+              ? colors.primary.zaloBlue
+              : colors.text.secondary;
 
     const formatCurrency = (n: number) =>
       new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n);
@@ -693,6 +717,29 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
                     Hiệu lực: {start} — {end}
                   </Text>
                 </div>
+                {/* Sign button — hiện khi buyer chưa ký */}
+                {canUserSign(c, session?.userId ?? '', 'buyer') && (
+                  <button
+                    type="button"
+                    disabled={actionId === c.id}
+                    onClick={() => void handleSignContract(c.id)}
+                    style={{
+                      marginTop: spacing.md,
+                      width: '100%',
+                      padding: spacing.md,
+                      borderRadius: '8px',
+                      border: 'none',
+                      backgroundColor: actionId === c.id ? colors.background.secondary : colors.primary.agriGreen,
+                      color: actionId === c.id ? colors.text.secondary : colors.text.inverse,
+                      fontSize: fontSize.small,
+                      fontWeight: fontWeight.semibold,
+                      cursor: actionId === c.id ? 'not-allowed' : 'pointer',
+                      minHeight: 44,
+                    }}
+                  >
+                    {actionId === c.id ? 'Đang xử lý…' : '✍️ Ký hợp đồng'}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setExpandedContractId((x) => (x === c.id ? null : c.id))}
