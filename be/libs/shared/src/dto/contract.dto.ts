@@ -8,6 +8,7 @@ import {
   IsUUID,
   MaxLength,
 } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 // ─── PRODUCT ───────────────────────────────────────────────────────────────────
 
@@ -32,33 +33,42 @@ export interface ProductDto {
 }
 
 export class CreateProductDto {
+  @ApiPropertyOptional({ description: 'Farm ID sourcing this product', example: 'a1b2c3d4-...' })
   @IsOptional()
   @IsString()
   farmId?: string;
 
+  @ApiProperty({ description: 'Product name', example: 'Gao ST25 An Giang' })
   @IsString()
   name: string;
 
+  @ApiProperty({ description: 'Crop type', example: 'rice' })
   @IsString()
   cropType: string;
 
+  @ApiProperty({ description: 'Unit of sale', example: 'kg' })
   @IsString()
   unit: string;
 
+  @ApiProperty({ description: 'Price per unit in VND', example: 25000 })
   @IsNumber()
   price: number;
 
+  @ApiProperty({ description: 'Product image URLs', example: ['https://cdn.example.com/img1.jpg'] })
   @IsArray()
   images: string[];
 
+  @ApiPropertyOptional({ description: 'Quality standard code', example: 'VietGAP-Rice-2024' })
   @IsOptional()
   @IsString()
   standardCode?: string;
 
+  @ApiPropertyOptional({ description: 'Available stock quantity', example: 500 })
   @IsOptional()
   @IsNumber()
   stockQuantity?: number;
 
+  @ApiPropertyOptional({ description: 'Product description', example: 'Premium fragrant rice from Mekong Delta' })
   @IsOptional()
   @IsString()
   description?: string;
@@ -85,30 +95,38 @@ export interface BuyingRequestDto {
 }
 
 export class CreateBuyingRequestDto {
+  @ApiProperty({ description: 'Desired crop type', example: 'rice' })
   @IsString()
   cropType: string;
 
+  @ApiProperty({ description: 'Quantity needed', example: 1000 })
   @IsNumber()
   quantity: number;
 
+  @ApiProperty({ description: 'Unit of quantity', example: 'kg' })
   @IsString()
   unit: string;
 
+  @ApiPropertyOptional({ description: 'Preferred quality standard code', example: 'VietGAP-Rice-2024' })
   @IsOptional()
   @IsString()
   qualityStandardCode?: string;
 
+  @ApiPropertyOptional({ description: 'Expected price per unit in VND', example: 22000 })
   @IsOptional()
   @IsNumber()
   expectedPrice?: number;
 
+  @ApiPropertyOptional({ description: 'Deposit amount offered in VND', example: 5000000 })
   @IsOptional()
   @IsNumber()
   depositOffered?: number;
 
+  @ApiProperty({ description: 'Required delivery date (ISO 8601)', example: '2024-06-30' })
   @IsString()
   deliveryDate: string;
 
+  @ApiPropertyOptional({ description: 'Additional requirements or description', example: 'Prefer organic, no pesticides 30 days before harvest', maxLength: 2000 })
   @IsOptional()
   @IsString()
   @MaxLength(2000)
@@ -135,15 +153,19 @@ export interface OrderDto {
 }
 
 export class CreateOrderDto {
+  @ApiProperty({ description: 'Product ID to purchase', example: 'a1b2c3d4-...' })
   @IsString()
   productId: string;
 
+  @ApiProperty({ description: 'Quantity to order', example: 500 })
   @IsNumber()
   quantity: number;
 
+  @ApiProperty({ description: 'Unit of quantity', example: 'kg' })
   @IsString()
   unit: string;
 
+  @ApiPropertyOptional({ description: 'Deposit amount in VND', example: 2000000 })
   @IsOptional()
   @IsNumber()
   deposit?: number;
@@ -168,22 +190,28 @@ export interface ProposalDto {
 }
 
 export class CreateProposalDto {
+  @ApiProperty({ description: 'Buying request ID this proposal responds to', example: 'a1b2c3d4-...' })
   @IsString()
   buyingRequestId: string;
 
+  @ApiProperty({ description: 'Farm ID supplying the goods', example: 'a1b2c3d4-e5f6-...' })
   @IsUUID('4')
   farmId: string;
 
+  @ApiProperty({ description: 'Proposed price per unit in VND', example: 23000 })
   @IsNumber()
   price: number;
 
+  @ApiProperty({ description: 'Proposed quantity', example: 1000 })
   @IsNumber()
   quantity: number;
 
+  @ApiPropertyOptional({ description: 'Standard code of the product offered', example: 'VietGAP-Rice-2024' })
   @IsOptional()
   @IsString()
   standardCode?: string;
 
+  @ApiPropertyOptional({ description: 'Additional note for the buyer', example: 'Can deliver within 7 days of signing' })
   @IsOptional()
   @IsString()
   note?: string;
@@ -222,51 +250,65 @@ export interface ContractDto {
 }
 
 export class CreateContractDto {
+  @ApiPropertyOptional({ description: 'Farmer party user ID', example: 'a1b2c3d4-...' })
   @IsOptional()
   @IsString()
   partyFarmerId?: string;
 
+  @ApiProperty({ description: 'Trader party user ID', example: 'b2c3d4e5-...' })
   @IsString()
   partyTraderId: string;
 
+  @ApiPropertyOptional({ description: 'Buyer party user ID', example: 'c3d4e5f6-...' })
   @IsOptional()
   @IsString()
   partyBuyerId?: string;
 
+  @ApiProperty({ description: 'Contract type', enum: ['farmer_trader', 'trader_buyer'], example: 'farmer_trader' })
   @IsIn(['farmer_trader', 'trader_buyer'])
   contractType: 'farmer_trader' | 'trader_buyer';
 
+  @ApiPropertyOptional({ description: 'Product ID associated with this contract', example: 'd4e5f6g7-...' })
   @IsOptional()
   @IsString()
   productId?: string;
 
+  @ApiPropertyOptional({ description: 'Standard ID applied', example: 'e5f6g7h8-...' })
   @IsOptional()
   @IsString()
   standardId?: string;
 
+  @ApiPropertyOptional({ description: 'Farm ID linked to this contract', example: 'f6g7h8i9-...' })
   @IsOptional()
   @IsString()
   farmId?: string;
 
+  @ApiProperty({ description: 'Contracted quantity', example: 5000 })
   @IsNumber()
   quantity: number;
 
+  @ApiProperty({ description: 'Unit of quantity', example: 'kg' })
   @IsString()
   unit: string;
 
+  @ApiProperty({ description: 'Total contract value in VND', example: 115000000 })
   @IsNumber()
   totalPrice: number;
 
+  @ApiPropertyOptional({ description: 'Deposit amount in VND', example: 23000000 })
   @IsOptional()
   @IsNumber()
   deposit?: number;
 
+  @ApiProperty({ description: 'Contract start date (ISO 8601)', example: '2024-04-01' })
   @IsString()
   startDate: string;
 
+  @ApiProperty({ description: 'Contract end date (ISO 8601)', example: '2024-09-30' })
   @IsString()
   endDate: string;
 
+  @ApiProperty({ description: 'Contract terms and conditions', example: 'Delivery to warehouse, moisture < 14%, grade A only' })
   @IsString()
   terms: string;
 }
@@ -288,9 +330,14 @@ export interface ContractChangeRequestDto {
 
 export class CreateContractChangeRequestDto {
   /** Khóa là tên trường hợp đồng (camelCase); mỗi mục phải khớp giá trị hiện tại ở oldValue. */
+  @ApiProperty({
+    description: 'Fields to change. Key is camelCase contract field name; each entry has oldValue and newValue.',
+    example: { quantity: { oldValue: 5000, newValue: 4500 } },
+  })
   @IsObject()
   changes: Record<string, { oldValue: unknown; newValue: unknown }>;
 
+  @ApiPropertyOptional({ description: 'Reason for requesting the change', example: 'Crop yield lower than expected due to flooding' })
   @IsOptional()
   @IsString()
   reason?: string;
@@ -333,13 +380,16 @@ export interface ConnectionDto {
 }
 
 export class CreateConnectionDto {
+  @ApiProperty({ description: 'User ID to send connection request to', example: 'a1b2c3d4-...' })
   @IsString()
   toUserId: string;
 
+  @ApiPropertyOptional({ description: 'Farm ID to include in the connection (farmer initiating)', example: 'b2c3d4e5-...' })
   @IsOptional()
   @IsString()
   farmId?: string;
 
+  @ApiPropertyOptional({ description: 'Introductory message to the recipient', example: 'I grow ST25 rice in An Giang, interested in a long-term partnership.' })
   @IsOptional()
   @IsString()
   message?: string;

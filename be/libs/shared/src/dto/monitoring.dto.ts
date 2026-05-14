@@ -1,4 +1,5 @@
 import { IsString, IsOptional, IsBoolean, IsIn, IsNumber } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
  * Giá trị cảm biến (design.md §4.5 SensorReadingDto)
@@ -25,16 +26,24 @@ export interface LatestSensorResponse {
  * Lịch sử cảm biến (query params)
  */
 export class SensorHistoryQueryDto {
+  @ApiProperty({ description: 'Start timestamp (ISO 8601)', example: '2024-03-01T00:00:00Z' })
   @IsString()
   from: string;
 
+  @ApiProperty({ description: 'End timestamp (ISO 8601)', example: '2024-03-08T00:00:00Z' })
   @IsString()
   to: string;
 
+  @ApiPropertyOptional({ description: 'Aggregation interval (e.g. 1h, 30m)', example: '1h' })
   @IsOptional()
   @IsString()
   interval?: string;
 
+  @ApiPropertyOptional({
+    description: 'Sensor type to filter',
+    enum: ['temperature', 'humidity', 'light', 'soil_moisture'],
+    example: 'temperature',
+  })
   @IsOptional()
   @IsIn(['temperature', 'humidity', 'light', 'soil_moisture'])
   sensorType?: 'temperature' | 'humidity' | 'light' | 'soil_moisture';

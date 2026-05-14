@@ -11,6 +11,7 @@ import {
   HttpStatus,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   BuyingRequestDto,
   CreateBuyingRequestDto,
@@ -32,6 +33,8 @@ import { UpdateBuyingRequestDto } from './dto/update-buying-request.dto';
  * PUT    /api/v1/buying-requests/:id    — buyer owner, cập nhật
  * DELETE /api/v1/buying-requests/:id   — buyer owner, soft delete
  */
+@ApiTags('buying-requests')
+@ApiBearerAuth()
 @Controller('buying-requests')
 export class BuyingRequestsController {
   constructor(private readonly buyingRequestsService: BuyingRequestsService) {}
@@ -43,6 +46,9 @@ export class BuyingRequestsController {
    */
   @Get()
   @Roles('buyer', 'trader')
+  @ApiOperation({ summary: 'List buying requests (trader sees all, buyer sees own)' })
+  @ApiResponse({ status: 200, description: 'Paginated list of buying requests' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   listBuyingRequests(
     @Query() query: BuyingRequestQueryDto,
     @CurrentUser() user: JwtPayload,
@@ -60,6 +66,10 @@ export class BuyingRequestsController {
    */
   @Get(':id')
   @Roles('buyer', 'trader')
+  @ApiOperation({ summary: 'Get buying request details by ID' })
+  @ApiResponse({ status: 200, description: 'Buying request details' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Buying request not found' })
   getBuyingRequest(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<BuyingRequestDto> {
@@ -73,6 +83,10 @@ export class BuyingRequestsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Roles('buyer')
+  @ApiOperation({ summary: 'Create a buying request (buyer only)' })
+  @ApiResponse({ status: 201, description: 'Buying request created with open status' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - buyer role required' })
   createBuyingRequest(
     @Body() dto: CreateBuyingRequestDto,
     @CurrentUser() user: JwtPayload,
@@ -86,6 +100,11 @@ export class BuyingRequestsController {
    */
   @Put(':id')
   @Roles('buyer')
+  @ApiOperation({ summary: 'Update a buying request (owner buyer only)' })
+  @ApiResponse({ status: 200, description: 'Buying request updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - only buyer owner' })
+  @ApiResponse({ status: 404, description: 'Buying request not found' })
   updateBuyingRequest(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateBuyingRequestDto,
@@ -101,6 +120,10 @@ export class BuyingRequestsController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Roles('buyer')
+  @ApiOperation({ summary: 'Soft delete a buying request (owner buyer only)' })
+  @ApiResponse({ status: 204, description: 'Buying request deleted' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - only buyer owner' })
   deleteBuyingRequest(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,

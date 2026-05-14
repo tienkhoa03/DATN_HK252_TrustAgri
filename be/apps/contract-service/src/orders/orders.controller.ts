@@ -9,6 +9,7 @@ import {
   HttpStatus,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   OrderDto,
   CreateOrderDto,
@@ -30,6 +31,8 @@ import { OrderQueryDto } from './dto/order-query.dto';
  * POST /api/v1/orders/:id/reject   — trader, từ chối đơn
  * POST /api/v1/orders/:id/cancel   — buyer, hủy đơn (trước khi xác nhận)
  */
+@ApiTags('orders')
+@ApiBearerAuth()
 @Controller('orders')
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
@@ -39,6 +42,9 @@ export class OrdersController {
    */
   @Get()
   @Roles('buyer', 'trader')
+  @ApiOperation({ summary: 'List orders (buyer sees own, trader sees all their orders)' })
+  @ApiResponse({ status: 200, description: 'Paginated list of orders' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   listOrders(
     @Query() query: OrderQueryDto,
     @CurrentUser() user: JwtPayload,
@@ -51,6 +57,10 @@ export class OrdersController {
    */
   @Get(':id')
   @Roles('buyer', 'trader')
+  @ApiOperation({ summary: 'Get order details by ID' })
+  @ApiResponse({ status: 200, description: 'Order details' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
   getOrder(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<OrderDto> {
@@ -64,6 +74,10 @@ export class OrdersController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Roles('buyer')
+  @ApiOperation({ summary: 'Create an order from a marketplace product (buyer only)' })
+  @ApiResponse({ status: 201, description: 'Order created with pending status' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - buyer role required' })
   createOrder(
     @Body() dto: CreateOrderDto,
     @CurrentUser() user: JwtPayload,
@@ -78,6 +92,11 @@ export class OrdersController {
   @Post(':id/accept')
   @HttpCode(HttpStatus.OK)
   @Roles('trader')
+  @ApiOperation({ summary: 'Accept an order (trader only), creates a contract automatically' })
+  @ApiResponse({ status: 200, description: 'Order accepted and contract created' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - trader role required' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
   acceptOrder(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,
@@ -92,6 +111,10 @@ export class OrdersController {
   @Post(':id/reject')
   @HttpCode(HttpStatus.OK)
   @Roles('trader')
+  @ApiOperation({ summary: 'Reject an order (trader only)' })
+  @ApiResponse({ status: 200, description: 'Order rejected' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - trader role required' })
   rejectOrder(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,
@@ -106,6 +129,10 @@ export class OrdersController {
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
   @Roles('buyer')
+  @ApiOperation({ summary: 'Cancel an order before trader acceptance (buyer only)' })
+  @ApiResponse({ status: 200, description: 'Order cancelled' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - buyer role required' })
   cancelOrder(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,

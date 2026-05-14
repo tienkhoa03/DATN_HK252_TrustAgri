@@ -1,5 +1,6 @@
 import { IsInt, IsOptional, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
  * Hợp đồng lỗi chuẩn — áp dụng cho mọi endpoint (design.md §1.2)
@@ -39,12 +40,14 @@ export interface ListResponse<T> {
  * Query params chung cho phân trang
  */
 export class PaginationQueryDto {
+  @ApiPropertyOptional({ description: 'Page number (1-based)', example: 1, minimum: 1, default: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
   page?: number = 1;
 
+  @ApiPropertyOptional({ description: 'Items per page', example: 20, minimum: 1, default: 20 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

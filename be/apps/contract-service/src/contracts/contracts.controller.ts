@@ -11,6 +11,7 @@ import {
   Headers,
   Patch,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   ContractDto,
   ComplianceDto,
@@ -34,6 +35,8 @@ import { ContractQueryDto } from './dto/contract-query.dto';
  * GET  /api/v1/contracts/:id          — chi tiết
  * POST /api/v1/contracts              — trader / admin tạo thủ công
  */
+@ApiTags('contracts')
+@ApiBearerAuth()
 @Controller('contracts')
 export class ContractsController {
   constructor(
@@ -43,6 +46,9 @@ export class ContractsController {
 
   @Get()
   @Roles('farmer', 'trader', 'buyer', 'admin')
+  @ApiOperation({ summary: 'List contracts filtered by role, status, and date range' })
+  @ApiResponse({ status: 200, description: 'Paginated list of contracts' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   listContracts(
     @Query() query: ContractQueryDto,
     @CurrentUser() user: JwtPayload,
@@ -56,6 +62,9 @@ export class ContractsController {
    */
   @Get('linked-farms')
   @Roles('trader')
+  @ApiOperation({ summary: 'List farms with active farmer_trader contracts for the authenticated trader' })
+  @ApiResponse({ status: 200, description: 'List of linked farms' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   listLinkedFarms(
     @CurrentUser() user: JwtPayload,
     @Headers('authorization') authorization?: string,
@@ -72,6 +81,10 @@ export class ContractsController {
 
   @Get(':id/audit-logs')
   @Roles('farmer', 'trader', 'buyer', 'admin')
+  @ApiOperation({ summary: 'Get audit log of status changes for a contract' })
+  @ApiResponse({ status: 200, description: 'List of audit log entries' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Contract not found' })
   listAuditLogs(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,
@@ -81,6 +94,10 @@ export class ContractsController {
 
   @Get(':id/compliance')
   @Roles('farmer', 'trader', 'buyer', 'admin')
+  @ApiOperation({ summary: 'Get compliance score and deviations for a contract' })
+  @ApiResponse({ status: 200, description: 'Compliance report with score and deviations' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Contract not found' })
   getCompliance(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,
@@ -91,6 +108,10 @@ export class ContractsController {
 
   @Get(':id')
   @Roles('farmer', 'trader', 'buyer', 'admin')
+  @ApiOperation({ summary: 'Get contract details by ID' })
+  @ApiResponse({ status: 200, description: 'Contract details' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Contract not found' })
   getContract(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,
@@ -101,6 +122,10 @@ export class ContractsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Roles('trader', 'admin')
+  @ApiOperation({ summary: 'Create a contract manually (trader or admin only)' })
+  @ApiResponse({ status: 201, description: 'Contract created, pending signatures' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - trader or admin only' })
   createContract(
     @Body() dto: CreateContractDto,
     @CurrentUser() user: JwtPayload,
@@ -115,6 +140,11 @@ export class ContractsController {
   @Patch(':id/sign')
   @HttpCode(HttpStatus.OK)
   @Roles('farmer', 'trader', 'buyer')
+  @ApiOperation({ summary: 'Sign a contract (activates when all parties have signed)' })
+  @ApiResponse({ status: 200, description: 'Signature recorded; contract activated if all parties signed' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - not a party to this contract' })
+  @ApiResponse({ status: 404, description: 'Contract not found' })
   signContract(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,

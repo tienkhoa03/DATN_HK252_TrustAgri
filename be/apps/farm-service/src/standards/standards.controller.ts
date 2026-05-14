@@ -10,6 +10,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   StandardDto,
   CreateStandardDto,
@@ -22,6 +23,8 @@ import {
 import { StandardsService } from './standards.service';
 import { ListStandardsQueryDto } from './dto/list-standards-query.dto';
 
+@ApiTags('standards')
+@ApiBearerAuth()
 @Controller('standards')
 export class StandardsController {
   constructor(private readonly standardsService: StandardsService) {}
@@ -32,6 +35,9 @@ export class StandardsController {
    * Public: cả farmer, trader, buyer, guest đều đọc được.
    */
   @Get()
+  @ApiOperation({ summary: 'List farming standards with optional filters' })
+  @ApiResponse({ status: 200, description: 'Paginated list of standards' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   list(
     @Query() query: ListStandardsQueryDto,
   ): Promise<ListResponse<StandardDto>> {
@@ -43,6 +49,10 @@ export class StandardsController {
    * Chi tiết tiêu chuẩn kèm steps.
    */
   @Get(':id')
+  @ApiOperation({ summary: 'Get standard details including all steps' })
+  @ApiResponse({ status: 200, description: 'Standard details with steps' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Standard not found' })
   findOne(@Param('id') id: string): Promise<StandardDto> {
     return this.standardsService.findOne(id);
   }
@@ -54,6 +64,10 @@ export class StandardsController {
   @Post()
   @Roles('trader')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a new farming standard (trader only)' })
+  @ApiResponse({ status: 201, description: 'Standard created successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - trader role required' })
   create(
     @Body() dto: CreateStandardDto,
     @CurrentUser() user: JwtPayload,
@@ -67,6 +81,11 @@ export class StandardsController {
    */
   @Put(':id')
   @Roles('trader')
+  @ApiOperation({ summary: 'Update a farming standard (owner trader only)' })
+  @ApiResponse({ status: 200, description: 'Standard updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - only owner trader' })
+  @ApiResponse({ status: 404, description: 'Standard not found' })
   update(
     @Param('id') id: string,
     @Body() dto: UpdateStandardDto,
@@ -82,6 +101,10 @@ export class StandardsController {
   @Delete(':id')
   @Roles('trader')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Soft delete a standard (owner trader only)' })
+  @ApiResponse({ status: 204, description: 'Standard deleted successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - only owner trader' })
   remove(
     @Param('id') id: string,
     @CurrentUser() user: JwtPayload,

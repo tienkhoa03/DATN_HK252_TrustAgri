@@ -7,6 +7,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   CurrentUser,
   JwtPayload,
@@ -16,6 +17,8 @@ import {
 import { NotificationsService } from './notifications.service';
 import { NotificationListQueryDto } from './dto/notification-list-query.dto';
 
+@ApiTags('notifications')
+@ApiBearerAuth()
 @Controller('notifications')
 export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
@@ -24,6 +27,9 @@ export class NotificationsController {
    * GET /api/v1/notifications — design.md §4.2
    */
   @Get()
+  @ApiOperation({ summary: 'List notifications for the authenticated user' })
+  @ApiResponse({ status: 200, description: 'Paginated list of notifications' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   list(
     @CurrentUser() user: JwtPayload,
     @Query() query: NotificationListQueryDto,
@@ -36,6 +42,9 @@ export class NotificationsController {
    */
   @Post('read-all')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mark all notifications as read for the authenticated user' })
+  @ApiResponse({ status: 200, description: 'Number of notifications marked as read' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   readAll(@CurrentUser() user: JwtPayload): Promise<{ updated: number }> {
     return this.notifications.markAllRead(user.sub);
   }
@@ -45,6 +54,10 @@ export class NotificationsController {
    */
   @Post(':id/read')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mark a single notification as read' })
+  @ApiResponse({ status: 200, description: 'Notification marked as read' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Notification not found' })
   markRead(
     @CurrentUser() user: JwtPayload,
     @Param('id') id: string,

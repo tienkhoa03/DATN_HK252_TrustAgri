@@ -9,6 +9,7 @@ import {
   HttpStatus,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   CareLogDto,
   CareLogSyncResponse,
@@ -23,6 +24,8 @@ import { CareLogsService } from './care-logs.service';
 import { ListCareLogsQueryDto } from './dto/list-care-logs-query.dto';
 import { SyncCareLogsDto } from './dto/sync-care-logs.dto';
 
+@ApiTags('care-logs')
+@ApiBearerAuth()
 @Controller('farms/:farmId/care-logs')
 export class CareLogsController {
   constructor(private readonly careLogsService: CareLogsService) {}
@@ -32,6 +35,10 @@ export class CareLogsController {
    * Danh sách nhật ký chăm sóc có phân trang.
    */
   @Get()
+  @ApiOperation({ summary: 'List care logs for a farm with pagination' })
+  @ApiResponse({ status: 200, description: 'Paginated list of care logs' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Farm not found' })
   list(
     @Param('farmId', new ParseUUIDPipe({ version: '4' })) farmId: string,
     @Query() query: ListCareLogsQueryDto,
@@ -45,6 +52,10 @@ export class CareLogsController {
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a care log entry for a farm (farm owner only)' })
+  @ApiResponse({ status: 201, description: 'Care log created successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - only farm owner' })
   create(
     @Param('farmId', new ParseUUIDPipe({ version: '4' })) farmId: string,
     @Body() dto: CreateCareLogDto,
@@ -59,6 +70,9 @@ export class CareLogsController {
    */
   @Post('sync')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Batch sync offline care logs (idempotent by clientRecordId)' })
+  @ApiResponse({ status: 200, description: 'Sync results per item (accepted/conflicted/rejected)' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   sync(
     @Param('farmId', new ParseUUIDPipe({ version: '4' })) farmId: string,
     @Body() dto: SyncCareLogsDto,
@@ -68,6 +82,8 @@ export class CareLogsController {
   }
 }
 
+@ApiTags('evidence')
+@ApiBearerAuth()
 @Controller('farms/:farmId/evidence')
 export class EvidenceController {
   constructor(private readonly careLogsService: CareLogsService) {}
@@ -78,6 +94,10 @@ export class EvidenceController {
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Save evidence metadata (file URL pre-uploaded by client)' })
+  @ApiResponse({ status: 201, description: 'Evidence metadata saved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - only farm owner' })
   create(
     @Param('farmId', new ParseUUIDPipe({ version: '4' })) farmId: string,
     @Body() dto: CreateEvidenceDto,

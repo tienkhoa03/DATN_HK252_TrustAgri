@@ -1,4 +1,5 @@
 import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   LatestSensorResponse,
   SensorHistoryQueryDto,
@@ -16,6 +17,8 @@ import { FarmAccessGuard } from './guards/farm-access.guard';
  * Phân quyền: chủ nông trại | thương lái có hợp đồng | người mua có order/hợp đồng
  * Alert endpoints được chuyển sang AlertsModule (alerts.controller.ts)
  */
+@ApiTags('sensors')
+@ApiBearerAuth()
 @Controller('monitoring/farms/:farmId')
 @UseGuards(FarmAccessGuard)
 export class SensorsController {
@@ -26,6 +29,11 @@ export class SensorsController {
    * Snapshot mới nhất tất cả cảm biến — đọc Redis, fallback InfluxDB.
    */
   @Get('latest')
+  @ApiOperation({ summary: 'Get latest sensor readings for a farm (Redis cache, fallback InfluxDB)' })
+  @ApiResponse({ status: 200, description: 'Latest sensor snapshot with all sensor types' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - no access to this farm' })
+  @ApiResponse({ status: 404, description: 'Farm not found' })
   getLatest(
     @Param('farmId', ParseUUIDPipe) farmId: string,
   ): Promise<LatestSensorResponse> {
@@ -38,6 +46,10 @@ export class SensorsController {
    * Query params: from (required), to (required), interval (optional), sensorType (optional)
    */
   @Get('history')
+  @ApiOperation({ summary: 'Get sensor history for a farm within a time range' })
+  @ApiResponse({ status: 200, description: 'Array of sensor readings' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - no access to this farm' })
   getHistory(
     @Param('farmId', ParseUUIDPipe) farmId: string,
     @Query() query: SensorHistoryQueryDto,

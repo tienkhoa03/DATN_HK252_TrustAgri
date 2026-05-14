@@ -9,6 +9,7 @@ import {
   HttpStatus,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   ProposalDto,
   CreateProposalDto,
@@ -28,6 +29,8 @@ import { ProposalQueryDto } from './dto/proposal-query.dto';
  * POST /api/v1/proposals/:id/accept   — buyer, chấp nhận → tạo hợp đồng
  * POST /api/v1/proposals/:id/reject   — buyer, từ chối
  */
+@ApiTags('proposals')
+@ApiBearerAuth()
 @Controller('proposals')
 export class ProposalsController {
   constructor(private readonly proposalsService: ProposalsService) {}
@@ -37,6 +40,9 @@ export class ProposalsController {
    */
   @Get()
   @Roles('buyer', 'trader')
+  @ApiOperation({ summary: 'List proposals (buyer sees received, trader sees sent)' })
+  @ApiResponse({ status: 200, description: 'Paginated list of proposals' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   listProposals(
     @Query() query: ProposalQueryDto,
     @CurrentUser() user: JwtPayload,
@@ -51,6 +57,10 @@ export class ProposalsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Roles('trader')
+  @ApiOperation({ summary: 'Submit a proposal for a buying request (trader only)' })
+  @ApiResponse({ status: 201, description: 'Proposal submitted with pending status' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - trader role required' })
   createProposal(
     @Body() dto: CreateProposalDto,
     @CurrentUser() user: JwtPayload,
@@ -65,6 +75,11 @@ export class ProposalsController {
   @Post(':id/accept')
   @HttpCode(HttpStatus.OK)
   @Roles('buyer')
+  @ApiOperation({ summary: 'Accept a proposal (buyer only), creates a contract automatically' })
+  @ApiResponse({ status: 200, description: 'Proposal accepted and contract created' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - buyer role required' })
+  @ApiResponse({ status: 404, description: 'Proposal not found' })
   acceptProposal(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,
@@ -79,6 +94,10 @@ export class ProposalsController {
   @Post(':id/reject')
   @HttpCode(HttpStatus.OK)
   @Roles('buyer')
+  @ApiOperation({ summary: 'Reject a proposal (buyer only)' })
+  @ApiResponse({ status: 200, description: 'Proposal rejected' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - buyer role required' })
   rejectProposal(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,

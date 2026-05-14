@@ -11,6 +11,7 @@ import {
   HttpStatus,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   ProductDto,
   CreateProductDto,
@@ -33,6 +34,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
  * PUT  /api/v1/products/:id      — trader owner, cập nhật
  * DELETE /api/v1/products/:id    — trader owner, soft delete
  */
+@ApiTags('products')
 @Controller('products')
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
@@ -44,6 +46,8 @@ export class ProductsController {
    */
   @Get()
   @Public()
+  @ApiOperation({ summary: 'List marketplace products with filters (public, no auth required)' })
+  @ApiResponse({ status: 200, description: 'Paginated list of active products' })
   listProducts(
     @Query() query: ProductQueryDto,
   ): Promise<ListResponse<ProductDto>> {
@@ -57,6 +61,9 @@ export class ProductsController {
    */
   @Get(':id')
   @Public()
+  @ApiOperation({ summary: 'Get product details by ID (public, no auth required)' })
+  @ApiResponse({ status: 200, description: 'Product details' })
+  @ApiResponse({ status: 404, description: 'Product not found' })
   getProduct(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
   ): Promise<ProductDto> {
@@ -70,6 +77,11 @@ export class ProductsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Roles('trader')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create a new marketplace product (trader only)' })
+  @ApiResponse({ status: 201, description: 'Product created successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - trader role required' })
   createProduct(
     @Body() dto: CreateProductDto,
     @CurrentUser() user: JwtPayload,
@@ -83,6 +95,12 @@ export class ProductsController {
    */
   @Put(':id')
   @Roles('trader')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update a product (owner trader only)' })
+  @ApiResponse({ status: 200, description: 'Product updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - only owner trader' })
+  @ApiResponse({ status: 404, description: 'Product not found' })
   updateProduct(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateProductDto,
@@ -98,6 +116,11 @@ export class ProductsController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @Roles('trader')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Soft delete a product (owner trader only)' })
+  @ApiResponse({ status: 204, description: 'Product deleted' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - only owner trader' })
   deleteProduct(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,

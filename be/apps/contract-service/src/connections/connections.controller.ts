@@ -10,6 +10,7 @@ import {
   HttpStatus,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   ConnectionDto,
   CreateConnectionDto,
@@ -29,6 +30,8 @@ import { SearchFarmerQueryDto } from './dto/search-farmer-query.dto';
  * GET /api/v1/traders/search
  * GET /api/v1/farmers/search
  */
+@ApiTags('search')
+@ApiBearerAuth()
 @Controller()
 export class SearchController {
   constructor(private readonly connectionsService: ConnectionsService) {}
@@ -39,6 +42,9 @@ export class SearchController {
    */
   @Get('traders/search')
   @Roles('farmer', 'trader', 'buyer')
+  @ApiOperation({ summary: 'Search for traders by region, crop type, and trust score' })
+  @ApiResponse({ status: 200, description: 'Paginated list of matching traders' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   searchTraders(
     @Query() query: SearchTraderQueryDto,
   ): Promise<ListResponse<UserProfileDto>> {
@@ -51,6 +57,9 @@ export class SearchController {
    */
   @Get('farmers/search')
   @Roles('farmer', 'trader', 'buyer')
+  @ApiOperation({ summary: 'Search for farmers by region and crop type' })
+  @ApiResponse({ status: 200, description: 'Paginated list of matching farmers' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   searchFarmers(
     @Query() query: SearchFarmerQueryDto,
   ): Promise<ListResponse<UserProfileDto>> {
@@ -66,6 +75,8 @@ export class SearchController {
  * POST   /api/v1/connections/:id/accept
  * POST   /api/v1/connections/:id/reject
  */
+@ApiTags('connections')
+@ApiBearerAuth()
 @Controller('connections')
 export class ConnectionsController {
   constructor(private readonly connectionsService: ConnectionsService) {}
@@ -75,6 +86,9 @@ export class ConnectionsController {
    * Danh sách kết nối của người dùng hiện tại (lọc role=incoming|outgoing, status).
    */
   @Get()
+  @ApiOperation({ summary: 'List connections for the authenticated user (incoming/outgoing)' })
+  @ApiResponse({ status: 200, description: 'Paginated list of connections' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   list(
     @CurrentUser() user: JwtPayload,
     @Query() query: ConnectionQueryDto,
@@ -89,6 +103,10 @@ export class ConnectionsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @Roles('farmer', 'trader')
+  @ApiOperation({ summary: 'Send a connection request to a farmer or trader' })
+  @ApiResponse({ status: 201, description: 'Connection request sent with pending status' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - farmer or trader role required' })
   create(
     @Body() dto: CreateConnectionDto,
     @CurrentUser() user: JwtPayload,
@@ -104,6 +122,10 @@ export class ConnectionsController {
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @Roles('farmer', 'trader')
+  @ApiOperation({ summary: 'Withdraw a pending connection request (sender only)' })
+  @ApiResponse({ status: 200, description: 'Connection request withdrawn' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - only the sender can withdraw' })
   remove(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,
@@ -118,6 +140,10 @@ export class ConnectionsController {
   @Post(':id/accept')
   @HttpCode(HttpStatus.OK)
   @Roles('farmer', 'trader')
+  @ApiOperation({ summary: 'Accept a connection request (recipient only)' })
+  @ApiResponse({ status: 200, description: 'Connection accepted' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - only the recipient can accept' })
   accept(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,
@@ -132,6 +158,10 @@ export class ConnectionsController {
   @Post(':id/reject')
   @HttpCode(HttpStatus.OK)
   @Roles('farmer', 'trader')
+  @ApiOperation({ summary: 'Reject a connection request (recipient only)' })
+  @ApiResponse({ status: 200, description: 'Connection rejected' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - only the recipient can reject' })
   reject(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,
@@ -146,6 +176,10 @@ export class ConnectionsController {
   @Post(':id/negotiate')
   @HttpCode(HttpStatus.OK)
   @Roles('farmer', 'trader')
+  @ApiOperation({ summary: 'Move an accepted connection to negotiating status' })
+  @ApiResponse({ status: 200, description: 'Connection moved to negotiating status' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - only parties to the connection' })
   negotiate(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,

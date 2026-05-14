@@ -13,6 +13,7 @@ import {
   UseGuards,
   Req,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import type { Request } from 'express';
 import {
   AuthLoginDto,
@@ -33,6 +34,7 @@ import { DevLocalhostGuard } from './guards/dev-localhost.guard';
 import { PasswordLoginEnabledGuard } from './guards/password-login-enabled.guard';
 import { getClientIp } from './utils/client-ip';
 
+@ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -45,6 +47,9 @@ export class AuthController {
   @Post('login')
   @Public()
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login with Zalo access token and issue JWT' })
+  @ApiResponse({ status: 200, description: 'Login successful, returns JWT tokens' })
+  @ApiResponse({ status: 401, description: 'Invalid Zalo access token' })
   login(@Body() dto: AuthLoginDto): Promise<AuthLoginResponseDto> {
     return this.authService.login(dto.zaloAccessToken, dto.phoneNumber);
   }
@@ -58,6 +63,10 @@ export class AuthController {
   @Public()
   @UseGuards(PasswordLoginEnabledGuard)
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Login with username/password (requires AUTH_PASSWORD_LOGIN_ENABLED=true)' })
+  @ApiResponse({ status: 200, description: 'Login successful, returns JWT tokens' })
+  @ApiResponse({ status: 401, description: 'Invalid credentials' })
+  @ApiResponse({ status: 403, description: 'Password login is disabled' })
   passwordLogin(@Body() dto: AuthPasswordLoginDto): Promise<AuthLoginResponseDto> {
     return this.authService.passwordLogin(dto.username, dto.password);
   }
@@ -74,6 +83,9 @@ export class AuthController {
   @Public()
   @UseGuards(DevLoginEnabledGuard, DevLocalhostGuard)
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Dev-only login using secret + zaloId (requires AUTH_DEV_LOGIN_ENABLED=true)' })
+  @ApiResponse({ status: 200, description: 'Login successful, returns JWT tokens' })
+  @ApiResponse({ status: 403, description: 'Dev login disabled or wrong secret' })
   devLogin(@Body() dto: AuthDevLoginDto, @Req() req: Request): Promise<AuthLoginResponseDto> {
     const ip = getClientIp(req);
     return this.authService.devLogin(ip, dto.secret, dto.zaloId);
@@ -87,6 +99,9 @@ export class AuthController {
   @Post('verify')
   @Public()
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify a JWT token and check Redis session validity' })
+  @ApiResponse({ status: 200, description: 'Token is valid' })
+  @ApiResponse({ status: 401, description: 'Token is invalid or expired' })
   verify(
     @Headers('authorization') authorization: string,
   ): Promise<AuthVerifyResponseDto> {
@@ -104,6 +119,10 @@ export class AuthController {
    */
   @Post('logout')
   @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Logout and invalidate the current JWT session' })
+  @ApiResponse({ status: 200, description: 'Logged out successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   logout(
     @Headers('authorization') authorization: string,
   ): Promise<{ success: true }> {
@@ -118,6 +137,10 @@ export class AuthController {
    * Response: UserProfileDto
    */
   @Get('me')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get the authenticated user profile' })
+  @ApiResponse({ status: 200, description: 'User profile returned' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   getMe(@CurrentUser() user: JwtPayload): Promise<UserProfileDto> {
     return this.authService.getMe(user.sub);
   }
@@ -128,6 +151,9 @@ export class AuthController {
    */
   @Get('users/:userId')
   @Public()
+  @ApiOperation({ summary: 'Get public user summary by ID (no auth required)' })
+  @ApiResponse({ status: 200, description: 'Public user summary returned' })
+  @ApiResponse({ status: 404, description: 'User not found' })
   getUserById(
     @Param('userId', new ParseUUIDPipe()) userId: string,
   ): Promise<UserPublicSummaryDto> {
@@ -141,6 +167,10 @@ export class AuthController {
    * Response: UserProfileDto
    */
   @Put('me')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update the authenticated user profile' })
+  @ApiResponse({ status: 200, description: 'Profile updated successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   updateMe(
     @CurrentUser() user: JwtPayload,
     @Body() dto: UserProfileUpdateDto,

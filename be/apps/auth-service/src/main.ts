@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { applyTrustagriHttpStack, corsOrigins } from '@trustagri/shared';
 
@@ -24,6 +25,17 @@ async function bootstrap() {
   const httpServer = app.getHttpAdapter().getInstance();
   if (typeof httpServer?.set === 'function') {
     httpServer.set('trust proxy', 1);
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('TrustAgri Auth Service')
+      .setDescription('Authentication, JWT, user profiles')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api-docs', app, document);
   }
 
   const port = process.env.PORT ?? process.env.AUTH_SERVICE_PORT ?? 3001;

@@ -15,6 +15,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   CreateTraderReviewDto,
   CurrentUser,
@@ -33,6 +34,8 @@ import { TraderReviewsService } from './trader-reviews.service';
  *   GET  /api/v1/traders/:traderId/reviews
  *   GET  /api/v1/traders/:traderId/trust-score
  */
+@ApiTags('trader-reviews')
+@ApiBearerAuth()
 @Controller('traders/:traderId')
 @UseGuards(JwtAuthGuard)
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
@@ -41,6 +44,10 @@ export class TraderReviewsController {
 
   @Post('reviews')
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a review for a trader (buyer only, tied to an order)' })
+  @ApiResponse({ status: 201, description: 'Review created successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - buyer role required' })
   createReview(
     @Param('traderId', new ParseUUIDPipe({ version: '4' })) traderId: string,
     @Body() dto: CreateTraderReviewDto,
@@ -53,6 +60,9 @@ export class TraderReviewsController {
   }
 
   @Get('reviews')
+  @ApiOperation({ summary: 'List all reviews for a trader' })
+  @ApiResponse({ status: 200, description: 'Paginated list of trader reviews' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   listReviews(
     @Param('traderId', new ParseUUIDPipe({ version: '4' })) traderId: string,
     @Query('page') page?: string,
@@ -65,6 +75,9 @@ export class TraderReviewsController {
   }
 
   @Get('trust-score')
+  @ApiOperation({ summary: 'Get the trust score (average rating) for a trader' })
+  @ApiResponse({ status: 200, description: 'Trust score with average and review count' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   getTrustScore(
     @Param('traderId', new ParseUUIDPipe({ version: '4' })) traderId: string,
   ): Promise<TrustScoreDto> {
@@ -77,6 +90,8 @@ export class TraderReviewsController {
  *   PATCH  /api/v1/reviews/:id
  *   DELETE /api/v1/reviews/:id
  */
+@ApiTags('trader-reviews')
+@ApiBearerAuth()
 @Controller('reviews')
 @UseGuards(JwtAuthGuard)
 @UsePipes(new ValidationPipe({ transform: true, whitelist: true }))
@@ -84,6 +99,11 @@ export class ReviewsController {
   constructor(private readonly service: TraderReviewsService) {}
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update a review (author only)' })
+  @ApiResponse({ status: 200, description: 'Review updated' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - only review author' })
+  @ApiResponse({ status: 404, description: 'Review not found' })
   updateReview(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @Body() dto: UpdateTraderReviewDto,
@@ -94,6 +114,10 @@ export class ReviewsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a review (author only)' })
+  @ApiResponse({ status: 204, description: 'Review deleted' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - only review author' })
   deleteReview(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
     @CurrentUser() user: JwtPayload,
