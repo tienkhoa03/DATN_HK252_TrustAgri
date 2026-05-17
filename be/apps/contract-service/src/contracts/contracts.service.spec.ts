@@ -71,6 +71,14 @@ function farmerTraderContract(overrides?: Partial<ContractEntity>): ContractEnti
   } as ContractEntity;
 }
 
+function mockAuthClient() {
+  return { getUserSnapshot: jest.fn() } as unknown as import('../clients/auth-client.service').AuthClientService;
+}
+
+function mockFarmClient() {
+  return { listFarmsByIds: jest.fn() } as unknown as import('../clients/farm-client.service').FarmClientService;
+}
+
 function makeService() {
   const contractRepo = mockContractRepo();
   const contractAudit = mockAudit();
@@ -81,6 +89,8 @@ function makeService() {
     contractAudit as unknown as ContractAuditService,
     config,
     connectionsService as unknown as ConnectionsService,
+    mockAuthClient(),
+    mockFarmClient(),
   );
   return { service, contractRepo, contractAudit, connectionsService };
 }
@@ -172,5 +182,68 @@ describe('ContractsService.sign', () => {
     await expect(
       service.sign('contract-uuid-1', { sub: 'farmer-1', role: 'farmer' }),
     ).rejects.toBeInstanceOf(ConflictException);
+  });
+});
+
+describe('ContractsService.reject', () => {
+  it('throws NotFoundException when contract missing', async () => {
+    const { service, contractRepo } = makeService();
+    contractRepo.findOne.mockResolvedValue(null);
+
+    await expect(
+      service.reject('missing', { sub: 'trader-1', role: 'trader' }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('throws ForbiddenException when user is not a party', async () => {
+    const { service, contractRepo } = makeService();
+    contractRepo.findOne.mockResolvedValue(farmerTraderContract());
+
+    await expect(
+      service.reject('contract-uuid-1', { sub: 'stranger', role: 'trader' }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('throws ConflictException when not pending_signature', async () => {
+    const { service, contractRepo } = makeService();
+    contractRepo.findOne.mockResolvedValue(
+      farmerTraderContract({ status: 'active' }),
+    );
+
+    await expect(
+      service.reject('contract-uuid-1', { sub: 'trader-1', role: 'trader' }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('throws ConflictException when trader already signed', async () => {
+    const { service, contractRepo } = makeService();
+    contractRepo.findOne.mockResolvedValue(
+      farmerTraderContract({ traderSignedAt: new Date() }),
+    );
+
+    await expect(
+      service.reject('contract-uuid-1', { sub: 'trader-1', role: 'trader' }),
+    ).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('trader reject sets status cancelled and logs audit', async () => {
+    const { service, contractRepo, contractAudit } = makeService();
+    const entity = farmerTraderContract();
+    contractRepo.findOne.mockResolvedValue(entity);
+    contractRepo.save.mockImplementation(async (e: ContractEntity) => ({ ...e }));
+
+    const dto = await service.reject(
+      'contract-uuid-1',
+      { sub: 'trader-1', role: 'trader' },
+      'Không đồng ý điều khoản',
+    );
+
+    expect(dto.status).toBe('cancelled');
+    expect(contractAudit.logStatusChange).toHaveBeenCalledWith(
+      'contract-uuid-1',
+      'pending_signature',
+      'cancelled',
+      'trader-1',
+    );
   });
 });

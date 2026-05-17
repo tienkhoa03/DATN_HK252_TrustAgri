@@ -30,6 +30,7 @@ import {
 } from '@/services/connectionService';
 import type { ConnectionDto, FarmerSearchResultDto } from '@/services/connectionService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { farmOwnerDisplay } from '@/utils/displayLabels';
 
 type ConnectionStatus = ConnectionDto['status'];
 type FarmConnectionFilter = 'all' | 'none' | ConnectionStatus;
@@ -555,7 +556,7 @@ export const MarketplaceSupplyPanel: React.FC = () => {
                         <Icon name="users" size="sm" color={colors.text.secondary} />
                         <div>
                           <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Nông dân</Text>
-                          <Text size="small" style={{ margin: 0 }}>{farmerNames[farm.ownerId] ?? `…${farm.ownerId.slice(-6)}`}</Text>
+                          <Text size="small" style={{ margin: 0 }}>{farmOwnerDisplay(farm, farmerNames[farm.ownerId])}</Text>
                         </div>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'flex-start', gap: spacing.sm }}>

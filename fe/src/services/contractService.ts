@@ -6,6 +6,7 @@
  *   GET    /api/v1/contracts/:id/audit-logs
  *   GET    /api/v1/contracts/:id/compliance  (FR-T11)
  *   POST   /api/v1/contracts   (trader | admin)
+ *   POST   /api/v1/contracts/:id/reject
  *
  * JWT: Authorization Bearer từ interceptor; `role` trong query phải khớp vai trò tài khoản (BE).
  */
@@ -13,6 +14,14 @@
 import apiClient from '@/api/client';
 import { ApiError } from '@/api/errors';
 import type { BuyerTransactionSummaryDto } from '@/services/orderService';
+import {
+  partyBuyerDisplay,
+  partyFarmerDisplay,
+  partyTraderDisplay,
+  userDisplayLabel,
+} from '@/utils/displayLabels';
+
+export { partyFarmerDisplay, partyBuyerDisplay, partyTraderDisplay };
 
 export interface ContractDto {
   id: string;
@@ -20,8 +29,11 @@ export interface ContractDto {
   partyTraderId: string;
   partyBuyerId?: string;
   partyFarmerName?: string | null;
+  partyFarmerPhone?: string | null;
   partyTraderName?: string | null;
+  partyTraderPhone?: string | null;
   partyBuyerName?: string | null;
+  partyBuyerPhone?: string | null;
   contractType: 'farmer_trader' | 'trader_buyer';
   productId?: string;
   standardId?: string;
@@ -168,17 +180,34 @@ export function contractTypeLabelVi(t: ContractDto['contractType']): string {
   return t === 'farmer_trader' ? 'Nông dân — Thương lái' : 'Thương lái — Người mua';
 }
 
-/** Hiển thị khi DTO chỉ có partyFarmerId. */
-export function partyFarmerLabel(farmerId: string): string {
-  return `Nông dân #${farmerId.slice(0, 8)}`;
+/** Hiển thị nông dân — truyền partyFarmerName khi có từ BE. */
+export function partyFarmerLabel(
+  farmerId: string,
+  name?: string | null,
+  phone?: string | null,
+): string {
+  return userDisplayLabel(name, farmerId, 'Nông dân', phone);
 }
 
-/** Hiển thị khi DTO chỉ có partyBuyerId. */
-export function partyBuyerLabel(buyerId: string): string {
-  return `Người mua #${buyerId.slice(0, 8)}`;
+/** Hiển thị người mua — truyền partyBuyerName khi có từ BE. */
+export function partyBuyerLabel(
+  buyerId: string,
+  name?: string | null,
+  phone?: string | null,
+): string {
+  return userDisplayLabel(name, buyerId, 'Người mua', phone);
 }
 
-type ContractCtx = 'list' | 'get' | 'create' | 'audit' | 'compliance';
+/** Hiển thị thương lái — truyền partyTraderName khi có từ BE. */
+export function partyTraderLabel(
+  traderId: string,
+  name?: string | null,
+  phone?: string | null,
+): string {
+  return userDisplayLabel(name, traderId, 'Thương lái', phone);
+}
+
+type ContractCtx = 'list' | 'get' | 'create' | 'audit' | 'compliance' | 'reject';
 
 export function toContractViMessage(err: unknown, context: ContractCtx = 'list'): string {
   if (err instanceof ApiError) {
@@ -211,6 +240,7 @@ export function toContractViMessage(err: unknown, context: ContractCtx = 'list')
     create: 'Không thể tạo hợp đồng.',
     audit: 'Không thể tải nhật ký hợp đồng.',
     compliance: 'Không thể tải dữ liệu tuân thủ quy trình.',
+    reject: 'Không thể từ chối hợp đồng.',
   };
   return fallback[context];
 }
@@ -276,6 +306,13 @@ export async function getContractCompliance(contractId: string): Promise<Complia
 /** PATCH /api/v1/contracts/:id/sign — ký hợp đồng (farmer/trader/buyer). */
 export async function signContract(contractId: string): Promise<ContractDto> {
   const { data } = await apiClient.patch<ContractDto>(`/contracts/${contractId}/sign`);
+  return normalizeContract(data);
+}
+
+/** POST /api/v1/contracts/:id/reject — từ chối hợp đồng chờ ký (bên chưa ký). */
+export async function rejectContract(contractId: string, reason?: string): Promise<ContractDto> {
+  const body = reason?.trim() ? { reason: reason.trim() } : {};
+  const { data } = await apiClient.post<ContractDto>(`/contracts/${contractId}/reject`, body);
   return normalizeContract(data);
 }
 

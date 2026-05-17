@@ -64,6 +64,7 @@ export interface AlertDto {
   acknowledged: boolean;
   acknowledgedBy?: string;
   acknowledgedByName?: string | null;
+  acknowledgedByPhone?: string | null;
   acknowledgedAt?: string;
   createdAt: string;
 }

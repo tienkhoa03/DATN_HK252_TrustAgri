@@ -5,6 +5,7 @@ import {
   BadRequestException,
   ConflictException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -24,6 +25,8 @@ import { ConnectionsService } from '../connections/connections.service';
 import { AuthClientService } from '../clients/auth-client.service';
 import { FarmClientService } from '../clients/farm-client.service';
 import { settledValue } from '../clients/settled.util';
+import type { UserDenormSnapshot } from '@trustagri/shared';
+import { ContractEventPublisherService } from '../contract-change-requests/services/contract-event-publisher.service';
 
 @Injectable()
 export class ContractsService {
@@ -37,6 +40,8 @@ export class ContractsService {
     private readonly connectionsService: ConnectionsService,
     private readonly authClient: AuthClientService,
     private readonly farmClient: FarmClientService,
+    @Optional()
+    private readonly contractPublisher?: ContractEventPublisherService,
   ) {}
 
   /**
@@ -288,30 +293,31 @@ export class ContractsService {
 
     this.validateCreateParties(dto);
 
-    const [farmerNameRes, traderNameRes, buyerNameRes, farmNameRes] =
-      await Promise.allSettled([
-        dto.partyFarmerId
-          ? this.authClient.getUserDisplayName(dto.partyFarmerId)
-          : Promise.resolve(null),
-        this.authClient.getUserDisplayName(dto.partyTraderId),
-        dto.partyBuyerId
-          ? this.authClient.getUserDisplayName(dto.partyBuyerId)
-          : Promise.resolve(null),
-        dto.farmId ? this.farmClient.getFarmName(dto.farmId) : Promise.resolve(null),
-      ]);
+    const partyTraderId =
+      user.role === 'trader' ? user.sub : dto.partyTraderId;
+
+    const denorm = await this.resolveContractPartyDenorm({
+      partyFarmerId: dto.partyFarmerId ?? null,
+      partyTraderId,
+      partyBuyerId: dto.partyBuyerId ?? null,
+      farmId: dto.farmId ?? null,
+    });
 
     const entity = this.contractRepo.create({
       partyFarmerId: dto.partyFarmerId ?? null,
-      partyTraderId: dto.partyTraderId,
+      partyTraderId,
       partyBuyerId: dto.partyBuyerId ?? null,
-      partyFarmerName: settledValue(farmerNameRes),
-      partyTraderName: settledValue(traderNameRes),
-      partyBuyerName: settledValue(buyerNameRes),
+      partyFarmerName: denorm.partyFarmerName,
+      partyFarmerPhone: denorm.partyFarmerPhone,
+      partyTraderName: denorm.partyTraderName,
+      partyTraderPhone: denorm.partyTraderPhone,
+      partyBuyerName: denorm.partyBuyerName,
+      partyBuyerPhone: denorm.partyBuyerPhone,
       contractType: dto.contractType,
       productId: dto.productId ?? null,
       standardId: dto.standardId ?? null,
       farmId: dto.farmId ?? null,
-      farmName: settledValue(farmNameRes),
+      farmName: denorm.farmName,
       quantity: dto.quantity,
       unit: dto.unit,
       totalPrice: dto.totalPrice,
@@ -330,6 +336,65 @@ export class ContractsService {
     const saved = await this.contractRepo.save(entity);
     await this.contractAudit.logStatusChange(saved.id, null, saved.status, user.sub);
     return this.toDto(saved);
+  }
+
+  /** Gọi Auth Service lấy displayName + phone; Farm Service lấy farmName — ghi vào INSERT. */
+  private async resolveContractPartyDenorm(parties: {
+    partyFarmerId: string | null;
+    partyTraderId: string;
+    partyBuyerId: string | null;
+    farmId: string | null;
+  }): Promise<{
+    partyFarmerName: string | null;
+    partyFarmerPhone: string | null;
+    partyTraderName: string | null;
+    partyTraderPhone: string | null;
+    partyBuyerName: string | null;
+    partyBuyerPhone: string | null;
+    farmName: string | null;
+  }> {
+    const [farmerSnapRes, traderSnapRes, buyerSnapRes, farmNameRes] =
+      await Promise.allSettled([
+        parties.partyFarmerId
+          ? this.authClient.getUserSnapshot(parties.partyFarmerId)
+          : Promise.resolve(null),
+        this.authClient.getUserSnapshot(parties.partyTraderId),
+        parties.partyBuyerId
+          ? this.authClient.getUserSnapshot(parties.partyBuyerId)
+          : Promise.resolve(null),
+        parties.farmId
+          ? this.farmClient.getFarmName(parties.farmId)
+          : Promise.resolve(null),
+      ]);
+
+    const farmerSnap = settledValue(farmerSnapRes);
+    const traderSnap = settledValue(traderSnapRes);
+    const buyerSnap = settledValue(buyerSnapRes);
+
+    this.logDenormMiss('partyFarmer', parties.partyFarmerId, farmerSnap);
+    this.logDenormMiss('partyTrader', parties.partyTraderId, traderSnap);
+    this.logDenormMiss('partyBuyer', parties.partyBuyerId, buyerSnap);
+
+    return {
+      partyFarmerName: farmerSnap?.displayName ?? null,
+      partyFarmerPhone: farmerSnap?.phone ?? null,
+      partyTraderName: traderSnap?.displayName ?? null,
+      partyTraderPhone: traderSnap?.phone ?? null,
+      partyBuyerName: buyerSnap?.displayName ?? null,
+      partyBuyerPhone: buyerSnap?.phone ?? null,
+      farmName: settledValue(farmNameRes),
+    };
+  }
+
+  private logDenormMiss(
+    label: string,
+    userId: string | null,
+    snap: UserDenormSnapshot | null,
+  ): void {
+    if (!userId || snap?.displayName) return;
+    this.logger.warn(
+      `Auth không trả displayName cho ${label} userId=${userId} — kiểm tra AUTH_SERVICE_URL và GET /auth/users/:id`,
+    );
   }
 
   private validateCreateParties(dto: CreateContractDto): void {
@@ -447,6 +512,66 @@ export class ContractsService {
     return this.toDto(saved);
   }
 
+  /**
+   * POST /contracts/:id/reject — bên chưa ký từ chối hợp đồng pending_signature.
+   */
+  async reject(id: string, user: JwtPayload, reason?: string): Promise<ContractDto> {
+    const entity = await this.contractRepo.findOne({ where: { id } });
+    if (!entity) {
+      throw new NotFoundException('Hợp đồng không tồn tại');
+    }
+    this.assertCanAccessContract(entity, user);
+
+    if (entity.status !== 'pending_signature') {
+      throw new ConflictException('Hợp đồng không ở trạng thái chờ ký');
+    }
+
+    if (user.role === 'farmer') {
+      if (entity.partyFarmerId !== user.sub) {
+        throw new ForbiddenException('Bạn không phải nông dân trong hợp đồng này');
+      }
+      if (entity.farmerSignedAt) {
+        throw new ConflictException('Bạn đã ký hợp đồng này rồi');
+      }
+    } else if (user.role === 'trader') {
+      if (entity.partyTraderId !== user.sub) {
+        throw new ForbiddenException('Bạn không phải thương lái trong hợp đồng này');
+      }
+      if (entity.traderSignedAt) {
+        throw new ConflictException('Bạn đã ký hợp đồng này rồi');
+      }
+    } else if (user.role === 'buyer') {
+      if (entity.partyBuyerId !== user.sub) {
+        throw new ForbiddenException('Bạn không phải người mua trong hợp đồng này');
+      }
+      if (entity.buyerSignedAt) {
+        throw new ConflictException('Bạn đã ký hợp đồng này rồi');
+      }
+    } else {
+      throw new ForbiddenException('Vai trò không được phép từ chối hợp đồng');
+    }
+
+    const previousStatus = entity.status;
+    entity.status = 'cancelled';
+    const saved = await this.contractRepo.save(entity);
+
+    await this.contractAudit.logStatusChange(saved.id, previousStatus, saved.status, user.sub);
+
+    const reasonNote = reason?.trim() ? ` reason="${reason.trim()}"` : '';
+    this.logger.log(`Contract ${id} rejected by ${user.sub} (${user.role});${reasonNote}`);
+
+    const dto = this.toDto(saved);
+    await this.contractPublisher
+      ?.publishContractChanged({ contract: dto })
+      .catch((err) =>
+        this.logger.warn(
+          `publishContractChanged after reject failed: ${(err as Error).message}`,
+        ),
+      );
+
+    return dto;
+  }
+
   async listAuditLogs(contractId: string, user: JwtPayload): Promise<ContractAuditLogEntryDto[]> {
     await this.getById(contractId, user);
     const rows = await this.contractAudit.findByContractId(contractId);
@@ -457,6 +582,7 @@ export class ContractsService {
       newStatus: r.newStatus,
       actorUserId: r.actorUserId,
       actorDisplayName: r.actorDisplayName ?? null,
+      actorPhone: r.actorPhone ?? null,
       occurredAt: r.occurredAt instanceof Date ? r.occurredAt.toISOString() : String(r.occurredAt),
     }));
   }
@@ -468,8 +594,11 @@ export class ContractsService {
       partyTraderId: entity.partyTraderId,
       partyBuyerId: entity.partyBuyerId ?? undefined,
       partyFarmerName: entity.partyFarmerName ?? null,
+      partyFarmerPhone: entity.partyFarmerPhone ?? null,
       partyTraderName: entity.partyTraderName ?? null,
+      partyTraderPhone: entity.partyTraderPhone ?? null,
       partyBuyerName: entity.partyBuyerName ?? null,
+      partyBuyerPhone: entity.partyBuyerPhone ?? null,
       contractType: entity.contractType,
       productId: entity.productId ?? undefined,
       standardId: entity.standardId ?? undefined,
@@ -500,5 +629,6 @@ export interface ContractAuditLogEntryDto {
   newStatus: string;
   actorUserId: string | null;
   actorDisplayName?: string | null;
+  actorPhone?: string | null;
   occurredAt: string;
 }

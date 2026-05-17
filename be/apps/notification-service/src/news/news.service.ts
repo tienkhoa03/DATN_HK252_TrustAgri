@@ -29,6 +29,7 @@ export class NewsService {
       id: e.id,
       traderId: e.traderId,
       traderDisplayName: e.traderDisplayName ?? null,
+      traderPhone: e.traderPhone ?? null,
       title: e.title,
       summary: e.summary,
       content: e.content,
@@ -76,14 +77,16 @@ export class NewsService {
     traderId: string,
     dto: NewsArticleCreateDto,
   ): Promise<NewsArticleDto> {
-    const [traderNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(traderId),
+    const [traderSnapRes] = await Promise.allSettled([
+      this.authClient.getUserSnapshot(traderId),
     ]);
+    const traderSnap = settledValue(traderSnapRes);
 
     const now = new Date();
     const entity = this.repo.create({
       traderId,
-      traderDisplayName: settledValue(traderNameRes),
+      traderDisplayName: traderSnap?.displayName ?? null,
+      traderPhone: traderSnap?.phone ?? null,
       title: dto.title,
       summary: dto.summary,
       content: dto.content,

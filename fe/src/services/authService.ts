@@ -177,9 +177,16 @@ export async function updateMe(patch: UserProfileUpdateDto): Promise<UserProfile
  * Tra cứu tên hiển thị của user theo ID (công khai trong hệ thống).
  * Trả null nếu không tìm thấy hoặc lỗi (graceful fallback).
  */
-export async function getUserById(userId: string): Promise<{ userId: string; displayName: string; avatarUrl?: string } | null> {
+export async function getUserById(
+  userId: string,
+): Promise<{ userId: string; displayName: string; phone?: string | null; avatarUrl?: string } | null> {
   try {
-    const { data } = await apiClient.get<{ userId: string; displayName: string; avatarUrl?: string }>(`/auth/users/${userId}`);
+    const { data } = await apiClient.get<{
+      userId: string;
+      displayName: string;
+      phone?: string | null;
+      avatarUrl?: string;
+    }>(`/auth/users/${userId}`);
     return data;
   } catch {
     return null;

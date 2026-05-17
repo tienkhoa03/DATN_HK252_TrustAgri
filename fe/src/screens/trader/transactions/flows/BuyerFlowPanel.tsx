@@ -15,7 +15,6 @@ import {
   rejectOrder,
   toOrderViMessage,
   orderStatusLabel,
-  buyerDisplayName as orderBuyerDisplayName,
   productDisplayName,
   type OrderDto,
 } from '@/services/orderService';
@@ -23,11 +22,11 @@ import {
   listContracts,
   contractStatusLabelVi,
   contractTypeLabelVi,
-  partyBuyerLabel,
   toContractViMessage,
   type ContractDto,
 } from '@/services/contractService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { orderBuyerDisplay, partyBuyerDisplay } from '@/utils/displayLabels';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
@@ -159,7 +158,7 @@ export const BuyerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
         {orders.map((order) => (
           <RequestCard
             key={order.id}
-            title={orderBuyerDisplayName(order.buyerId)}
+            title={orderBuyerDisplay(order)}
             subtitle={productDisplayName(order.productId)}
             meta={orderStatusLabel(order.status)}
             isLoading={!!orderPending[order.id]}
@@ -225,6 +224,11 @@ export const BuyerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
               );
             }
           }}
+          onRejected={(updated) => {
+            setSelectedContract(null);
+            setWaitingContracts((prev) => prev.filter((c) => c.id !== updated.id));
+            setHistoryContracts((prev) => [updated, ...prev.filter((c) => c.id !== updated.id)]);
+          }}
         />
       )}
     </>
@@ -285,7 +289,7 @@ const BuyerContractInfoCard: React.FC<{ contract: ContractDto; onTap: () => void
           </Text>
           <Text.Title size="small" style={{ margin: `${spacing.xs} 0` }}>
             {contract.partyBuyerId
-              ? (contract.partyBuyerName ?? partyBuyerLabel(contract.partyBuyerId))
+              ? partyBuyerDisplay(contract)
               : '—'}
           </Text.Title>
           <Text size="xSmall" style={{ color: colors.text.secondary, fontSize: fontSize.caption }}>

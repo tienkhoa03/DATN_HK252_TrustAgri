@@ -26,13 +26,15 @@ export class FarmsService {
   ) {}
 
   async create(dto: CreateFarmDto, ownerId: string): Promise<FarmDto> {
-    const [ownerNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(ownerId),
+    const [ownerSnapRes] = await Promise.allSettled([
+      this.authClient.getUserSnapshot(ownerId),
     ]);
+    const ownerSnap = settledValue(ownerSnapRes);
 
     const farm = this.farmRepo.create({
       ownerId,
-      ownerDisplayName: settledValue(ownerNameRes),
+      ownerDisplayName: ownerSnap?.displayName ?? null,
+      ownerPhone: ownerSnap?.phone ?? null,
       name: dto.name,
       location: dto.location,
       area: dto.area,
@@ -175,6 +177,7 @@ export class FarmsService {
       id: farm.id,
       ownerId: farm.ownerId,
       ownerDisplayName: farm.ownerDisplayName ?? null,
+      ownerPhone: farm.ownerPhone ?? null,
       name: farm.name,
       location: farm.location,
       area: farm.area,

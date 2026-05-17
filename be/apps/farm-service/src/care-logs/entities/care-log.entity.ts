@@ -65,6 +65,9 @@ export class CareLogEntity {
   @Column({ name: 'performed_by_name', type: 'varchar', nullable: true })
   performedByName: string | null;
 
+  @Column({ name: 'performed_by_phone', type: 'varchar', nullable: true })
+  performedByPhone: string | null;
+
   @OneToMany(() => EvidenceEntity, (e) => e.careLog, { cascade: true, eager: false })
   evidences: EvidenceEntity[];
 

@@ -3,21 +3,22 @@
  * (FR-T04, FR-T05, US-T03)
  */
 import React, { useState } from 'react';
-import { Text } from 'zmp-ui';
+import { Modal, Text } from 'zmp-ui';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
 import type { ContractDto } from '@/services/contractService';
 import {
   contractStatusLabelVi,
   contractTypeLabelVi,
-  partyFarmerLabel,
-  partyBuyerLabel,
   signContract,
+  rejectContract,
   canUserSign,
   hasUserSigned,
   toContractViMessage,
 } from '@/services/contractService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { partyBuyerDisplay, partyFarmerDisplay } from '@/utils/displayLabels';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
@@ -27,6 +28,7 @@ export interface ContractDetailModalProps {
   visible: boolean;
   onClose: () => void;
   onSigned?: (updated: ContractDto) => void;
+  onRejected?: (updated: ContractDto) => void;
 }
 
 interface TimelineEvent {
@@ -84,11 +86,16 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
   visible,
   onClose,
   onSigned,
+  onRejected,
 }) => {
   const session = useAtomValue(authSessionAtom);
   const openSnackbar = useStableOpenSnackbar();
+  const queryClient = useQueryClient();
   const [contract, setContract] = useState<ContractDto>(initialContract);
   const [signing, setSigning] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejecting, setRejecting] = useState(false);
 
   if (!visible) return null;
 
@@ -126,13 +133,36 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
     }
   };
 
+  const handleRejectConfirm = async () => {
+    setRejecting(true);
+    try {
+      const updated = await rejectContract(contract.id, rejectReason);
+      setRejectDialogOpen(false);
+      setRejectReason('');
+      void queryClient.invalidateQueries({ queryKey: ['trader-contracts'] });
+      onRejected?.(updated);
+      onClose();
+      openSnackbar({
+        type: 'success',
+        text: 'Đã từ chối hợp đồng.',
+        duration: 3000,
+        icon: true,
+      });
+    } catch (err) {
+      openSnackbar({
+        type: 'error',
+        text: toContractViMessage(err, 'reject'),
+        duration: 3500,
+        icon: true,
+      });
+    } finally {
+      setRejecting(false);
+    }
+  };
+
   const timeline = buildTimeline(contract);
-  const farmerLine = contract.partyFarmerId
-    ? (contract.partyFarmerName ?? partyFarmerLabel(contract.partyFarmerId))
-    : null;
-  const buyerLine = contract.partyBuyerId
-    ? (contract.partyBuyerName ?? partyBuyerLabel(contract.partyBuyerId))
-    : null;
+  const farmerLine = contract.partyFarmerId ? partyFarmerDisplay(contract) : null;
+  const buyerLine = contract.partyBuyerId ? partyBuyerDisplay(contract) : null;
   const statusColor =
     contract.status === 'active'
       ? colors.primary.agriGreen
@@ -267,29 +297,99 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
           />
         </div>
 
-        {/* Sign button */}
+        {/* Sign / Reject actions */}
         {showSignButton && (
-          <button
-            type="button"
-            disabled={signing}
-            onClick={() => void handleSign()}
+          <div
             style={{
-              width: '100%',
-              padding: spacing.md,
-              backgroundColor: signing ? colors.background.secondary : colors.primary.agriGreen,
-              color: signing ? colors.text.secondary : colors.text.inverse,
-              border: 'none',
-              borderRadius: '10px',
-              fontSize: fontSize.body,
-              fontWeight: fontWeight.semibold,
-              cursor: signing ? 'not-allowed' : 'pointer',
-              minHeight: 48,
+              display: 'flex',
+              gap: spacing.sm,
               marginBottom: spacing.md,
             }}
           >
-            {signing ? 'Đang xử lý…' : '✍️ Ký hợp đồng'}
-          </button>
+            <button
+              type="button"
+              disabled={signing || rejecting}
+              onClick={() => void handleSign()}
+              style={{
+                flex: 1,
+                padding: spacing.md,
+                backgroundColor:
+                  signing || rejecting ? colors.background.secondary : colors.primary.agriGreen,
+                color: signing || rejecting ? colors.text.secondary : colors.text.inverse,
+                border: 'none',
+                borderRadius: '10px',
+                fontSize: fontSize.body,
+                fontWeight: fontWeight.semibold,
+                cursor: signing || rejecting ? 'not-allowed' : 'pointer',
+                minHeight: 48,
+              }}
+            >
+              {signing ? 'Đang xử lý…' : '✍️ Ký hợp đồng'}
+            </button>
+            <button
+              type="button"
+              disabled={signing || rejecting}
+              onClick={() => setRejectDialogOpen(true)}
+              style={{
+                flex: 1,
+                padding: spacing.md,
+                backgroundColor: colors.background.primary,
+                color: colors.functional.alertRed,
+                border: `1px solid ${colors.functional.alertRed}`,
+                borderRadius: '10px',
+                fontSize: fontSize.body,
+                fontWeight: fontWeight.semibold,
+                cursor: signing || rejecting ? 'not-allowed' : 'pointer',
+                minHeight: 48,
+              }}
+            >
+              Từ chối
+            </button>
+          </div>
         )}
+
+        <Modal
+          visible={rejectDialogOpen}
+          title="Từ chối hợp đồng?"
+          description="Hợp đồng sẽ chuyển sang trạng thái đã hủy. Bạn có thể nhập lý do (tuỳ chọn)."
+          zIndex={2100}
+          onClose={() => {
+            if (rejecting) return;
+            setRejectDialogOpen(false);
+            setRejectReason('');
+          }}
+          verticalActions
+          actions={[
+            {
+              text: rejecting ? 'Đang xử lý…' : 'Xác nhận từ chối',
+              danger: true,
+              onClick: () => void handleRejectConfirm(),
+            },
+            {
+              text: 'Huỷ',
+              close: true,
+            },
+          ]}
+        >
+          <textarea
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Lý do từ chối (tuỳ chọn)"
+            maxLength={500}
+            disabled={rejecting}
+            rows={3}
+            style={{
+              width: '100%',
+              boxSizing: 'border-box',
+              marginTop: spacing.sm,
+              padding: spacing.sm,
+              borderRadius: 8,
+              border: `1px solid ${colors.background.secondary}`,
+              fontSize: fontSize.body,
+              resize: 'vertical',
+            }}
+          />
+        </Modal>
 
         {alreadySigned && (
           <div

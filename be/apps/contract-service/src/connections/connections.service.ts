@@ -15,6 +15,7 @@ import {
   CreateConnectionDto,
   ListResponse,
   UserProfileDto,
+  type UserDenormSnapshot,
 } from '@trustagri/shared';
 import { ConnectionEntity } from './entities/connection.entity';
 import { ConnectionPublisherService } from './services/connection-publisher.service';
@@ -327,14 +328,14 @@ export class ConnectionsService implements OnModuleInit {
     }
 
     // Kiểm tra người nhận tồn tại và có vai trò hợp lệ
-    const [toUserRows] = await this.dataSource.query<RawUserRow[]>(
+    const toUserRows = await this.dataSource.query<{ user_id: string; role: string }[]>(
       `SELECT user_id, role FROM users WHERE user_id = $1`,
       [dto.toUserId],
     );
-    if (!toUserRows) {
+    if (!toUserRows?.length) {
       throw new NotFoundException('Người dùng đích không tồn tại');
     }
-    const toRole = toUserRows.role as 'farmer' | 'trader';
+    const toRole = toUserRows[0].role as 'farmer' | 'trader';
 
     if (toRole !== 'farmer' && toRole !== 'trader') {
       throw new BadRequestException(
@@ -342,29 +343,37 @@ export class ConnectionsService implements OnModuleInit {
       );
     }
 
-    // Kiểm tra duplicate: đã có kết nối pending/accepted giữa hai người này chưa
-    const existing = await this.connectionRepo
+    // Trùng chỉ khi cùng from + to + farm (một thương lái có thể kết nối nhiều vườn của cùng nông dân)
+    const farmId = dto.farmId ?? null;
+    const duplicateQb = this.connectionRepo
       .createQueryBuilder('c')
-      .where(
-        '((c.fromUserId = :from AND c.toUserId = :to) OR (c.fromUserId = :to AND c.toUserId = :from))',
-        { from: userId, to: dto.toUserId },
-      )
+      .where('c.fromUserId = :from', { from: userId })
+      .andWhere('c.toUserId = :to', { to: dto.toUserId })
       .andWhere('c.status IN (:...statuses)', {
         statuses: ['pending', 'accepted', 'negotiating', 'signed'],
-      })
-      .getOne();
+      });
+
+    if (farmId === null) {
+      duplicateQb.andWhere('c.farmId IS NULL');
+    } else {
+      duplicateQb.andWhere('c.farmId = :farmId', { farmId });
+    }
+
+    const existing = await duplicateQb.getOne();
 
     if (existing) {
       throw new ConflictException(
-        'Đã có yêu cầu kết nối hoặc đang được kết nối với người dùng này',
+        farmId
+          ? 'Đã có yêu cầu kết nối hoặc đang kết nối với vườn này'
+          : 'Đã có yêu cầu kết nối hoặc đang kết nối với người dùng này (không gắn vườn)',
       );
     }
 
-    const [fromNameRes, toNameRes, farmNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(userId),
-      this.authClient.getUserDisplayName(dto.toUserId),
-      dto.farmId ? this.farmClient.getFarmName(dto.farmId) : Promise.resolve(null),
-    ]);
+    const denorm = await this.resolveConnectionDenorm(
+      userId,
+      dto.toUserId,
+      dto.farmId ?? null,
+    );
 
     const entity = this.connectionRepo.create({
       fromUserId: userId,
@@ -372,9 +381,11 @@ export class ConnectionsService implements OnModuleInit {
       fromRole: userRole,
       toRole,
       farmId: dto.farmId ?? null,
-      fromUserName: settledValue(fromNameRes),
-      toUserName: settledValue(toNameRes),
-      farmName: settledValue(farmNameRes),
+      fromUserName: denorm.fromUserName,
+      fromUserPhone: denorm.fromUserPhone,
+      toUserName: denorm.toUserName,
+      toUserPhone: denorm.toUserPhone,
+      farmName: denorm.farmName,
       message: dto.message ?? null,
       status: 'pending',
     });
@@ -556,6 +567,50 @@ export class ConnectionsService implements OnModuleInit {
     }
   }
 
+  /** Gọi Auth Service lấy displayName + phone; Farm Service lấy farmName — ghi vào INSERT. */
+  private async resolveConnectionDenorm(
+    fromUserId: string,
+    toUserId: string,
+    farmId: string | null,
+  ): Promise<{
+    fromUserName: string | null;
+    fromUserPhone: string | null;
+    toUserName: string | null;
+    toUserPhone: string | null;
+    farmName: string | null;
+  }> {
+    const [fromSnapRes, toSnapRes, farmNameRes] = await Promise.allSettled([
+      this.authClient.getUserSnapshot(fromUserId),
+      this.authClient.getUserSnapshot(toUserId),
+      farmId ? this.farmClient.getFarmName(farmId) : Promise.resolve(null),
+    ]);
+
+    const fromSnap = settledValue(fromSnapRes);
+    const toSnap = settledValue(toSnapRes);
+
+    this.logConnectionDenormMiss('fromUser', fromUserId, fromSnap);
+    this.logConnectionDenormMiss('toUser', toUserId, toSnap);
+
+    return {
+      fromUserName: fromSnap?.displayName ?? null,
+      fromUserPhone: fromSnap?.phone ?? null,
+      toUserName: toSnap?.displayName ?? null,
+      toUserPhone: toSnap?.phone ?? null,
+      farmName: settledValue(farmNameRes),
+    };
+  }
+
+  private logConnectionDenormMiss(
+    label: string,
+    userId: string,
+    snap: UserDenormSnapshot | null,
+  ): void {
+    if (snap?.displayName) return;
+    this.logger.warn(
+      `Auth không trả displayName cho ${label} userId=${userId} — kiểm tra AUTH_SERVICE_URL và GET /auth/users/:id`,
+    );
+  }
+
   private ensurePending(connection: ConnectionEntity): void {
     if (connection.status !== 'pending') {
       throw new ConflictException(
@@ -570,7 +625,9 @@ export class ConnectionsService implements OnModuleInit {
       fromUserId: entity.fromUserId,
       toUserId: entity.toUserId,
       fromUserName: entity.fromUserName ?? null,
+      fromUserPhone: entity.fromUserPhone ?? null,
       toUserName: entity.toUserName ?? null,
+      toUserPhone: entity.toUserPhone ?? null,
       fromRole: entity.fromRole,
       toRole: entity.toRole,
       farmId: entity.farmId ?? undefined,

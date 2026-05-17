@@ -245,7 +245,7 @@ export class AuthService {
   async getUserPublicById(userId: string): Promise<UserPublicSummaryDto> {
     const user = await this.userRepo.findOne({
       where: { userId },
-      select: ['userId', 'displayName', 'avatarUrl'],
+      select: ['userId', 'displayName', 'phone', 'avatarUrl'],
     });
     if (!user) {
       throw new NotFoundException('Người dùng không tồn tại');
@@ -253,6 +253,7 @@ export class AuthService {
     return {
       userId: user.userId,
       displayName: user.displayName,
+      phone: user.phone ?? null,
       ...(user.avatarUrl ? { avatarUrl: user.avatarUrl } : {}),
     };
   }

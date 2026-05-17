@@ -170,13 +170,15 @@ export class AlertsService {
       throw new NotFoundException('Cảnh báo không tồn tại');
     }
 
-    const [ackNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(userId),
+    const [ackSnapRes] = await Promise.allSettled([
+      this.authClient.getUserSnapshot(userId),
     ]);
+    const ackSnap = settledValue(ackSnapRes);
 
     alert.acknowledged = true;
     alert.acknowledgedBy = userId;
-    alert.acknowledgedByName = settledValue(ackNameRes);
+    alert.acknowledgedByName = ackSnap?.displayName ?? null;
+    alert.acknowledgedByPhone = ackSnap?.phone ?? null;
     alert.acknowledgedAt = new Date();
     await this.alertRepo.save(alert);
 
@@ -219,6 +221,7 @@ export class AlertsService {
       acknowledged: entity.acknowledged,
       acknowledgedBy: entity.acknowledgedBy,
       acknowledgedByName: entity.acknowledgedByName ?? null,
+      acknowledgedByPhone: entity.acknowledgedByPhone ?? null,
       acknowledgedAt: entity.acknowledgedAt?.toISOString(),
       createdAt: entity.createdAt.toISOString(),
     };

@@ -77,9 +77,10 @@ export class CareLogsService {
 
     const deviation = await this.detectDeviation(farm, dto.standardStepId);
 
-    const [performedByNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(userId),
+    const [performedSnapRes] = await Promise.allSettled([
+      this.authClient.getUserSnapshot(userId),
     ]);
+    const performedSnap = settledValue(performedSnapRes);
 
     const entity = this.careLogRepo.create({
       farmId,
@@ -91,7 +92,8 @@ export class CareLogsService {
       syncStatus: 'synced',
       clientRecordId: dto.clientRecordId ?? null,
       performedBy: userId,
-      performedByName: settledValue(performedByNameRes),
+      performedByName: performedSnap?.displayName ?? null,
+      performedByPhone: performedSnap?.phone ?? null,
     });
 
     const saved = await this.careLogRepo.save(entity);
@@ -270,6 +272,7 @@ export class CareLogsService {
       performedAt: entity.performedAt.toISOString(),
       performedBy: entity.performedBy ?? undefined,
       performedByName: entity.performedByName ?? null,
+      performedByPhone: entity.performedByPhone ?? null,
       evidences: (entity.evidences ?? []).map((e) => this.toEvidenceDto(e)),
       deviation: entity.deviation ?? undefined,
       syncStatus: entity.syncStatus,

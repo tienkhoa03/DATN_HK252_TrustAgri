@@ -46,6 +46,11 @@ import {
 } from '@/services/contractService';
 import { listCareLogs, type CareLogDto } from '@/services/careLogService';
 import { listStandards, type StandardDto } from '@/services/standardService';
+import {
+  connectionFarmerDisplay,
+  farmDisplayLabel,
+  farmOwnerDisplay,
+} from '@/utils/displayLabels';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -95,9 +100,7 @@ function formatViDateTime(iso: string): string {
 }
 
 function complianceContractOptionLabel(c: ContractDto): string {
-  const farm = c.farmId
-    ? (c.farmName ?? `Vườn #${c.farmId.slice(0, 8)}`)
-    : 'Chưa gắn vườn';
+  const farm = c.farmId ? farmDisplayLabel(c.farmName, c.farmId) : 'Chưa gắn vườn';
   return `${contractStatusLabelVi(c.status)} · ${farm} · #${c.id.slice(0, 8)}`;
 }
 
@@ -1231,7 +1234,7 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
                       <div>
                         <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Nông dân</Text>
                         <Text size="small" style={{ margin: 0 }}>
-                          {farmerNameByUserId[farm.ownerId] ?? `…${farm.ownerId.slice(-6)}`}
+                          {farmOwnerDisplay(farm, farmerNameByUserId[farm.ownerId])}
                         </Text>
                       </div>
                     </div>
@@ -1346,7 +1349,7 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.xs }}>
                     <Text.Title size="small" style={{ margin: 0 }}>
-                      {`Nông dân (...${conn.fromUserId.slice(-4)})`}
+                      {connectionFarmerDisplay(conn)}
                     </Text.Title>
                     <Text size="xSmall" style={{ color: colors.text.secondary }}>
                       {(() => {

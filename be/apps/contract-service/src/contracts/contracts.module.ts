@@ -8,6 +8,7 @@ import { ContractsController } from './contracts.controller';
 import { ContractAuditService } from './contract-audit.service';
 import { ComplianceService } from './compliance.service';
 import { ConnectionsModule } from '../connections/connections.module';
+import { ContractEventPublisherService } from '../contract-change-requests/services/contract-event-publisher.service';
 
 @Module({
   imports: [
@@ -16,7 +17,12 @@ import { ConnectionsModule } from '../connections/connections.module';
     ConnectionsModule,
   ],
   controllers: [ContractsController],
-  providers: [ContractsService, ContractAuditService, ComplianceService],
+  providers: [
+    ContractsService,
+    ContractAuditService,
+    ComplianceService,
+    ContractEventPublisherService,
+  ],
   exports: [ContractsService, ContractAuditService, ComplianceService],
 })
 export class ContractsModule {}

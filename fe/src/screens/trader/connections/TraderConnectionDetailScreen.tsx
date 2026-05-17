@@ -19,6 +19,7 @@ import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
 import type { ConnectionDto } from '@/services/connectionService';
 import { CreateFarmerContractModal } from '../transactions/components/CreateFarmerContractModal';
 import type { ContractDto } from '@/services/contractService';
+import { connectionFarmerDisplay, farmDisplayLabel } from '@/utils/displayLabels';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -185,7 +186,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
     );
   }
 
-  const farmerLabel = `Nông dân (...${connection.fromUserId.slice(-4)})`;
+  const farmerLabel = connectionFarmerDisplay(connection);
   const statusColor: Record<ConnectionStatus, string> = {
     pending: colors.functional.warningYellow,
     accepted: colors.primary.agriGreen,
@@ -331,7 +332,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Text size="xSmall" style={{ color: colors.text.secondary }}>Vườn liên quan</Text>
                 <Text size="xSmall" style={{ fontWeight: fontWeight.semibold }}>
-                  {connection.farmName ?? `Vườn #${connection.farmId.slice(0, 8)}`}
+                  {farmDisplayLabel(connection.farmName, connection.farmId)}
                 </Text>
               </div>
             )}
@@ -468,7 +469,10 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
         <CreateFarmerContractModal
           visible
           farmerUserId={farmerUserId}
+          farmerDisplayName={farmerLabel}
+          farmerPhone={connection.fromRole === 'farmer' ? connection.fromUserPhone : connection.toUserPhone}
           farmId={connection.farmId ?? null}
+          farmName={connection.farmName}
           onClose={() => setShowCreateContract(false)}
           onCreated={handleContractCreated}
         />

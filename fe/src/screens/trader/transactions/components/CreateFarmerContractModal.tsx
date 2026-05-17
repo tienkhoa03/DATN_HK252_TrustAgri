@@ -12,11 +12,17 @@ import {
   type ContractDto,
 } from '@/services/contractService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { farmDisplayLabel, userDisplayLabel } from '@/utils/displayLabels';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 
 const UNIT_OPTIONS = ['kg', 'tấn', 'thùng', 'bao', 'tạ'];
+
+/** Khớp RoleAppShell / BottomNavigation (64px) + safe area thiết bị */
+const BOTTOM_NAV_CLEARANCE = 'calc(64px + env(safe-area-inset-bottom, 0px))';
+/** Vùn nút submit cố định: padding md×2 + minHeight nút 44px */
+const SUBMIT_BAR_HEIGHT_PX = 76;
 
 function todayStr(): string {
   return new Date().toISOString().split('T')[0];
@@ -31,7 +37,10 @@ function oneYearLaterStr(): string {
 export interface CreateFarmerContractModalProps {
   visible: boolean;
   farmerUserId: string;
+  farmerDisplayName?: string;
+  farmerPhone?: string | null;
   farmId: string | null;
+  farmName?: string | null;
   onClose: () => void;
   onCreated: (contract: ContractDto) => void;
 }
@@ -39,7 +48,10 @@ export interface CreateFarmerContractModalProps {
 export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps> = ({
   visible,
   farmerUserId,
+  farmerDisplayName,
+  farmerPhone,
   farmId: initialFarmId,
+  farmName,
   onClose,
   onCreated,
 }) => {
@@ -93,7 +105,9 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
         deposit: deposit ? Number(deposit) : undefined,
         startDate,
         endDate,
-        terms: terms.trim() || `Hợp đồng bao tiêu với nông dân ${farmerUserId.slice(-4)}`,
+        terms:
+          terms.trim() ||
+          `Hợp đồng bao tiêu với ${userDisplayLabel(farmerDisplayName, farmerUserId, 'Nông dân', farmerPhone)}`,
       });
       openSnackbar({ type: 'success', text: 'Đã tạo hợp đồng — đang chờ ký.', duration: 3000, icon: true });
       onCreated(contract);
@@ -151,19 +165,25 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
         <div>
           <Text.Title size="small" style={{ margin: 0 }}>Tạo hợp đồng bao tiêu</Text.Title>
           <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-            Nông dân #{farmerUserId.slice(-4)}
+            {userDisplayLabel(farmerDisplayName, farmerUserId, 'Nông dân', farmerPhone)}
+            {farmId ? ` · ${farmDisplayLabel(farmName, farmId)}` : ''}
           </Text>
         </div>
       </div>
 
-      {/* Form */}
-      <div style={{ padding: spacing.md, paddingBottom: 100 }}>
+      {/* Form — chừa chỗ cho thanh submit + bottom nav */}
+      <div
+        style={{
+          padding: spacing.md,
+          paddingBottom: `calc(${SUBMIT_BAR_HEIGHT_PX}px + 64px + env(safe-area-inset-bottom, 0px) + ${spacing.lg})`,
+        }}
+      >
 
         {/* FarmId */}
-        <FormField label="Mã vườn (nếu có)">
+        <FormField label={farmName ? 'Vườn' : 'Mã vườn (nếu có)'}>
           <input
             type="text"
-            value={farmId}
+            value={farmName && initialFarmId ? farmName : farmId}
             onChange={(e) => setFarmId(e.target.value)}
             placeholder="UUID vườn — để trống nếu chưa xác định"
             disabled={!!initialFarmId}
@@ -275,17 +295,19 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
         </div>
       </div>
 
-      {/* Sticky submit */}
+      {/* Sticky submit — nằm phía trên bottom nav (64px) */}
       <div
         style={{
           position: 'fixed',
-          bottom: 0,
+          bottom: BOTTOM_NAV_CLEARANCE,
           left: 0,
           right: 0,
           padding: spacing.md,
+          paddingBottom: `calc(${spacing.md} + env(safe-area-inset-bottom, 0px))`,
           backgroundColor: colors.background.primary,
           borderTop: `1px solid ${colors.background.secondary}`,
           boxShadow: '0 -4px 12px rgba(0,0,0,0.08)',
+          zIndex: 1001,
         }}
       >
         <button

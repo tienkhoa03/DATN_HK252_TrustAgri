@@ -20,6 +20,7 @@ import {
   toContractChangeRequestViMessage,
   type ContractChangeRequestDto,
 } from '@/services/contractChangeRequestService';
+import { contractPartyDisplay } from '@/utils/displayLabels';
 
 const FIELD_LABEL_VI: Record<string, string> = {
   quantity: 'Khối lượng',
@@ -62,7 +63,19 @@ function isPartyOfContract(
 
 export interface ContractChangeRequestsPanelProps {
   contractId: string;
-  contract?: Pick<ContractDto, 'partyFarmerId' | 'partyTraderId' | 'partyBuyerId' | 'contractType'>;
+  contract?: Pick<
+    ContractDto,
+    | 'partyFarmerId'
+    | 'partyFarmerName'
+    | 'partyFarmerPhone'
+    | 'partyTraderId'
+    | 'partyTraderName'
+    | 'partyTraderPhone'
+    | 'partyBuyerId'
+    | 'partyBuyerName'
+    | 'partyBuyerPhone'
+    | 'contractType'
+  >;
   viewerRole: 'farmer' | 'trader' | 'buyer';
   onMutationSuccess?: () => void;
 }
@@ -225,7 +238,7 @@ export const ContractChangeRequestsPanel: React.FC<ContractChangeRequestsPanelPr
               <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
                 Người gửi:{' '}
                 <strong style={{ color: colors.text.primary }}>
-                  {req.requestedBy ? `#${req.requestedBy.slice(-8)}` : '—'}
+                  {contractPartyDisplay(req.requestedBy, contract)}
                 </strong>
               </Text>
               {req.reason && (
@@ -274,7 +287,7 @@ export const ContractChangeRequestsPanel: React.FC<ContractChangeRequestsPanelPr
               {req.status !== 'pending' && req.respondedAt && (
                 <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.sm }}>
                   Phản hồi: {new Date(req.respondedAt).toLocaleString('vi-VN')}
-                  {req.respondedBy ? ` · bởi #${req.respondedBy.slice(-8)}` : ''}
+                  {req.respondedBy ? ` · bởi ${contractPartyDisplay(req.respondedBy, contract)}` : ''}
                 </Text>
               )}
 

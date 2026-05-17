@@ -26,6 +26,7 @@ import {
   ProposalComparisonTable,
   type ProposalItem,
 } from '../components/ProposalComparisonTable';
+import { proposalTraderDisplay } from '@/utils/displayLabels';
 
 export interface SourcingInboxPanelProps {
   buyingRequestId: string;
@@ -36,7 +37,7 @@ function mapProposal(p: ProposalDto): ProposalItem {
   return {
     id: p.id,
     traderId: p.traderId,
-    traderName: `Thương lái #${p.traderId.slice(0, 8)}`,
+    traderName: proposalTraderDisplay(p),
     pricePerUnit: p.price,
     quantity: p.quantity,
     deliveryDate: undefined,

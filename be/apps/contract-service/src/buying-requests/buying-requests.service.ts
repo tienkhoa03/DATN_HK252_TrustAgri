@@ -88,13 +88,16 @@ export class BuyingRequestsService {
     dto: CreateBuyingRequestDto,
     buyerId: string,
   ): Promise<BuyingRequestDto> {
-    const [buyerNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(buyerId),
+    const [buyerSnapRes] = await Promise.allSettled([
+      this.authClient.getUserSnapshot(buyerId),
     ]);
+
+    const buyerSnap = settledValue(buyerSnapRes);
 
     const entity = this.buyingRequestRepo.create({
       buyerId,
-      buyerDisplayName: settledValue(buyerNameRes),
+      buyerDisplayName: buyerSnap?.displayName ?? null,
+      buyerPhone: buyerSnap?.phone ?? null,
       cropType: dto.cropType,
       quantity: dto.quantity,
       unit: dto.unit,
@@ -182,6 +185,7 @@ export class BuyingRequestsService {
       id: entity.id,
       buyerId: entity.buyerId,
       buyerDisplayName: entity.buyerDisplayName ?? null,
+      buyerPhone: entity.buyerPhone ?? null,
       cropType: entity.cropType,
       quantity: Number(entity.quantity),
       unit: entity.unit,

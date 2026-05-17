@@ -21,7 +21,8 @@ import { getContract, type ContractDto } from '@/services/contractService';
 import { getFarm, type FarmDto } from '@/services/farmService';
 import { listCareLogs, type CareLogDto } from '@/services/careLogService';
 import { getLatest, type SensorReadingDto } from '@/services/monitoringService';
-import { productDisplayName, traderDisplayName } from '@/services/orderService';
+import { productDisplayName } from '@/services/orderService';
+import { farmDisplayLabel, partyTraderDisplay } from '@/utils/displayLabels';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -249,7 +250,7 @@ export const BuyerLiveMonitorDetailScreen: React.FC = () => {
               )}
               {contract?.partyTraderId && (
                 <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                  Thương lái: {traderDisplayName(contract.partyTraderId)}
+                  Thương lái: {partyTraderDisplay(contract)}
                 </Text>
               )}
               {contract?.endDate && (

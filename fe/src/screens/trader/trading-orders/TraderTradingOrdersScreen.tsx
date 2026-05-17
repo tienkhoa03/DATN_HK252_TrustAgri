@@ -31,7 +31,6 @@ import {
 } from '../../../services/marketplaceService';
 import {
   listBuyingRequests,
-  buyerDisplayName,
   cropLabelBR,
   standardLabelBR,
   toBuyingRequestViMessage,
@@ -43,7 +42,6 @@ import {
   rejectOrder,
   toOrderViMessage,
   orderStatusLabel,
-  buyerDisplayName as orderBuyerDisplayName,
   productDisplayName,
   type OrderDto,
 } from '../../../services/orderService';
@@ -56,11 +54,16 @@ import {
   contractStatusLabelVi,
   contractTypeLabelVi,
   toContractViMessage,
-  partyFarmerLabel,
-  partyBuyerLabel,
   type ContractDto,
 } from '../../../services/contractService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import {
+  buyingRequestBuyerDisplay,
+  farmDisplayLabel,
+  orderBuyerDisplay,
+  partyBuyerDisplay,
+  partyFarmerDisplay,
+} from '@/utils/displayLabels';
 import { ContractChangeRequestsPanel } from '@/screens/shared/contract-change-requests';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
@@ -238,7 +241,10 @@ const ProductForm: React.FC<ProductFormProps> = ({
         {isEditing ? (
           <div style={{ ...inputStyle, backgroundColor: colors.background.secondary, color: colors.text.secondary }}>
             {initial?.farmId
-              ? (farms.find((f) => f.id === initial.farmId)?.name ?? `Vườn #${String(initial.farmId).slice(0, 8)}…`)
+              ? farmDisplayLabel(
+                  farms.find((f) => f.id === initial.farmId)?.name,
+                  String(initial.farmId),
+                )
               : '—'}
           </div>
         ) : (
@@ -1038,7 +1044,7 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
         {buyingRequests.map((req) => {
           const cropName = cropLabelBR(req.cropType);
           const stdName = standardLabelBR(req.qualityStandardCode);
-          const buyerName = buyerDisplayName(req.buyerId);
+          const buyerName = buyingRequestBuyerDisplay(req);
           const deliveryDate = new Date(req.deliveryDate).toLocaleDateString('vi-VN', {
             day: '2-digit', month: '2-digit', year: 'numeric',
           });
@@ -1235,7 +1241,7 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
                 <div>
                   <Text.Title size="small" style={{ margin: 0 }}>
-                    {orderBuyerDisplayName(order.buyerId)}
+                    {orderBuyerDisplay(order)}
                   </Text.Title>
                   <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
                     {productDisplayName(order.productId)}
@@ -1338,7 +1344,7 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
 
           <div style={{ padding: spacing.md, backgroundColor: colors.background.secondary, borderRadius: '8px', marginBottom: spacing.md }}>
             <Text size="xSmall" style={{ color: colors.text.secondary }}>Người mua</Text>
-            <Text.Title size="small" style={{ margin: 0 }}>{orderBuyerDisplayName(order.buyerId)}</Text.Title>
+            <Text.Title size="small" style={{ margin: 0 }}>{orderBuyerDisplay(order)}</Text.Title>
             <div style={{ display: 'inline-block', padding: `${spacing.xs} ${spacing.sm}`, backgroundColor: `${statusColor}15`, borderRadius: '6px', margin: `${spacing.xs} 0` }}>
               <Text size="small" style={{ color: statusColor, fontWeight: fontWeight.semibold }}>{orderStatusLabel(order.status)}</Text>
             </div>
@@ -1418,8 +1424,8 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
             const statusColor = getContractStatusColor(c.status);
             const partyLine =
               c.contractType === 'farmer_trader'
-                ? `Nông dân: ${c.partyFarmerId ? (c.partyFarmerName ?? partyFarmerLabel(c.partyFarmerId)) : '—'}`
-                : `Người mua: ${c.partyBuyerId ? (c.partyBuyerName ?? partyBuyerLabel(c.partyBuyerId)) : '—'}`;
+                ? `Nông dân: ${c.partyFarmerId ? partyFarmerDisplay(c) : '—'}`
+                : `Người mua: ${c.partyBuyerId ? partyBuyerDisplay(c) : '—'}`;
             const start = new Date(c.startDate).toLocaleDateString('vi-VN');
             const end = new Date(c.endDate).toLocaleDateString('vi-VN');
 

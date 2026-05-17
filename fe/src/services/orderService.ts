@@ -14,13 +14,16 @@
 
 import apiClient from '@/api/client';
 import { ApiError } from '@/api/errors';
+import { userDisplayLabel } from '@/utils/displayLabels';
 
 export interface OrderDto {
   id: string;
   buyerId: string;
   traderId: string;
   buyerDisplayName?: string | null;
+  buyerPhone?: string | null;
   traderDisplayName?: string | null;
+  traderPhone?: string | null;
   productId: string;
   quantity: number;
   unit: string;
@@ -68,14 +71,22 @@ export interface CreateOrderDto {
   deposit?: number;
 }
 
-// ── UI helpers (DTO chỉ có id, không có tên hiển thị) ─────────────────────────
+// ── UI helpers — truyền *DisplayName từ DTO khi có ───────────────────────────
 
-export function buyerDisplayName(buyerId: string): string {
-  return `Người mua #${buyerId.slice(0, 8)}`;
+export function buyerDisplayName(
+  buyerId: string,
+  name?: string | null,
+  phone?: string | null,
+): string {
+  return userDisplayLabel(name, buyerId, 'Người mua', phone);
 }
 
-export function traderDisplayName(traderId: string): string {
-  return `Thương lái #${traderId.slice(0, 8)}`;
+export function traderDisplayName(
+  traderId: string,
+  name?: string | null,
+  phone?: string | null,
+): string {
+  return userDisplayLabel(name, traderId, 'Thương lái', phone);
 }
 
 export function productDisplayName(productId: string): string {

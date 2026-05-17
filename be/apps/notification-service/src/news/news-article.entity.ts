@@ -23,6 +23,9 @@ export class NewsArticleEntity {
   @Column({ name: 'trader_display_name', type: 'varchar', nullable: true })
   traderDisplayName: string | null;
 
+  @Column({ name: 'trader_phone', type: 'varchar', nullable: true })
+  traderPhone: string | null;
+
   @Column({ type: 'varchar', length: 512 })
   title: string;
 

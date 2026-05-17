@@ -87,6 +87,7 @@ services:
       PORT: 3002
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
+      AUTH_SERVICE_URL: http://auth-service:3001
       FARM_SERVICE_URL: http://farm-service:3003
     ports:
       - '3002:3002'
@@ -106,6 +107,7 @@ services:
     environment:
       PORT: 3003
       POSTGRES_HOST: postgres
+      AUTH_SERVICE_URL: http://auth-service:3001
       MONITORING_SERVICE_URL: http://monitoring-service:3005
     ports:
       - '3003:3003'
@@ -124,6 +126,7 @@ services:
       PORT: 3004
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
+      AUTH_SERVICE_URL: http://auth-service:3001
       FARM_SERVICE_URL: http://farm-service:3003
       MONITORING_SERVICE_URL: http://monitoring-service:3005
     ports:
@@ -145,6 +148,8 @@ services:
       PORT: 3005
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
+      AUTH_SERVICE_URL: http://auth-service:3001
+      FARM_SERVICE_URL: http://farm-service:3003
       INFLUXDB_URL: http://influxdb:8086
     ports:
       - '3005:3005'

@@ -50,8 +50,14 @@ export class ConnectionEntity {
   @Column({ name: 'from_user_name', type: 'varchar', nullable: true })
   fromUserName: string | null;
 
+  @Column({ name: 'from_user_phone', type: 'varchar', nullable: true })
+  fromUserPhone: string | null;
+
   @Column({ name: 'to_user_name', type: 'varchar', nullable: true })
   toUserName: string | null;
+
+  @Column({ name: 'to_user_phone', type: 'varchar', nullable: true })
+  toUserPhone: string | null;
 
   @Column({ name: 'farm_name', type: 'varchar', nullable: true })
   farmName: string | null;

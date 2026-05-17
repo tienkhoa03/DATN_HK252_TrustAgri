@@ -86,9 +86,10 @@ export class StandardsService {
       throw new ConflictException(`Mã tiêu chuẩn '${dto.code}' đã tồn tại`);
     }
 
-    const [ownerTraderNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(traderId),
+    const [ownerTraderSnapRes] = await Promise.allSettled([
+      this.authClient.getUserSnapshot(traderId),
     ]);
+    const ownerTraderSnap = settledValue(ownerTraderSnapRes);
 
     const standard = this.standardRepo.create({
       code: dto.code,
@@ -96,7 +97,8 @@ export class StandardsService {
       description: dto.description,
       cropType: dto.cropType ?? null,
       ownerTraderId: traderId,
-      ownerTraderName: settledValue(ownerTraderNameRes),
+      ownerTraderName: ownerTraderSnap?.displayName ?? null,
+      ownerTraderPhone: ownerTraderSnap?.phone ?? null,
     });
     const saved = await this.standardRepo.save(standard);
 
@@ -211,6 +213,7 @@ export class StandardsService {
       version: standard.version,
       ownerTraderId: standard.ownerTraderId ?? undefined,
       ownerTraderName: standard.ownerTraderName ?? null,
+      ownerTraderPhone: standard.ownerTraderPhone ?? null,
       steps,
       createdAt: standard.createdAt.toISOString(),
       updatedAt: standard.updatedAt.toISOString(),

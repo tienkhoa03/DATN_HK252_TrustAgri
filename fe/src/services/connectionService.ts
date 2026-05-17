@@ -34,7 +34,9 @@ export interface ConnectionDto {
   fromUserId: string;
   toUserId: string;
   fromUserName?: string | null;
+  fromUserPhone?: string | null;
   toUserName?: string | null;
+  toUserPhone?: string | null;
   fromRole: 'farmer' | 'trader';
   toRole: 'farmer' | 'trader';
   farmId?: string;

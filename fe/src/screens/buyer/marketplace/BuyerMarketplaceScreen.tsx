@@ -23,6 +23,7 @@ import { listNews, type NewsArticleDto } from '@/services/newsForecastService';
 import { BuyerHeader } from '../components/BuyerHeader';
 import { BuyerDashboardScreen } from '../dashboard';
 import { TrustBadgeGroup } from '../components/TrustBadgeGroup';
+import { productTraderDisplay } from '@/utils/displayLabels';
 
 const NEWS_LIMIT = 5;
 const PRODUCTS_PER_PAGE = 12;
@@ -397,7 +398,7 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
 
                 {product.traderId && (
                   <Text size="small" style={{ color: colors.text.secondary, margin: 0, fontSize: '11px' }}>
-                    Thương lái: {product.traderId.slice(0, 8)}
+                    Thương lái: {productTraderDisplay(product)}
                   </Text>
                 )}
 

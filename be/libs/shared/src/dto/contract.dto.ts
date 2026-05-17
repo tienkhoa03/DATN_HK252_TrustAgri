@@ -20,6 +20,7 @@ export interface ProductDto {
   traderId: string;
   farmId?: string;
   traderDisplayName?: string | null;
+  traderPhone?: string | null;
   farmName?: string | null;
   name: string;
   cropType: string;
@@ -85,6 +86,7 @@ export interface BuyingRequestDto {
   id: string;
   buyerId: string;
   buyerDisplayName?: string | null;
+  buyerPhone?: string | null;
   cropType: string;
   quantity: number;
   unit: string;
@@ -146,7 +148,9 @@ export interface OrderDto {
   buyerId: string;
   traderId: string;
   buyerDisplayName?: string | null;
+  buyerPhone?: string | null;
   traderDisplayName?: string | null;
+  traderPhone?: string | null;
   productId: string;
   quantity: number;
   unit: string;
@@ -187,6 +191,7 @@ export interface ProposalDto {
   traderId: string;
   farmId?: string;
   traderDisplayName?: string | null;
+  traderPhone?: string | null;
   farmName?: string | null;
   price: number;
   quantity: number;
@@ -235,8 +240,11 @@ export interface ContractDto {
   partyTraderId: string;
   partyBuyerId?: string;
   partyFarmerName?: string | null;
+  partyFarmerPhone?: string | null;
   partyTraderName?: string | null;
+  partyTraderPhone?: string | null;
   partyBuyerName?: string | null;
+  partyBuyerPhone?: string | null;
   contractType: 'farmer_trader' | 'trader_buyer';
   productId?: string;
   standardId?: string;
@@ -332,11 +340,13 @@ export interface ContractChangeRequestDto {
   contractId: string;
   requestedBy: string;
   requestedByName?: string | null;
+  requestedByPhone?: string | null;
   changes: Record<string, { oldValue: unknown; newValue: unknown }>;
   reason?: string;
   status: 'pending' | 'accepted' | 'rejected';
   respondedBy?: string;
   respondedByName?: string | null;
+  respondedByPhone?: string | null;
   createdAt: string;
   respondedAt?: string;
 }
@@ -384,7 +394,9 @@ export interface ConnectionDto {
   fromUserId: string;
   toUserId: string;
   fromUserName?: string | null;
+  fromUserPhone?: string | null;
   toUserName?: string | null;
+  toUserPhone?: string | null;
   fromRole: 'farmer' | 'trader';
   toRole: 'farmer' | 'trader';
   farmId?: string;

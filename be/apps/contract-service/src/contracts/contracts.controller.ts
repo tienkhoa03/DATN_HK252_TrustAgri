@@ -25,6 +25,7 @@ import {
 import { ContractsService, type ContractAuditLogEntryDto } from './contracts.service';
 import { ComplianceService } from './compliance.service';
 import { ContractQueryDto } from './dto/contract-query.dto';
+import { RejectContractDto } from './dto/reject-contract.dto';
 
 /**
  * Hợp đồng
@@ -150,5 +151,26 @@ export class ContractsController {
     @CurrentUser() user: JwtPayload,
   ): Promise<ContractDto> {
     return this.contractsService.sign(id, user);
+  }
+
+  /**
+   * POST /api/v1/contracts/:id/reject
+   * Bên chưa ký từ chối hợp đồng đang chờ ký → status cancelled.
+   */
+  @Post(':id/reject')
+  @HttpCode(HttpStatus.OK)
+  @Roles('farmer', 'trader', 'buyer')
+  @ApiOperation({ summary: 'Reject a pending contract (unsigned party only)' })
+  @ApiResponse({ status: 200, description: 'Contract cancelled' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - not a party or already signed' })
+  @ApiResponse({ status: 404, description: 'Contract not found' })
+  @ApiResponse({ status: 409, description: 'Conflict - not pending signature or already signed' })
+  rejectContract(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @Body() dto: RejectContractDto,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<ContractDto> {
+    return this.contractsService.reject(id, user, dto.reason);
   }
 }

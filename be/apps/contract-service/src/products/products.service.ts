@@ -114,15 +114,18 @@ export class ProductsService {
     }
     await this.contractsService.assertTraderFarmLinked(traderId, farmId);
 
-    const [traderNameRes, farmNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(traderId),
+    const [traderSnapRes, farmNameRes] = await Promise.allSettled([
+      this.authClient.getUserSnapshot(traderId),
       this.farmClient.getFarmName(farmId),
     ]);
+
+    const traderSnap = settledValue(traderSnapRes);
 
     const entity = this.productRepo.create({
       traderId,
       farmId,
-      traderDisplayName: settledValue(traderNameRes),
+      traderDisplayName: traderSnap?.displayName ?? null,
+      traderPhone: traderSnap?.phone ?? null,
       farmName: settledValue(farmNameRes),
       name: dto.name,
       cropType: dto.cropType,
@@ -217,6 +220,7 @@ export class ProductsService {
       traderId: entity.traderId,
       farmId: entity.farmId ?? undefined,
       traderDisplayName: entity.traderDisplayName ?? null,
+      traderPhone: entity.traderPhone ?? null,
       farmName: entity.farmName ?? null,
       name: entity.name,
       cropType: entity.cropType,

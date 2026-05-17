@@ -23,6 +23,7 @@ export interface NewsArticleDto {
   id: string;
   traderId?: string;
   traderDisplayName?: string | null;
+  traderPhone?: string | null;
   title: string;
   summary: string;
   content: string;
@@ -89,6 +90,7 @@ export interface ForecastDto {
   id: string;
   traderId?: string;
   traderDisplayName?: string | null;
+  traderPhone?: string | null;
   region: string;
   cropType: string;
   type: 'price' | 'demand' | 'weather';

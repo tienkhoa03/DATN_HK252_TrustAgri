@@ -24,6 +24,7 @@
 
 import apiClient from '@/api/client';
 import { ApiError } from '@/api/errors';
+import { userDisplayLabel } from '@/utils/displayLabels';
 
 // ── DTO types (camelCase — khớp backend design.md §4.4.2) ─────────────────────
 
@@ -31,6 +32,7 @@ export interface BuyingRequestDto {
   id: string;
   buyerId: string;
   buyerDisplayName?: string | null;
+  buyerPhone?: string | null;
   buyerName?: string;      // alias cũ — ưu tiên buyerDisplayName
   cropType: string;
   quantity: number;
@@ -121,8 +123,12 @@ export function standardLabelBR(code?: string): string | undefined {
  * BuyingRequestDto chỉ trả buyerId; tên đầy đủ cần một lần gọi GET /auth/users/:id
  * (ngoài phạm vi Phase 10 — sẽ làm ở Phase 11 khi proposal cần thông tin buyer).
  */
-export function buyerDisplayName(buyerId: string): string {
-  return `Người mua #${buyerId.slice(-6)}`;
+export function buyerDisplayName(
+  buyerId: string,
+  name?: string | null,
+  phone?: string | null,
+): string {
+  return userDisplayLabel(name, buyerId, 'Người mua', phone);
 }
 
 // ── Vietnamese error message mapper ──────────────────────────────────────────

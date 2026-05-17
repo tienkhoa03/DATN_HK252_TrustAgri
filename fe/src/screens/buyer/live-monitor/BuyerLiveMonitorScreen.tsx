@@ -20,7 +20,8 @@ import {
   toContractViMessage,
   type ContractDto,
 } from '@/services/contractService';
-import { productDisplayName, traderDisplayName } from '@/services/orderService';
+import { productDisplayName } from '@/services/orderService';
+import { partyTraderDisplay } from '@/utils/displayLabels';
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
@@ -134,7 +135,7 @@ export const BuyerLiveMonitorScreen: React.FC = () => {
                   {c.productId ? productDisplayName(c.productId) : 'Sản phẩm'}
                 </Text>
                 <Text size="xSmall" style={{ color: colors.text.secondary, margin: `${spacing.xs} 0 0` }}>
-                  {traderDisplayName(c.partyTraderId)}
+                  {partyTraderDisplay(c)}
                 </Text>
               </div>
               <span

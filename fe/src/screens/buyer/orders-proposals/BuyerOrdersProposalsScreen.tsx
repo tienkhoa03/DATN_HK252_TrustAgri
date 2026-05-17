@@ -19,13 +19,13 @@ import { EmptyState } from '../../../design-system/components/EmptyState';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import { partyTraderDisplay, proposalTraderDisplay, orderTraderDisplay } from '@/utils/displayLabels';
 import {
   listProposals,
   acceptProposal,
   rejectProposal,
   toProposalViMessage,
   standardLabelProp,
-  traderDisplayName,
   type ProposalDto,
 } from '../../../services/proposalService';
 import {
@@ -363,7 +363,7 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
                 <div>
                   <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-                    {traderDisplayName(proposal.traderId)}
+                    {proposalTraderDisplay(proposal)}
                   </Text>
                   <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>{ageLabel}</Text>
                 </div>
@@ -493,7 +493,7 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
                 <div>
                   <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-                    {traderDisplayName(order.traderId)}
+                    {orderTraderDisplay(order)}
                   </Text>
                   <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
                     Đặt ngày {orderDate}
@@ -608,7 +608,7 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
                 <div>
                   <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-                    {traderDisplayName(order.traderId)}
+                    {orderTraderDisplay(order)}
                   </Text>
                   <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
                     {order.status === 'completed' ? `Hoàn tất ${doneDate}` :
@@ -676,7 +676,7 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
         ) : (
           contractItems.map((c) => {
             const cColor = contractStatusColor(c.status);
-            const traderLine = `Thương lái: ${traderDisplayName(c.partyTraderId)}`;
+            const traderLine = `Thương lái: ${partyTraderDisplay(c)}`;
             const start = new Date(c.startDate).toLocaleDateString('vi-VN');
             const end = new Date(c.endDate).toLocaleDateString('vi-VN');
 

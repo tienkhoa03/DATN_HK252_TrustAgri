@@ -26,15 +26,17 @@ export class ContractAuditService {
     const repo = manager
       ? manager.getRepository(ContractAuditLogEntity)
       : this.auditRepo;
-    const nameRes = await Promise.allSettled([
-      this.authClient.getUserDisplayName(actorUserId),
+    const snapRes = await Promise.allSettled([
+      this.authClient.getUserSnapshot(actorUserId),
     ]);
+    const snap = settledValue(snapRes[0]);
     const row = repo.create({
       contractId,
       previousStatus,
       newStatus,
       actorUserId,
-      actorDisplayName: settledValue(nameRes[0]),
+      actorDisplayName: snap?.displayName ?? null,
+      actorPhone: snap?.phone ?? null,
     });
     await repo.save(row);
   }

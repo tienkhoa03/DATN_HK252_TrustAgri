@@ -102,16 +102,19 @@ export class ProposalsService {
 
     await this.contractsService.assertTraderFarmLinked(traderId, dto.farmId);
 
-    const [traderNameRes, farmNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(traderId),
+    const [traderSnapRes, farmNameRes] = await Promise.allSettled([
+      this.authClient.getUserSnapshot(traderId),
       this.farmClient.getFarmName(dto.farmId),
     ]);
+
+    const traderSnap = settledValue(traderSnapRes);
 
     const entity = this.proposalRepo.create({
       buyingRequestId: dto.buyingRequestId,
       traderId,
       farmId: dto.farmId,
-      traderDisplayName: settledValue(traderNameRes),
+      traderDisplayName: traderSnap?.displayName ?? null,
+      traderPhone: traderSnap?.phone ?? null,
       farmName: settledValue(farmNameRes),
       price: dto.price,
       quantity: dto.quantity,
@@ -211,9 +214,7 @@ export class ProposalsService {
 
     const totalPrice = Number(proposal.price) * Number(proposal.quantity);
 
-    const [traderNameRes, buyerNameRes, farmNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(proposal.traderId),
-      this.authClient.getUserDisplayName(buyingRequest.buyerId),
+    const [farmNameRes] = await Promise.allSettled([
       proposal.farmId
         ? this.farmClient.getFarmName(proposal.farmId)
         : Promise.resolve(null),
@@ -224,8 +225,10 @@ export class ProposalsService {
       partyTraderId: proposal.traderId,
       partyBuyerId: buyingRequest.buyerId,
       partyFarmerId: null,
-      partyTraderName: settledValue(traderNameRes),
-      partyBuyerName: settledValue(buyerNameRes),
+      partyTraderName: proposal.traderDisplayName ?? null,
+      partyTraderPhone: proposal.traderPhone ?? null,
+      partyBuyerName: buyingRequest.buyerDisplayName ?? null,
+      partyBuyerPhone: buyingRequest.buyerPhone ?? null,
       productId: null,
       standardId: null,
       farmId: proposal.farmId,
@@ -254,6 +257,7 @@ export class ProposalsService {
       traderId: entity.traderId,
       farmId: entity.farmId ?? undefined,
       traderDisplayName: entity.traderDisplayName ?? null,
+      traderPhone: entity.traderPhone ?? null,
       farmName: entity.farmName ?? null,
       price: Number(entity.price),
       quantity: Number(entity.quantity),

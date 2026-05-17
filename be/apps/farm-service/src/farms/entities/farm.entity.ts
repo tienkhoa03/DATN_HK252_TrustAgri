@@ -38,6 +38,9 @@ export class FarmEntity {
   @Column({ name: 'owner_display_name', type: 'varchar', nullable: true })
   ownerDisplayName: string | null;
 
+  @Column({ name: 'owner_phone', type: 'varchar', nullable: true })
+  ownerPhone: string | null;
+
   @Column()
   name: string;
 

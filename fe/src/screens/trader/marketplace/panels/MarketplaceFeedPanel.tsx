@@ -43,6 +43,7 @@ import {
   type FarmDto,
 } from '@/services/farmService';
 import { getUserById } from '@/services/authService';
+import { buyingRequestBuyerDisplay, farmDisplayLabel } from '@/utils/displayLabels';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -190,7 +191,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, farms, isEditing, on
         {isEditing ? (
           <div style={{ ...inputStyle, backgroundColor: colors.background.secondary, color: colors.text.secondary }}>
             {initial?.farmId
-              ? (farms.find((f) => f.id === initial.farmId)?.name ?? `Vườn #${String(initial.farmId).slice(0, 8)}…`)
+              ? farmDisplayLabel(
+                  farms.find((f) => f.id === initial.farmId)?.name,
+                  String(initial.farmId),
+                )
               : '—'}
           </div>
         ) : (
@@ -821,7 +825,11 @@ export const MarketplaceFeedPanel: React.FC = () => {
         {filteredBuyingRequests.map((req) => {
           const cropName = cropLabelBR(req.cropType);
           const stdName = standardLabelBR(req.qualityStandardCode);
-          const buyerName = buyerNames[req.buyerId] ?? req.buyerName ?? `Người mua #${req.buyerId.slice(-6)}`;
+          const buyerName = buyingRequestBuyerDisplay({
+            ...req,
+            buyerDisplayName: buyerNames[req.buyerId] ?? req.buyerDisplayName,
+            buyerPhone: req.buyerPhone,
+          });
           const deliveryDate = new Date(req.deliveryDate).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
           const ageDays = Math.floor((Date.now() - new Date(req.createdAt).getTime()) / 86400000);
           const ageLabel = ageDays === 0 ? 'Hôm nay' : ageDays === 1 ? '1 ngày trước' : `${ageDays} ngày trước`;
@@ -933,7 +941,11 @@ export const MarketplaceFeedPanel: React.FC = () => {
       {detailRequest && (
         <BuyingRequestDetailModal
           req={detailRequest}
-          buyerName={buyerNames[detailRequest.buyerId] ?? detailRequest.buyerName ?? `Người mua #${detailRequest.buyerId.slice(-6)}`}
+          buyerName={buyingRequestBuyerDisplay({
+            ...detailRequest,
+            buyerDisplayName: buyerNames[detailRequest.buyerId] ?? detailRequest.buyerDisplayName,
+            buyerPhone: detailRequest.buyerPhone,
+          })}
           onClose={() => setDetailRequest(null)}
           onPropose={() => openProposalFor(detailRequest)}
         />

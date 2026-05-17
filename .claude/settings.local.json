@@ -20,7 +20,8 @@
       "Bash(node scripts/check-bundle-size.js)",
       "Bash(grep -E \"\\\\.tsx?$\")",
       "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
-      "Bash(Get-ChildItem *)"
+      "Bash(Get-ChildItem *)",
+      "Bash(Select-Object Name)"
     ]
   }
 }

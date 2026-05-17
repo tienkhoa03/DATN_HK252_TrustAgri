@@ -28,6 +28,7 @@ import {
   toConnectionViMessage,
 } from '@/services/connectionService';
 import type { ConnectionDto } from '@/services/connectionService';
+import { connectionCounterpartDisplay } from '@/utils/displayLabels';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -42,15 +43,8 @@ function relativeDate(iso: string): string {
   return `${days} ngày trước`;
 }
 
-/**
- * Tên hiển thị placeholder cho bên đối tác.
- * Backend v1 ConnectionDto chưa embed displayName — Phase 15 sẽ enrich thêm.
- * Với incoming: bên gửi là fromUserId; với outgoing: bên nhận là toUserId.
- */
-function counterpartLabel(conn: ConnectionDto, myRole: 'farmer' | 'trader', direction: 'incoming' | 'outgoing'): string {
-  const otherId = direction === 'incoming' ? conn.fromUserId : conn.toUserId;
-  const roleStr = myRole === 'farmer' ? 'Thương lái' : 'Nông dân';
-  return `${roleStr} (...${otherId.slice(-4)})`;
+function counterpartLabel(conn: ConnectionDto, _myRole: 'farmer' | 'trader', direction: 'incoming' | 'outgoing'): string {
+  return connectionCounterpartDisplay(conn, direction);
 }
 
 const STATUS_LABEL: Record<ConnectionDto['status'], string> = {

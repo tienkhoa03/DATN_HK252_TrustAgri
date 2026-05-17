@@ -14,7 +14,9 @@ export interface TraderReviewDto {
   traderId: string;
   buyerId: string;
   traderDisplayName?: string | null;
+  traderPhone?: string | null;
   buyerDisplayName?: string | null;
+  buyerPhone?: string | null;
   orderId?: string;
   rating: number;
   comment?: string;

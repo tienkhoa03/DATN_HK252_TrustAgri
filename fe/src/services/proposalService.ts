@@ -12,6 +12,7 @@
 
 import apiClient from '@/api/client';
 import { ApiError } from '@/api/errors';
+import { userDisplayLabel } from '@/utils/displayLabels';
 
 export interface ProposalDto {
   id: string;
@@ -19,6 +20,7 @@ export interface ProposalDto {
   traderId: string;
   farmId?: string;
   traderDisplayName?: string | null;
+  traderPhone?: string | null;
   farmName?: string | null;
   price: number;
   quantity: number;
@@ -63,8 +65,12 @@ export function standardLabelProp(code?: string): string | undefined {
   return STANDARD_LABELS_PROP[code] ?? code;
 }
 
-export function traderDisplayName(traderId: string): string {
-  return `Thương lái #${traderId.slice(0, 8)}`;
+export function traderDisplayName(
+  traderId: string,
+  name?: string | null,
+  phone?: string | null,
+): string {
+  return userDisplayLabel(name, traderId, 'Thương lái', phone);
 }
 
 export function proposalStatusLabel(status: ProposalDto['status']): string {

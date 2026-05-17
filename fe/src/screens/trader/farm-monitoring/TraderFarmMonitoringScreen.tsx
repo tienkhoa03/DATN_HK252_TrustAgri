@@ -26,6 +26,7 @@ import { getFarm, type FarmDto } from '@/services/farmService';
 import { searchFarmers, type FarmerSearchResultDto } from '@/services/connectionService';
 import { FarmTrafficLightCard } from './components/FarmTrafficLightCard';
 import { FarmMonitoringDetail } from './components/FarmMonitoringDetail';
+import { farmOwnerDisplay } from '@/utils/displayLabels';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -114,7 +115,7 @@ export function TraderFarmMonitoringScreen() {
             // compliance unavailable — default 0
           }
           const farmerName =
-            farmerMap[farmData.ownerId] ?? `…${farmData.ownerId.slice(-6)}`;
+            farmOwnerDisplay(farmData, farmerMap[farmData.ownerId]);
           return {
             farm: farmData,
             farmerName,

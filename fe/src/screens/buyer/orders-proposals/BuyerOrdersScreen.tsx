@@ -24,7 +24,6 @@ import {
   rejectProposal,
   toProposalViMessage,
   standardLabelProp,
-  traderDisplayName as traderDisplayNameProposal,
   type ProposalDto,
 } from '@/services/proposalService';
 import {
@@ -33,9 +32,14 @@ import {
   toOrderViMessage,
   orderStatusLabel,
   productDisplayName,
-  traderDisplayName,
   type OrderDto,
 } from '@/services/orderService';
+import {
+  orderTraderDisplay,
+  partyTraderDisplay,
+  proposalTraderDisplay,
+  contractPartyDisplay,
+} from '@/utils/displayLabels';
 import {
   listContracts,
   contractStatusLabelVi,
@@ -371,7 +375,7 @@ export const BuyerOrdersScreen: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
                     <div>
                       <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-                        {traderDisplayNameProposal(proposal.traderId)}
+                        {proposalTraderDisplay(proposal)}
                       </Text>
                       <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>{ageLabel(proposal.createdAt)}</Text>
                     </div>
@@ -439,7 +443,7 @@ export const BuyerOrdersScreen: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
                     <div>
                       <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-                        {traderDisplayName(order.traderId)}
+                        {orderTraderDisplay(order)}
                       </Text>
                       <Text size="xSmall" style={{ color: colors.text.secondary }}>{ageLabel(order.createdAt)}</Text>
                     </div>
@@ -508,7 +512,9 @@ export const BuyerOrdersScreen: React.FC = () => {
                     notes: req.changes['terms']?.newValue as string | undefined,
                   },
                   requestedAt: req.createdAt,
-                  requestedBy: req.requestedBy ? `#${req.requestedBy.slice(-6)}` : undefined,
+                  requestedBy: req.requestedBy
+                    ? contractPartyDisplay(req.requestedBy, c)
+                    : undefined,
                 };
                 return (
                   <RenegotiationCard
@@ -531,7 +537,7 @@ export const BuyerOrdersScreen: React.FC = () => {
                       {c.productId ? productDisplayName(c.productId) : 'Hợp đồng'}
                     </Text>
                     <Text size="xSmall" style={{ color: colors.text.secondary }}>
-                      Thương lái: {traderDisplayName(c.partyTraderId)}
+                      Thương lái: {partyTraderDisplay(c)}
                     </Text>
                   </div>
                   <span style={statusBadgeStyle(colors.primary.agriGreen)}>
@@ -581,7 +587,7 @@ export const BuyerOrdersScreen: React.FC = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
                   <div>
                     <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-                      {traderDisplayName(order.traderId)}
+                      {orderTraderDisplay(order)}
                     </Text>
                     <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
                       Hoàn tất {new Date(order.updatedAt).toLocaleDateString('vi-VN')}
@@ -614,7 +620,7 @@ export const BuyerOrdersScreen: React.FC = () => {
                       {c.productId ? productDisplayName(c.productId) : 'Hợp đồng'}
                     </Text>
                     <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                      {traderDisplayName(c.partyTraderId)}
+                      {partyTraderDisplay(c)}
                     </Text>
                   </div>
                   <span style={statusBadgeStyle(colors.primary.zaloBlue)}>Hoàn thành</span>
@@ -651,7 +657,7 @@ export const BuyerOrdersScreen: React.FC = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
               <div>
                 <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-                  {traderDisplayName(order.traderId)}
+                  {orderTraderDisplay(order)}
                 </Text>
                 <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
                   {new Date(order.updatedAt).toLocaleDateString('vi-VN')}
@@ -678,7 +684,7 @@ export const BuyerOrdersScreen: React.FC = () => {
                   {c.productId ? productDisplayName(c.productId) : 'Hợp đồng'}
                 </Text>
                 <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                  {traderDisplayName(c.partyTraderId)}
+                  {partyTraderDisplay(c)}
                 </Text>
               </div>
               <span style={statusBadgeStyle(colors.text.secondary)}>Đã hủy</span>

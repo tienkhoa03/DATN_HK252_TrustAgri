@@ -188,16 +188,21 @@ export class OrdersService {
 
     const totalPrice = Number(product.price) * dto.quantity;
 
-    const [buyerNameRes, traderNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(buyerId),
-      this.authClient.getUserDisplayName(product.traderId),
+    const [buyerSnapRes, traderSnapRes] = await Promise.allSettled([
+      this.authClient.getUserSnapshot(buyerId),
+      this.authClient.getUserSnapshot(product.traderId),
     ]);
+
+    const buyerSnap = settledValue(buyerSnapRes);
+    const traderSnap = settledValue(traderSnapRes);
 
     const entity = this.orderRepo.create({
       buyerId,
       traderId: product.traderId,
-      buyerDisplayName: settledValue(buyerNameRes),
-      traderDisplayName: settledValue(traderNameRes),
+      buyerDisplayName: buyerSnap?.displayName ?? null,
+      buyerPhone: buyerSnap?.phone ?? null,
+      traderDisplayName: traderSnap?.displayName ?? null,
+      traderPhone: traderSnap?.phone ?? null,
       productId: dto.productId,
       quantity: dto.quantity,
       unit: dto.unit,
@@ -294,18 +299,24 @@ export class OrdersService {
     const endDate = new Date(today);
     endDate.setFullYear(endDate.getFullYear() + 1);
 
-    const [traderNameRes, buyerNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(order.traderId),
-      this.authClient.getUserDisplayName(order.buyerId),
-    ]);
+    const traderSnap = {
+      displayName: order.traderDisplayName,
+      phone: order.traderPhone,
+    };
+    const buyerSnap = {
+      displayName: order.buyerDisplayName,
+      phone: order.buyerPhone,
+    };
 
     const contract = this.contractRepo.create({
       contractType: 'trader_buyer',
       partyTraderId: order.traderId,
       partyBuyerId: order.buyerId,
       partyFarmerId: null,
-      partyTraderName: settledValue(traderNameRes),
-      partyBuyerName: settledValue(buyerNameRes),
+      partyTraderName: traderSnap.displayName ?? null,
+      partyTraderPhone: traderSnap.phone ?? null,
+      partyBuyerName: buyerSnap.displayName ?? null,
+      partyBuyerPhone: buyerSnap.phone ?? null,
       productId: order.productId,
       standardId: null,
       farmId: null,
@@ -333,7 +344,9 @@ export class OrdersService {
       buyerId: entity.buyerId,
       traderId: entity.traderId,
       buyerDisplayName: entity.buyerDisplayName ?? null,
+      buyerPhone: entity.buyerPhone ?? null,
       traderDisplayName: entity.traderDisplayName ?? null,
+      traderPhone: entity.traderPhone ?? null,
       productId: entity.productId,
       quantity: Number(entity.quantity),
       unit: entity.unit,

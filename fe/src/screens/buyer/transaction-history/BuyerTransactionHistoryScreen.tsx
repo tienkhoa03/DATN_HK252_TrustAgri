@@ -14,12 +14,12 @@ import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { orderTraderDisplay } from '@/utils/displayLabels';
 import {
   listOrders,
   orderStatusLabel,
   productDisplayName,
   toOrderViMessage,
-  traderDisplayName,
   type ListOrdersResponse,
   type OrderDto,
 } from '@/services/orderService';
@@ -474,7 +474,7 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
                       <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-                        {traderDisplayName(order.traderId)}
+                        {orderTraderDisplay(order)}
                       </Text>
                       <Text size="small" style={{ color: colors.text.secondary, margin: '4px 0 0' }}>
                         {new Date(order.createdAt).toLocaleString('vi-VN')}

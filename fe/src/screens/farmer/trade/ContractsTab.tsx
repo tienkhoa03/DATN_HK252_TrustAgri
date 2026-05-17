@@ -207,6 +207,10 @@ export const ContractsTab: React.FC = () => {
           contract={detailModal}
           onClose={() => setDetailModal(null)}
           onSigned={handleContractUpdated}
+          onRejected={(updated) => {
+            setContracts((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+            setDetailModal(null);
+          }}
         />
       )}
 

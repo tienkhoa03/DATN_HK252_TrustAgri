@@ -44,6 +44,9 @@ export class ProposalEntity {
   @Column({ name: 'trader_display_name', type: 'varchar', nullable: true })
   traderDisplayName: string | null;
 
+  @Column({ name: 'trader_phone', type: 'varchar', nullable: true })
+  traderPhone: string | null;
+
   @Column({ name: 'farm_name', type: 'varchar', nullable: true })
   farmName: string | null;
 

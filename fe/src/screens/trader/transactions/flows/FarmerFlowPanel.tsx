@@ -14,11 +14,11 @@ import {
   listContracts,
   contractStatusLabelVi,
   contractTypeLabelVi,
-  partyFarmerLabel,
   toContractViMessage,
   type ContractDto,
 } from '@/services/contractService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { partyFarmerDisplay } from '@/utils/displayLabels';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
@@ -194,6 +194,11 @@ export const FarmerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
               );
             }
           }}
+          onRejected={(updated) => {
+            setSelectedContract(null);
+            setWaitingContracts((prev) => prev.filter((c) => c.id !== updated.id));
+            setHistoryContracts((prev) => [updated, ...prev.filter((c) => c.id !== updated.id)]);
+          }}
         />
       )}
 
@@ -209,7 +214,10 @@ export const FarmerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
         <CreateFarmerContractModal
           visible
           farmerUserId={contractTarget.farmerUserId}
+          farmerDisplayName={contractTarget.farmerDisplayName}
+          farmerPhone={contractTarget.farmerPhone}
           farmId={contractTarget.farmId}
+          farmName={contractTarget.farmName}
           onClose={() => setContractTarget(null)}
           onCreated={handleContractCreated}
         />
@@ -271,9 +279,7 @@ const ContractInfoCard: React.FC<{ contract: ContractDto; onTap: () => void }> =
             {contractTypeLabelVi(contract.contractType)}
           </Text>
           <Text.Title size="small" style={{ margin: `${spacing.xs} 0` }}>
-            {contract.partyFarmerId
-              ? (contract.partyFarmerName ?? partyFarmerLabel(contract.partyFarmerId))
-              : '—'}
+            {contract.partyFarmerId ? partyFarmerDisplay(contract) : '—'}
           </Text.Title>
           <Text size="xSmall" style={{ color: colors.text.secondary, fontSize: fontSize.caption }}>
             {new Date(contract.startDate).toLocaleDateString('vi-VN')} —{' '}

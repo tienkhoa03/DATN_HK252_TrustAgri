@@ -84,11 +84,20 @@ export class ContractEntity {
   @Column({ name: 'party_farmer_name', type: 'varchar', nullable: true })
   partyFarmerName: string | null;
 
+  @Column({ name: 'party_farmer_phone', type: 'varchar', nullable: true })
+  partyFarmerPhone: string | null;
+
   @Column({ name: 'party_trader_name', type: 'varchar', nullable: true })
   partyTraderName: string | null;
 
+  @Column({ name: 'party_trader_phone', type: 'varchar', nullable: true })
+  partyTraderPhone: string | null;
+
   @Column({ name: 'party_buyer_name', type: 'varchar', nullable: true })
   partyBuyerName: string | null;
+
+  @Column({ name: 'party_buyer_phone', type: 'varchar', nullable: true })
+  partyBuyerPhone: string | null;
 
   @Column({ name: 'farm_name', type: 'varchar', nullable: true })
   farmName: string | null;

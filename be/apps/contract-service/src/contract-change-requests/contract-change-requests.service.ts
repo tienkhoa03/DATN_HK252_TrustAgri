@@ -114,9 +114,10 @@ export class ContractChangeRequestsService {
 
     this.assertOldValuesMatchContract(contract, dto.changes);
 
-    const [requestedByNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(user.sub),
+    const [requestedSnapRes] = await Promise.allSettled([
+      this.authClient.getUserSnapshot(user.sub),
     ]);
+    const requestedSnap = settledValue(requestedSnapRes);
 
     const saved = await this.dataSource.transaction(async (manager) => {
       const cRepo = manager.getRepository(ContractEntity);
@@ -125,7 +126,8 @@ export class ContractChangeRequestsService {
       const row = crRepo.create({
         contractId,
         requestedBy: user.sub,
-        requestedByName: settledValue(requestedByNameRes),
+        requestedByName: requestedSnap?.displayName ?? null,
+        requestedByPhone: requestedSnap?.phone ?? null,
         changes: dto.changes,
         reason: dto.reason ?? null,
         status: 'pending',
@@ -178,9 +180,10 @@ export class ContractChangeRequestsService {
       throw new BadRequestException('Trạng thái hợp đồng không khớp yêu cầu đang xử lý');
     }
 
-    const [respondedByNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(user.sub),
+    const [respondedSnapRes] = await Promise.allSettled([
+      this.authClient.getUserSnapshot(user.sub),
     ]);
+    const respondedSnap = settledValue(respondedSnapRes);
 
     await this.dataSource.transaction(async (manager) => {
       const cRepo = manager.getRepository(ContractEntity);
@@ -197,7 +200,8 @@ export class ContractChangeRequestsService {
 
       row.status = 'accepted';
       row.respondedBy = user.sub;
-      row.respondedByName = settledValue(respondedByNameRes);
+      row.respondedByName = respondedSnap?.displayName ?? null;
+      row.respondedByPhone = respondedSnap?.phone ?? null;
       row.respondedAt = new Date();
       await crRepo.save(row);
 
@@ -245,9 +249,10 @@ export class ContractChangeRequestsService {
       throw new BadRequestException('Trạng thái hợp đồng không khớp yêu cầu đang xử lý');
     }
 
-    const [respondedByNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(user.sub),
+    const [respondedSnapRes] = await Promise.allSettled([
+      this.authClient.getUserSnapshot(user.sub),
     ]);
+    const respondedSnap = settledValue(respondedSnapRes);
 
     await this.dataSource.transaction(async (manager) => {
       const cRepo = manager.getRepository(ContractEntity);
@@ -258,7 +263,8 @@ export class ContractChangeRequestsService {
 
       row.status = 'rejected';
       row.respondedBy = user.sub;
-      row.respondedByName = settledValue(respondedByNameRes);
+      row.respondedByName = respondedSnap?.displayName ?? null;
+      row.respondedByPhone = respondedSnap?.phone ?? null;
       row.respondedAt = new Date();
       await crRepo.save(row);
 
@@ -441,8 +447,11 @@ export class ContractChangeRequestsService {
       partyTraderId: entity.partyTraderId,
       partyBuyerId: entity.partyBuyerId ?? undefined,
       partyFarmerName: entity.partyFarmerName ?? null,
+      partyFarmerPhone: entity.partyFarmerPhone ?? null,
       partyTraderName: entity.partyTraderName ?? null,
+      partyTraderPhone: entity.partyTraderPhone ?? null,
       partyBuyerName: entity.partyBuyerName ?? null,
+      partyBuyerPhone: entity.partyBuyerPhone ?? null,
       contractType: entity.contractType,
       productId: entity.productId ?? undefined,
       standardId: entity.standardId ?? undefined,
@@ -467,11 +476,13 @@ export class ContractChangeRequestsService {
       contractId: row.contractId,
       requestedBy: row.requestedBy,
       requestedByName: row.requestedByName ?? null,
+      requestedByPhone: row.requestedByPhone ?? null,
       changes: row.changes,
       reason: row.reason ?? undefined,
       status: row.status,
       respondedBy: row.respondedBy ?? undefined,
       respondedByName: row.respondedByName ?? null,
+      respondedByPhone: row.respondedByPhone ?? null,
       createdAt: row.createdAt.toISOString(),
       respondedAt: row.respondedAt
         ? row.respondedAt.toISOString()

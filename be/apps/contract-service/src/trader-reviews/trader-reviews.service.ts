@@ -71,16 +71,21 @@ export class TraderReviewsService {
       throw new ConflictException('Bạn đã đánh giá giao dịch này rồi');
     }
 
-    const [traderNameRes, buyerNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(traderId),
-      this.authClient.getUserDisplayName(buyerId),
+    const [traderSnapRes, buyerSnapRes] = await Promise.allSettled([
+      this.authClient.getUserSnapshot(traderId),
+      this.authClient.getUserSnapshot(buyerId),
     ]);
+
+    const traderSnap = settledValue(traderSnapRes);
+    const buyerSnap = settledValue(buyerSnapRes);
 
     const review = this.reviewRepo.create({
       traderId,
       buyerId,
-      traderDisplayName: settledValue(traderNameRes),
-      buyerDisplayName: settledValue(buyerNameRes),
+      traderDisplayName: traderSnap?.displayName ?? null,
+      traderPhone: traderSnap?.phone ?? null,
+      buyerDisplayName: buyerSnap?.displayName ?? null,
+      buyerPhone: buyerSnap?.phone ?? null,
       orderId: dto.orderId,
       rating: dto.rating,
       comment: dto.comment ?? null,
@@ -186,7 +191,9 @@ export class TraderReviewsService {
       traderId: review.traderId,
       buyerId: review.buyerId,
       traderDisplayName: review.traderDisplayName ?? null,
+      traderPhone: review.traderPhone ?? null,
       buyerDisplayName: buyerDisplayName ?? review.buyerDisplayName ?? null,
+      buyerPhone: review.buyerPhone ?? null,
       orderId: review.orderId ?? undefined,
       rating: review.rating,
       comment: review.comment ?? undefined,

@@ -45,6 +45,9 @@ export class StandardEntity {
   @Column({ name: 'owner_trader_name', type: 'varchar', nullable: true })
   ownerTraderName: string | null;
 
+  @Column({ name: 'owner_trader_phone', type: 'varchar', nullable: true })
+  ownerTraderPhone: string | null;
+
   @OneToMany(() => StandardStepEntity, (step) => step.standard, {
     cascade: true,
     eager: false,

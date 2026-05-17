@@ -9,7 +9,10 @@ import {
   toConnectionViMessage,
   type ConnectionDto,
 } from '@/services/connectionService';
+import { getUserById } from '@/services/authService';
+import { getFarm } from '@/services/farmService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { farmDisplayLabel, userDisplayLabel } from '@/utils/displayLabels';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
@@ -17,6 +20,17 @@ import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 export interface SelectedConnectionInfo {
   farmerUserId: string;
   farmId: string | null;
+  farmerDisplayName: string;
+  farmerPhone?: string | null;
+  farmName: string | null;
+}
+
+/** Một dòng kết nối đã resolve tên hiển thị (denorm DB hoặc gọi auth/farm). */
+interface ConnectionListItem {
+  conn: ConnectionDto;
+  farmerUserId: string;
+  farmerDisplayName: string;
+  farmLabel: string | null;
 }
 
 interface Props {
@@ -31,40 +45,97 @@ function getFarmerUserId(conn: ConnectionDto): string {
   return conn.fromRole === 'farmer' ? conn.fromUserId : conn.toUserId;
 }
 
-function getFarmerDisplayName(conn: ConnectionDto): string {
-  const name =
-    conn.fromRole === 'farmer' ? conn.fromUserName : conn.toUserName;
-  const id = getFarmerUserId(conn);
-  return name ?? `Nông dân #${id.slice(0, 8)}`;
+function farmerNameFromConn(conn: ConnectionDto): string | null | undefined {
+  return conn.fromRole === 'farmer' ? conn.fromUserName : conn.toUserName;
 }
 
-function getFarmDisplayLabel(conn: ConnectionDto): string | null {
+function farmerPhoneFromConn(conn: ConnectionDto): string | null | undefined {
+  return conn.fromRole === 'farmer' ? conn.fromUserPhone : conn.toUserPhone;
+}
+
+async function resolveFarmerDisplayName(
+  conn: ConnectionDto,
+  farmerUserId: string,
+): Promise<string> {
+  const cachedName = farmerNameFromConn(conn);
+  const cachedPhone = farmerPhoneFromConn(conn);
+  if (cachedName?.trim()) {
+    return userDisplayLabel(cachedName, farmerUserId, 'Nông dân', cachedPhone);
+  }
+
+  const user = await getUserById(farmerUserId);
+  return userDisplayLabel(user?.displayName, farmerUserId, 'Nông dân', user?.phone ?? cachedPhone);
+}
+
+async function resolveFarmLabel(
+  conn: ConnectionDto,
+): Promise<string | null> {
   if (!conn.farmId) return null;
-  return conn.farmName ?? `Vườn #${conn.farmId.slice(0, 8)}`;
+  if (conn.farmName?.trim()) return conn.farmName.trim();
+
+  try {
+    const farm = await getFarm(conn.farmId);
+    return farmDisplayLabel(farm.name, conn.farmId);
+  } catch {
+    // graceful — fallback id
+  }
+
+  return farmDisplayLabel(conn.farmName, conn.farmId);
+}
+
+async function enrichConnections(
+  items: ConnectionDto[],
+): Promise<ConnectionListItem[]> {
+  return Promise.all(
+    items.map(async (conn) => {
+      const farmerUserId = getFarmerUserId(conn);
+      const [farmerDisplayName, farmLabel] = await Promise.all([
+        resolveFarmerDisplayName(conn, farmerUserId),
+        resolveFarmLabel(conn),
+      ]);
+      return { conn, farmerUserId, farmerDisplayName, farmLabel };
+    }),
+  );
 }
 
 export const SelectConnectionModal: React.FC<Props> = ({ visible, onClose, onSelected }) => {
   const openSnackbar = useStableOpenSnackbar();
-  const [connections, setConnections] = useState<ConnectionDto[]>([]);
+  const [items, setItems] = useState<ConnectionListItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
+    let cancelled = false;
     setLoading(true);
-    listConnections({ status: 'all', limit: 100 })
-      .then((res) => {
-        setConnections(
-          res.items.filter(
-            (c) =>
-              ELIGIBLE_STATUSES.has(c.status) &&
-              (c.fromRole === 'farmer' || c.toRole === 'farmer'),
-          ),
+    setItems([]);
+
+    void (async () => {
+      try {
+        const res = await listConnections({ status: 'all', limit: 100 });
+        const eligible = res.items.filter(
+          (c) =>
+            ELIGIBLE_STATUSES.has(c.status) &&
+            (c.fromRole === 'farmer' || c.toRole === 'farmer'),
         );
-      })
-      .catch((err) => {
-        openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'list'), duration: 3000, icon: true });
-      })
-      .finally(() => setLoading(false));
+        const enriched = await enrichConnections(eligible);
+        if (!cancelled) setItems(enriched);
+      } catch (err) {
+        if (!cancelled) {
+          openSnackbar({
+            type: 'error',
+            text: toConnectionViMessage(err, 'list'),
+            duration: 3000,
+            icon: true,
+          });
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [visible, openSnackbar]);
 
   if (!visible) return null;
@@ -124,7 +195,7 @@ export const SelectConnectionModal: React.FC<Props> = ({ visible, onClose, onSel
       <div style={{ flex: 1, overflowY: 'auto', padding: spacing.md }}>
         {loading && <SkeletonList />}
 
-        {!loading && connections.length === 0 && (
+        {!loading && items.length === 0 && (
           <div style={{ textAlign: 'center', padding: `${spacing.xl} 0` }}>
             <div style={{ fontSize: 48, marginBottom: spacing.md }}>🤝</div>
             <Text.Title size="small" style={{ marginBottom: spacing.sm }}>
@@ -137,19 +208,22 @@ export const SelectConnectionModal: React.FC<Props> = ({ visible, onClose, onSel
         )}
 
         {!loading &&
-          connections.map((conn) => {
-            const farmerUserId = getFarmerUserId(conn);
-            return (
-              <ConnectionCard
-                key={conn.id}
-                farmerDisplayName={getFarmerDisplayName(conn)}
-                farmLabel={getFarmDisplayLabel(conn)}
-                onSelect={() =>
-                  onSelected({ farmerUserId, farmId: conn.farmId ?? null })
-                }
-              />
-            );
-          })}
+          items.map(({ conn, farmerUserId, farmerDisplayName, farmLabel }) => (
+            <ConnectionCard
+              key={conn.id}
+              farmerDisplayName={farmerDisplayName}
+              farmLabel={farmLabel}
+              onSelect={() =>
+                onSelected({
+                  farmerUserId,
+                  farmId: conn.farmId ?? null,
+                  farmerDisplayName,
+                  farmerPhone: farmerPhoneFromConn(conn) ?? null,
+                  farmName: farmLabel,
+                })
+              }
+            />
+          ))}
       </div>
     </div>
   );

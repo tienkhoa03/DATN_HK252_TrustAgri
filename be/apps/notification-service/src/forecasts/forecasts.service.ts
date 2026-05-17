@@ -29,6 +29,7 @@ export class ForecastsService {
       id: e.id,
       traderId: e.traderId,
       traderDisplayName: e.traderDisplayName ?? null,
+      traderPhone: e.traderPhone ?? null,
       region: e.region,
       cropType: e.cropType,
       type: e.type,
@@ -73,13 +74,15 @@ export class ForecastsService {
     traderId: string,
     dto: ForecastCreateDto,
   ): Promise<ForecastDto> {
-    const [traderNameRes] = await Promise.allSettled([
-      this.authClient.getUserDisplayName(traderId),
+    const [traderSnapRes] = await Promise.allSettled([
+      this.authClient.getUserSnapshot(traderId),
     ]);
+    const traderSnap = settledValue(traderSnapRes);
 
     const entity = this.repo.create({
       traderId,
-      traderDisplayName: settledValue(traderNameRes),
+      traderDisplayName: traderSnap?.displayName ?? null,
+      traderPhone: traderSnap?.phone ?? null,
       region: dto.region,
       cropType: dto.cropType,
       type: dto.type,

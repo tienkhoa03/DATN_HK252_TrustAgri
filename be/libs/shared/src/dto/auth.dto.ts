@@ -61,12 +61,20 @@ export interface UserProfileDto {
 }
 
 /**
- * GET /api/v1/auth/users/:userId — chỉ trả các trường hiển thị công khai (không có phone/email/zaloId).
+ * GET /api/v1/auth/users/:userId — tóm tắt hiển thị (không có email/zaloId).
+ * phone dùng cho denorm trên UI đối tác đã kết nối / hợp đồng.
  */
 export interface UserPublicSummaryDto {
   userId: string;
   displayName: string;
+  phone?: string | null;
   avatarUrl?: string;
+}
+
+/** Snapshot denorm khi ghi DB (tên + SĐT). */
+export interface UserDenormSnapshot {
+  displayName: string | null;
+  phone: string | null;
 }
 
 /**

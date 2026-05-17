@@ -30,6 +30,9 @@ export class BuyingRequestEntity {
   @Column({ name: 'buyer_display_name', type: 'varchar', nullable: true })
   buyerDisplayName: string | null;
 
+  @Column({ name: 'buyer_phone', type: 'varchar', nullable: true })
+  buyerPhone: string | null;
+
   @Column({ name: 'crop_type' })
   cropType: string;
 

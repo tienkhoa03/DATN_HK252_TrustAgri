@@ -53,6 +53,7 @@ export interface FarmDto {
   id: string;
   ownerId: string;
   ownerDisplayName?: string | null;
+  ownerPhone?: string | null;
   name: string;
   location: FarmLocationDto;
   area: number;
@@ -155,6 +156,7 @@ export interface CareLogDto {
   performedAt: string;
   performedBy?: string;
   performedByName?: string | null;
+  performedByPhone?: string | null;
   evidences: EvidenceDto[];
   deviation?: boolean;
   syncStatus: 'synced' | 'pending' | 'conflict';
@@ -242,6 +244,7 @@ export interface StandardDto {
   version: number;
   ownerTraderId?: string;
   ownerTraderName?: string | null;
+  ownerTraderPhone?: string | null;
   steps: StandardStepDto[];
   createdAt: string;
   updatedAt: string;

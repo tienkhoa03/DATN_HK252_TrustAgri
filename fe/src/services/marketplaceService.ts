@@ -28,6 +28,7 @@ export interface ProductDto {
   traderId: string;
   farmId?: string;
   traderDisplayName?: string | null;
+  traderPhone?: string | null;
   farmName?: string | null;
   name: string;
   cropType: string;
