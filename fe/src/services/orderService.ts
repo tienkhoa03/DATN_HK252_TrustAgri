@@ -19,6 +19,8 @@ export interface OrderDto {
   id: string;
   buyerId: string;
   traderId: string;
+  buyerDisplayName?: string | null;
+  traderDisplayName?: string | null;
   productId: string;
   quantity: number;
   unit: string;

@@ -13,7 +13,8 @@ export interface TraderReviewDto {
   id: string;
   traderId: string;
   buyerId: string;
-  buyerDisplayName?: string;
+  traderDisplayName?: string | null;
+  buyerDisplayName?: string | null;
   orderId?: string;
   rating: number;
   comment?: string;

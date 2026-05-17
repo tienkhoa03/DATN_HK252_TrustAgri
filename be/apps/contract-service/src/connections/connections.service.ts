@@ -18,6 +18,9 @@ import {
 } from '@trustagri/shared';
 import { ConnectionEntity } from './entities/connection.entity';
 import { ConnectionPublisherService } from './services/connection-publisher.service';
+import { AuthClientService } from '../clients/auth-client.service';
+import { FarmClientService } from '../clients/farm-client.service';
+import { settledValue } from '../clients/settled.util';
 import { ConnectionQueryDto } from './dto/connection-query.dto';
 import { SearchTraderQueryDto } from './dto/search-trader-query.dto';
 import { SearchFarmerQueryDto } from './dto/search-farmer-query.dto';
@@ -56,6 +59,8 @@ export class ConnectionsService implements OnModuleInit {
     private readonly connectionRepo: Repository<ConnectionEntity>,
     private readonly dataSource: DataSource,
     private readonly publisher: ConnectionPublisherService,
+    private readonly authClient: AuthClientService,
+    private readonly farmClient: FarmClientService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -355,12 +360,21 @@ export class ConnectionsService implements OnModuleInit {
       );
     }
 
+    const [fromNameRes, toNameRes, farmNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(userId),
+      this.authClient.getUserDisplayName(dto.toUserId),
+      dto.farmId ? this.farmClient.getFarmName(dto.farmId) : Promise.resolve(null),
+    ]);
+
     const entity = this.connectionRepo.create({
       fromUserId: userId,
       toUserId: dto.toUserId,
       fromRole: userRole,
       toRole,
       farmId: dto.farmId ?? null,
+      fromUserName: settledValue(fromNameRes),
+      toUserName: settledValue(toNameRes),
+      farmName: settledValue(farmNameRes),
       message: dto.message ?? null,
       status: 'pending',
     });
@@ -555,9 +569,12 @@ export class ConnectionsService implements OnModuleInit {
       id: entity.id,
       fromUserId: entity.fromUserId,
       toUserId: entity.toUserId,
+      fromUserName: entity.fromUserName ?? null,
+      toUserName: entity.toUserName ?? null,
       fromRole: entity.fromRole,
       toRole: entity.toRole,
       farmId: entity.farmId ?? undefined,
+      farmName: entity.farmName ?? null,
       message: entity.message ?? undefined,
       status: entity.status,
       createdAt: entity.createdAt.toISOString(),

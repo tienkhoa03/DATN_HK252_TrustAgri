@@ -18,7 +18,9 @@
       "Bash(New-Item -ItemType Directory -Force -Path \"C:\\\\Users\\\\VivoBookS\\\\_code_\\\\_CapstoneProject\\\\trustagri\\\\fe\\\\src\\\\screens\\\\buyer\\\\orders-proposals\\\\components\")",
       "Bash(Out-Null)",
       "Bash(node scripts/check-bundle-size.js)",
-      "Bash(grep -E \"\\\\.tsx?$\")"
+      "Bash(grep -E \"\\\\.tsx?$\")",
+      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
+      "Bash(Get-ChildItem *)"
     ]
   }
 }

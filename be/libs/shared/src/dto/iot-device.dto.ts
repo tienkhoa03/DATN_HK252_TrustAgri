@@ -21,6 +21,7 @@ export type IotDeviceStatus = 'online' | 'offline';
 export interface IotDeviceDto {
   id: string;
   farmId: string;
+  farmName?: string | null;
   name: string;
   status: IotDeviceStatus;
   batteryLevel?: number | null;

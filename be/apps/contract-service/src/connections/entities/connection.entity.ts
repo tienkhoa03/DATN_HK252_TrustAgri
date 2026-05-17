@@ -47,6 +47,15 @@ export class ConnectionEntity {
   @Column({ name: 'farm_id', nullable: true, type: 'varchar' })
   farmId: string | null;
 
+  @Column({ name: 'from_user_name', type: 'varchar', nullable: true })
+  fromUserName: string | null;
+
+  @Column({ name: 'to_user_name', type: 'varchar', nullable: true })
+  toUserName: string | null;
+
+  @Column({ name: 'farm_name', type: 'varchar', nullable: true })
+  farmName: string | null;
+
   @Column({ type: 'text', nullable: true })
   message: string | null;
 

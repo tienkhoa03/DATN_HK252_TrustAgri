@@ -20,6 +20,8 @@ import { FarmEntity } from '../farms/entities/farm.entity';
 import { StandardStepEntity } from '../standards/entities/standard-step.entity';
 import { ListCareLogsQueryDto } from './dto/list-care-logs-query.dto';
 import { SyncCareLogsDto } from './dto/sync-care-logs.dto';
+import { AuthClientService } from '../clients/auth-client.service';
+import { settledValue } from '../clients/settled.util';
 
 const CONFLICT_WINDOW_MS =
   parseInt(process.env.CARE_LOG_CONFLICT_WINDOW_SECONDS ?? '60', 10) * 1000;
@@ -37,6 +39,7 @@ export class CareLogsService {
     private readonly farmRepo: Repository<FarmEntity>,
     @InjectRepository(StandardStepEntity)
     private readonly stepRepo: Repository<StandardStepEntity>,
+    private readonly authClient: AuthClientService,
   ) {}
 
   async listCareLogs(
@@ -74,6 +77,10 @@ export class CareLogsService {
 
     const deviation = await this.detectDeviation(farm, dto.standardStepId);
 
+    const [performedByNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(userId),
+    ]);
+
     const entity = this.careLogRepo.create({
       farmId,
       standardStepId: dto.standardStepId ?? null,
@@ -84,6 +91,7 @@ export class CareLogsService {
       syncStatus: 'synced',
       clientRecordId: dto.clientRecordId ?? null,
       performedBy: userId,
+      performedByName: settledValue(performedByNameRes),
     });
 
     const saved = await this.careLogRepo.save(entity);
@@ -261,6 +269,7 @@ export class CareLogsService {
       notes: entity.notes ?? undefined,
       performedAt: entity.performedAt.toISOString(),
       performedBy: entity.performedBy ?? undefined,
+      performedByName: entity.performedByName ?? null,
       evidences: (entity.evidences ?? []).map((e) => this.toEvidenceDto(e)),
       deviation: entity.deviation ?? undefined,
       syncStatus: entity.syncStatus,

@@ -55,6 +55,7 @@ export class SensorHistoryQueryDto {
 export interface AlertDto {
   id: string;
   farmId: string;
+  farmName?: string | null;
   sensorType: string;
   severity: 'warning' | 'danger';
   threshold: number;
@@ -62,6 +63,7 @@ export interface AlertDto {
   suggestedAction?: string;
   acknowledged: boolean;
   acknowledgedBy?: string;
+  acknowledgedByName?: string | null;
   acknowledgedAt?: string;
   createdAt: string;
 }

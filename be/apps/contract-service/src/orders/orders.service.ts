@@ -18,6 +18,8 @@ import { OrderQueryDto } from './dto/order-query.dto';
 import { ProductEntity } from '../products/entities/product.entity';
 import { ContractEntity } from '../contracts/entities/contract.entity';
 import { ContractAuditService } from '../contracts/contract-audit.service';
+import { AuthClientService } from '../clients/auth-client.service';
+import { settledValue } from '../clients/settled.util';
 
 @Injectable()
 export class OrdersService {
@@ -31,6 +33,7 @@ export class OrdersService {
     @InjectRepository(ContractEntity)
     private readonly contractRepo: Repository<ContractEntity>,
     private readonly contractAudit: ContractAuditService,
+    private readonly authClient: AuthClientService,
   ) {}
 
   /**
@@ -185,9 +188,16 @@ export class OrdersService {
 
     const totalPrice = Number(product.price) * dto.quantity;
 
+    const [buyerNameRes, traderNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(buyerId),
+      this.authClient.getUserDisplayName(product.traderId),
+    ]);
+
     const entity = this.orderRepo.create({
       buyerId,
       traderId: product.traderId,
+      buyerDisplayName: settledValue(buyerNameRes),
+      traderDisplayName: settledValue(traderNameRes),
       productId: dto.productId,
       quantity: dto.quantity,
       unit: dto.unit,
@@ -284,14 +294,22 @@ export class OrdersService {
     const endDate = new Date(today);
     endDate.setFullYear(endDate.getFullYear() + 1);
 
+    const [traderNameRes, buyerNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(order.traderId),
+      this.authClient.getUserDisplayName(order.buyerId),
+    ]);
+
     const contract = this.contractRepo.create({
       contractType: 'trader_buyer',
       partyTraderId: order.traderId,
       partyBuyerId: order.buyerId,
       partyFarmerId: null,
+      partyTraderName: settledValue(traderNameRes),
+      partyBuyerName: settledValue(buyerNameRes),
       productId: order.productId,
       standardId: null,
       farmId: null,
+      farmName: null,
       quantity: order.quantity,
       unit: order.unit,
       totalPrice: order.totalPrice,
@@ -314,6 +332,8 @@ export class OrdersService {
       id: entity.id,
       buyerId: entity.buyerId,
       traderId: entity.traderId,
+      buyerDisplayName: entity.buyerDisplayName ?? null,
+      traderDisplayName: entity.traderDisplayName ?? null,
       productId: entity.productId,
       quantity: Number(entity.quantity),
       unit: entity.unit,

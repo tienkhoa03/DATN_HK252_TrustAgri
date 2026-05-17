@@ -35,6 +35,9 @@ export class FarmEntity {
   @Column({ name: 'owner_id' })
   ownerId: string;
 
+  @Column({ name: 'owner_display_name', type: 'varchar', nullable: true })
+  ownerDisplayName: string | null;
+
   @Column()
   name: string;
 

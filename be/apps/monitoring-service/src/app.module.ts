@@ -16,9 +16,11 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { SensorsModule } from './sensors/sensors.module';
 import { AlertsModule } from './alerts/alerts.module';
 import { DevicesModule } from './devices/devices.module';
+import { ClientsModule } from './clients/clients.module';
 
 @Module({
   imports: [
+    ClientsModule,
     SharedConfigModule,
     LoggerModule,
     ConfigModule.forFeature(databaseConfig),

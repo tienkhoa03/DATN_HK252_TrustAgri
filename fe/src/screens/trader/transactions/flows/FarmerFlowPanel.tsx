@@ -1,12 +1,14 @@
 /**
  * FarmerFlowPanel — "Với Nông dân" flow (contract-centric)
  * Tabs: Chờ ký (pending_signature) | Đã ký (active / pending_change) | Lịch sử (completed / cancelled)
- * Requirements: FR-T08, US-T03
+ * Requirements: FR-T08, FR-T09, US-T03
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { Text } from 'zmp-ui';
 import { StatusTabbedList } from '../components/StatusTabbedList';
 import { ContractDetailModal } from '../components/ContractDetailModal';
+import { CreateFarmerContractModal } from '../components/CreateFarmerContractModal';
+import { SelectConnectionModal, type SelectedConnectionInfo } from '../components/SelectConnectionModal';
 import { EmptyState } from '@/design-system/components/EmptyState/EmptyState';
 import {
   listContracts,
@@ -49,6 +51,10 @@ export const FarmerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
   const [loaded, setLoaded] = useState(false);
   const [selectedContract, setSelectedContract] = useState<ContractDto | null>(null);
 
+  // Flow: Select connection → Create contract
+  const [showSelectConnection, setShowSelectConnection] = useState(false);
+  const [contractTarget, setContractTarget] = useState<SelectedConnectionInfo | null>(null);
+
   const loadContracts = useCallback(async () => {
     if (loaded) return;
     setLoading(true);
@@ -82,6 +88,18 @@ export const FarmerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
     void loadContracts();
   }, [loadContracts]);
 
+  const handleConnectionSelected = (info: SelectedConnectionInfo) => {
+    setShowSelectConnection(false);
+    setContractTarget(info);
+  };
+
+  const handleContractCreated = (contract: ContractDto) => {
+    setContractTarget(null);
+    setWaitingContracts((prev) => [contract, ...prev]);
+    setActiveTab('waiting');
+    openSnackbar({ type: 'success', text: 'Hợp đồng đã tạo — đang ở tab Chờ ký.', duration: 3000, icon: true });
+  };
+
   const renderContractList = (contracts: ContractDto[], emptyTitle: string, emptyDesc: string) => {
     if (loading) return <SkeletonList />;
     if (contracts.length === 0) {
@@ -98,6 +116,46 @@ export const FarmerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
 
   return (
     <>
+      {/* Header row with add button */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: `${spacing.sm} ${spacing.md}`,
+          backgroundColor: colors.background.primary,
+          borderBottom: `1px solid ${colors.background.secondary}`,
+        }}
+      >
+        <Text
+          size="xSmall"
+          style={{ color: colors.text.secondary, fontSize: fontSize.caption }}
+        >
+          Hợp đồng với nông dân
+        </Text>
+        <button
+          type="button"
+          onClick={() => setShowSelectConnection(true)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: spacing.xs,
+            padding: `${spacing.xs} ${spacing.md}`,
+            backgroundColor: colors.primary.agriGreen,
+            color: '#fff',
+            border: 'none',
+            borderRadius: 8,
+            fontSize: fontSize.caption,
+            fontWeight: fontWeight.semibold,
+            cursor: 'pointer',
+            minHeight: 36,
+          }}
+        >
+          <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
+          Thêm hợp đồng
+        </button>
+      </div>
+
       <StatusTabbedList tabs={TABS} activeId={activeTab} onTabChange={setActiveTab}>
         {activeTab === 'waiting' &&
           renderContractList(
@@ -119,6 +177,7 @@ export const FarmerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
           )}
       </StatusTabbedList>
 
+      {/* Contract detail modal */}
       {selectedContract && (
         <ContractDetailModal
           contract={selectedContract}
@@ -135,6 +194,24 @@ export const FarmerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
               );
             }
           }}
+        />
+      )}
+
+      {/* Step 1: Select connected farmer */}
+      <SelectConnectionModal
+        visible={showSelectConnection}
+        onClose={() => setShowSelectConnection(false)}
+        onSelected={handleConnectionSelected}
+      />
+
+      {/* Step 2: Create contract form */}
+      {contractTarget && (
+        <CreateFarmerContractModal
+          visible
+          farmerUserId={contractTarget.farmerUserId}
+          farmId={contractTarget.farmId}
+          onClose={() => setContractTarget(null)}
+          onCreated={handleContractCreated}
         />
       )}
     </>
@@ -194,7 +271,9 @@ const ContractInfoCard: React.FC<{ contract: ContractDto; onTap: () => void }> =
             {contractTypeLabelVi(contract.contractType)}
           </Text>
           <Text.Title size="small" style={{ margin: `${spacing.xs} 0` }}>
-            {contract.partyFarmerId ? partyFarmerLabel(contract.partyFarmerId) : '—'}
+            {contract.partyFarmerId
+              ? (contract.partyFarmerName ?? partyFarmerLabel(contract.partyFarmerId))
+              : '—'}
           </Text.Title>
           <Text size="xSmall" style={{ color: colors.text.secondary, fontSize: fontSize.caption }}>
             {new Date(contract.startDate).toLocaleDateString('vi-VN')} —{' '}

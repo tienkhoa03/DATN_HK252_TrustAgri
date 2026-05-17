@@ -19,6 +19,8 @@ import {
   ContractChangedEventPayload,
   ContractEventPublisherService,
 } from './services/contract-event-publisher.service';
+import { AuthClientService } from '../clients/auth-client.service';
+import { settledValue } from '../clients/settled.util';
 
 /** Các trường hợp đồng được phép đổi qua change-request (camelCase, khớp ContractDto). */
 const ALLOWED_CONTRACT_KEYS = new Set([
@@ -44,6 +46,7 @@ export class ContractChangeRequestsService {
     private readonly dataSource: DataSource,
     private readonly contractAudit: ContractAuditService,
     private readonly publisher: ContractEventPublisherService,
+    private readonly authClient: AuthClientService,
   ) {}
 
   async list(
@@ -111,6 +114,10 @@ export class ContractChangeRequestsService {
 
     this.assertOldValuesMatchContract(contract, dto.changes);
 
+    const [requestedByNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(user.sub),
+    ]);
+
     const saved = await this.dataSource.transaction(async (manager) => {
       const cRepo = manager.getRepository(ContractEntity);
       const crRepo = manager.getRepository(ContractChangeRequestEntity);
@@ -118,10 +125,12 @@ export class ContractChangeRequestsService {
       const row = crRepo.create({
         contractId,
         requestedBy: user.sub,
+        requestedByName: settledValue(requestedByNameRes),
         changes: dto.changes,
         reason: dto.reason ?? null,
         status: 'pending',
         respondedBy: null,
+        respondedByName: null,
         respondedAt: null,
       });
       const cr = await crRepo.save(row);
@@ -169,6 +178,10 @@ export class ContractChangeRequestsService {
       throw new BadRequestException('Trạng thái hợp đồng không khớp yêu cầu đang xử lý');
     }
 
+    const [respondedByNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(user.sub),
+    ]);
+
     await this.dataSource.transaction(async (manager) => {
       const cRepo = manager.getRepository(ContractEntity);
       const crRepo = manager.getRepository(ContractChangeRequestEntity);
@@ -184,6 +197,7 @@ export class ContractChangeRequestsService {
 
       row.status = 'accepted';
       row.respondedBy = user.sub;
+      row.respondedByName = settledValue(respondedByNameRes);
       row.respondedAt = new Date();
       await crRepo.save(row);
 
@@ -231,6 +245,10 @@ export class ContractChangeRequestsService {
       throw new BadRequestException('Trạng thái hợp đồng không khớp yêu cầu đang xử lý');
     }
 
+    const [respondedByNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(user.sub),
+    ]);
+
     await this.dataSource.transaction(async (manager) => {
       const cRepo = manager.getRepository(ContractEntity);
       const crRepo = manager.getRepository(ContractChangeRequestEntity);
@@ -240,6 +258,7 @@ export class ContractChangeRequestsService {
 
       row.status = 'rejected';
       row.respondedBy = user.sub;
+      row.respondedByName = settledValue(respondedByNameRes);
       row.respondedAt = new Date();
       await crRepo.save(row);
 
@@ -421,10 +440,14 @@ export class ContractChangeRequestsService {
       partyFarmerId: entity.partyFarmerId ?? undefined,
       partyTraderId: entity.partyTraderId,
       partyBuyerId: entity.partyBuyerId ?? undefined,
+      partyFarmerName: entity.partyFarmerName ?? null,
+      partyTraderName: entity.partyTraderName ?? null,
+      partyBuyerName: entity.partyBuyerName ?? null,
       contractType: entity.contractType,
       productId: entity.productId ?? undefined,
       standardId: entity.standardId ?? undefined,
       farmId: entity.farmId ?? undefined,
+      farmName: entity.farmName ?? null,
       quantity: Number(entity.quantity),
       unit: entity.unit,
       totalPrice: Number(entity.totalPrice),
@@ -443,10 +466,12 @@ export class ContractChangeRequestsService {
       id: row.id,
       contractId: row.contractId,
       requestedBy: row.requestedBy,
+      requestedByName: row.requestedByName ?? null,
       changes: row.changes,
       reason: row.reason ?? undefined,
       status: row.status,
       respondedBy: row.respondedBy ?? undefined,
+      respondedByName: row.respondedByName ?? null,
       createdAt: row.createdAt.toISOString(),
       respondedAt: row.respondedAt
         ? row.respondedAt.toISOString()

@@ -14,6 +14,8 @@ import {
 import { BuyingRequestEntity } from './entities/buying-request.entity';
 import { BuyingRequestQueryDto } from './dto/buying-request-query.dto';
 import { UpdateBuyingRequestDto } from './dto/update-buying-request.dto';
+import { AuthClientService } from '../clients/auth-client.service';
+import { settledValue } from '../clients/settled.util';
 
 @Injectable()
 export class BuyingRequestsService {
@@ -22,6 +24,7 @@ export class BuyingRequestsService {
   constructor(
     @InjectRepository(BuyingRequestEntity)
     private readonly buyingRequestRepo: Repository<BuyingRequestEntity>,
+    private readonly authClient: AuthClientService,
   ) {}
 
   /**
@@ -85,8 +88,13 @@ export class BuyingRequestsService {
     dto: CreateBuyingRequestDto,
     buyerId: string,
   ): Promise<BuyingRequestDto> {
+    const [buyerNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(buyerId),
+    ]);
+
     const entity = this.buyingRequestRepo.create({
       buyerId,
+      buyerDisplayName: settledValue(buyerNameRes),
       cropType: dto.cropType,
       quantity: dto.quantity,
       unit: dto.unit,
@@ -173,6 +181,7 @@ export class BuyingRequestsService {
     return {
       id: entity.id,
       buyerId: entity.buyerId,
+      buyerDisplayName: entity.buyerDisplayName ?? null,
       cropType: entity.cropType,
       quantity: Number(entity.quantity),
       unit: entity.unit,

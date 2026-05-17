@@ -5,6 +5,9 @@ import { AlertDto, ListResponse, SensorReadingDto } from '@trustagri/shared';
 import { AlertEntity } from './alert.entity';
 import { AlertQueryDto } from './dto/alert-query.dto';
 import { AlertPublisherService } from './services/alert-publisher.service';
+import { FarmClientService } from '../clients/farm-client.service';
+import { AuthClientService } from '../clients/auth-client.service';
+import { settledValue } from '../clients/settled.util';
 
 interface SensorThreshold {
   min?: number;
@@ -69,6 +72,8 @@ export class AlertsService {
     @InjectRepository(AlertEntity)
     private readonly alertRepo: Repository<AlertEntity>,
     private readonly publisher: AlertPublisherService,
+    private readonly farmClient: FarmClientService,
+    private readonly authClient: AuthClientService,
   ) {}
 
   /**
@@ -98,8 +103,13 @@ export class AlertsService {
     const suggestedAction =
       SUGGESTED_ACTIONS[reading.sensorType]?.[isHigh ? 'high' : 'low'];
 
+    const [farmNameRes] = await Promise.allSettled([
+      this.farmClient.getFarmName(reading.farmId),
+    ]);
+
     const entity = this.alertRepo.create({
       farmId: reading.farmId,
+      farmName: settledValue(farmNameRes),
       sensorType: reading.sensorType,
       severity,
       threshold: thresholdValue,
@@ -160,8 +170,13 @@ export class AlertsService {
       throw new NotFoundException('Cảnh báo không tồn tại');
     }
 
+    const [ackNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(userId),
+    ]);
+
     alert.acknowledged = true;
     alert.acknowledgedBy = userId;
+    alert.acknowledgedByName = settledValue(ackNameRes);
     alert.acknowledgedAt = new Date();
     await this.alertRepo.save(alert);
 
@@ -195,6 +210,7 @@ export class AlertsService {
     return {
       id: entity.id,
       farmId: entity.farmId,
+      farmName: entity.farmName ?? null,
       sensorType: entity.sensorType,
       severity: entity.severity,
       threshold: entity.threshold,
@@ -202,6 +218,7 @@ export class AlertsService {
       suggestedAction: entity.suggestedAction,
       acknowledged: entity.acknowledged,
       acknowledgedBy: entity.acknowledgedBy,
+      acknowledgedByName: entity.acknowledgedByName ?? null,
       acknowledgedAt: entity.acknowledgedAt?.toISOString(),
       createdAt: entity.createdAt.toISOString(),
     };

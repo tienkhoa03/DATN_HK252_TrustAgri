@@ -95,7 +95,9 @@ function formatViDateTime(iso: string): string {
 }
 
 function complianceContractOptionLabel(c: ContractDto): string {
-  const farm = c.farmId ? `Vườn …${c.farmId.slice(-6)}` : 'Chưa gắn vườn';
+  const farm = c.farmId
+    ? (c.farmName ?? `Vườn #${c.farmId.slice(0, 8)}`)
+    : 'Chưa gắn vườn';
   return `${contractStatusLabelVi(c.status)} · ${farm} · #${c.id.slice(0, 8)}`;
 }
 

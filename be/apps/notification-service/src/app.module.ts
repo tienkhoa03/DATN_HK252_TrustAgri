@@ -10,9 +10,11 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { NotificationsModule } from './notifications/notifications.module';
 import { NewsModule } from './news/news.module';
 import { ForecastsModule } from './forecasts/forecasts.module';
+import { ClientsModule } from './clients/clients.module';
 
 @Module({
   imports: [
+    ClientsModule,
     SharedConfigModule,
     LoggerModule,
     ConfigModule.forFeature(databaseConfig),

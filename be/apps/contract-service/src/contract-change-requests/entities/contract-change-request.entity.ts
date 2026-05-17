@@ -31,6 +31,9 @@ export class ContractChangeRequestEntity {
   @Column({ name: 'requested_by', type: 'varchar' })
   requestedBy: string;
 
+  @Column({ name: 'requested_by_name', type: 'varchar', nullable: true })
+  requestedByName: string | null;
+
   @Column({ type: 'jsonb' })
   changes: Record<string, { oldValue: unknown; newValue: unknown }>;
 
@@ -45,6 +48,9 @@ export class ContractChangeRequestEntity {
    */
   @Column({ name: 'responded_by', type: 'varchar', nullable: true })
   respondedBy: string | null;
+
+  @Column({ name: 'responded_by_name', type: 'varchar', nullable: true })
+  respondedByName: string | null;
 
   @Column({ name: 'responded_at', type: 'timestamptz', nullable: true })
   respondedAt: Date | null;

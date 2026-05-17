@@ -7,6 +7,7 @@
  * - Removed Google Maps placeholder
  * - Pending connections show "Hủy yêu cầu" button; accepted connections stay unchanged
  * - Trạng thái kết nối theo farmId (ConnectionDto.farmId), không gộp theo ownerId
+ * - Lọc trạng thái kết nối (pending/accepted/negotiating/signed/rejected/chưa kết nối) phía client
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -27,8 +28,11 @@ import {
   toConnectionViMessage,
   searchFarmers,
 } from '@/services/connectionService';
-import type { FarmerSearchResultDto } from '@/services/connectionService';
+import type { ConnectionDto, FarmerSearchResultDto } from '@/services/connectionService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+
+type ConnectionStatus = ConnectionDto['status'];
+type FarmConnectionFilter = 'all' | 'none' | ConnectionStatus;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -66,10 +70,48 @@ const CERTIFICATION_OPTIONS = [
   { value: 'organic', label: 'Hữu cơ' },
 ];
 
+const CONNECTION_STATUS_FILTER_OPTIONS: { value: FarmConnectionFilter; label: string }[] = [
+  { value: 'all', label: 'Tất cả trạng thái' },
+  { value: 'none', label: 'Chưa kết nối' },
+  { value: 'pending', label: 'Chờ phản hồi' },
+  { value: 'accepted', label: 'Đã kết nối' },
+  { value: 'negotiating', label: 'Đang đàm phán' },
+  { value: 'signed', label: 'Đã ký kết' },
+  { value: 'rejected', label: 'Đã từ chối' },
+];
+
+const STATUS_PRIORITY: Record<ConnectionStatus, number> = {
+  rejected: 1,
+  pending: 2,
+  accepted: 3,
+  negotiating: 4,
+  signed: 5,
+};
+
+const STATUS_LABEL: Record<FarmConnectionFilter, string> = {
+  all: '',
+  none: 'Chưa kết nối',
+  pending: 'Chờ phản hồi',
+  accepted: 'Đã kết nối',
+  negotiating: 'Đang đàm phán',
+  signed: 'Đã ký kết',
+  rejected: 'Đã từ chối',
+};
+
+const STATUS_COLOR: Record<FarmConnectionFilter, string> = {
+  all: colors.text.secondary,
+  none: colors.text.secondary,
+  pending: colors.functional.warningYellow,
+  accepted: colors.primary.agriGreen,
+  negotiating: colors.primary.zaloBlue,
+  signed: '#9B59B6',
+  rejected: colors.functional.alertRed,
+};
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ConnectionInfo {
-  status: 'pending' | 'accepted';
+  status: ConnectionStatus;
   connectionId: string;
 }
 
@@ -82,6 +124,22 @@ function cropLabel(cropType: string): string {
 function areaDisplay(areaM2: number): string {
   if (areaM2 >= 10000) return `${(areaM2 / 10000).toFixed(2)} ha`;
   return `${areaM2.toLocaleString('vi-VN')} m²`;
+}
+
+function farmConnectionStatus(
+  farmId: string,
+  map: Record<string, ConnectionInfo>,
+): FarmConnectionFilter {
+  return map[farmId]?.status ?? 'none';
+}
+
+function matchesConnectionStatusFilter(
+  farmId: string,
+  filter: FarmConnectionFilter,
+  map: Record<string, ConnectionInfo>,
+): boolean {
+  if (filter === 'all') return true;
+  return farmConnectionStatus(farmId, map) === filter;
 }
 
 function searchErrorMessage(err: unknown): string {
@@ -125,7 +183,12 @@ export const MarketplaceSupplyPanel: React.FC = () => {
 
   // UI-only filter state (dropdowns / keyword input — does NOT trigger search)
   const [searchKeyword, setSearchKeyword] = useState('');
-  const [filter, setFilter] = useState({ cropType: 'all', region: 'all', certification: 'all' });
+  const [filter, setFilter] = useState({
+    cropType: 'all',
+    region: 'all',
+    certification: 'all',
+    connectionStatus: 'all' as FarmConnectionFilter,
+  });
 
   // Results state
   const [farms, setFarms] = useState<FarmDto[]>([]);
@@ -223,11 +286,11 @@ export const MarketplaceSupplyPanel: React.FC = () => {
       const res = await listConnections({ limit: 100 });
       const map: Record<string, ConnectionInfo> = {};
       res.items.forEach((conn) => {
-        if (conn.status === 'rejected' || !conn.farmId) return;
+        if (!conn.farmId) return;
         const farmId = conn.farmId;
-        // accepted takes priority over pending
-        if (!map[farmId] || conn.status === 'accepted') {
-          map[farmId] = { status: conn.status as 'pending' | 'accepted', connectionId: conn.id };
+        const existing = map[farmId];
+        if (!existing || STATUS_PRIORITY[conn.status] > STATUS_PRIORITY[existing.status]) {
+          map[farmId] = { status: conn.status, connectionId: conn.id };
         }
       });
       setConnectionStatusMap(map);
@@ -309,6 +372,10 @@ export const MarketplaceSupplyPanel: React.FC = () => {
     marginBottom: spacing.md,
   };
 
+  const displayFarms = farms.filter((farm) =>
+    matchesConnectionStatusFilter(farm.id, filter.connectionStatus, connectionStatusMap),
+  );
+
   const connectBtnStyle: React.CSSProperties = {
     marginTop: spacing.md,
     width: '100%',
@@ -381,8 +448,17 @@ export const MarketplaceSupplyPanel: React.FC = () => {
         </select>
 
         <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 4 }}>Tiêu chuẩn:</Text>
-        <select style={{ ...selectStyle, marginBottom: spacing.md }} value={filter.certification} onChange={(e) => setFilter((prev) => ({ ...prev, certification: e.target.value }))}>
+        <select style={selectStyle} value={filter.certification} onChange={(e) => setFilter((prev) => ({ ...prev, certification: e.target.value }))}>
           {CERTIFICATION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+
+        <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 4 }}>Trạng thái kết nối:</Text>
+        <select
+          style={{ ...selectStyle, marginBottom: spacing.md }}
+          value={filter.connectionStatus}
+          onChange={(e) => setFilter((prev) => ({ ...prev, connectionStatus: e.target.value as FarmConnectionFilter }))}
+        >
+          {CONNECTION_STATUS_FILTER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
 
         <button
@@ -411,13 +487,29 @@ export const MarketplaceSupplyPanel: React.FC = () => {
         </div>
       )}
 
-      {/* Results */}
-      {!isLoading && farms.length > 0 && (
-        <>
-          <Text.Title size="small" style={{ marginBottom: spacing.md }}>Kết quả ({total})</Text.Title>
+      {/* Empty state — filtered out by connection status */}
+      {!isLoading && farms.length > 0 && displayFarms.length === 0 && (
+        <div style={{ textAlign: 'center', padding: `${spacing.xl} ${spacing.md}` }}>
+          <Icon name="users" size="lg" color={colors.text.secondary} />
+          <Text size="small" style={{ color: colors.text.secondary, marginTop: spacing.md }}>
+            Không có vườn với trạng thái &quot;{STATUS_LABEL[filter.connectionStatus]}&quot;
+          </Text>
+          <Text size="xSmall" style={{ color: colors.text.secondary }}>Hãy chọn trạng thái khác hoặc nhấn Tìm kiếm lại</Text>
+        </div>
+      )}
 
-          {farms.map((farm) => {
+      {/* Results */}
+      {!isLoading && displayFarms.length > 0 && (
+        <>
+          <Text.Title size="small" style={{ marginBottom: spacing.md }}>
+            Kết quả (
+            {filter.connectionStatus === 'all' ? total : `${displayFarms.length} / ${farms.length}`}
+            )
+          </Text.Title>
+
+          {displayFarms.map((farm) => {
             const connInfo = connectionStatusMap[farm.id];
+            const farmStatus = farmConnectionStatus(farm.id, connectionStatusMap);
             const isCancelling = cancellingFarmId === farm.id;
 
             return (
@@ -430,6 +522,11 @@ export const MarketplaceSupplyPanel: React.FC = () => {
                     </Text>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: spacing.xs }}>
+                    {farmStatus !== 'none' && (
+                      <span style={{ padding: `2px ${spacing.sm}`, backgroundColor: `${STATUS_COLOR[farmStatus]}18`, borderRadius: 99, fontSize: fontSize.small, fontWeight: fontWeight.semibold, color: STATUS_COLOR[farmStatus] }}>
+                        {STATUS_LABEL[farmStatus]}
+                      </span>
+                    )}
                     <span style={{ padding: `2px ${spacing.sm}`, backgroundColor: `${colors.primary.agriGreen}18`, borderRadius: 99, fontSize: fontSize.caption, fontWeight: fontWeight.semibold, color: colors.primary.agriGreen }}>
                       {cropLabel(farm.cropType)}
                     </span>
@@ -479,12 +576,7 @@ export const MarketplaceSupplyPanel: React.FC = () => {
                 )}
 
                 {/* Connection button / status */}
-                {connInfo?.status === 'accepted' ? (
-                  <div style={{ ...connectBtnStyle, backgroundColor: `${colors.primary.agriGreen}18`, color: colors.primary.agriGreen, cursor: 'default' }}>
-                    <Icon name="check" size="sm" color={colors.primary.agriGreen} />
-                    Đã kết nối
-                  </div>
-                ) : connInfo?.status === 'pending' ? (
+                {connInfo?.status === 'pending' ? (
                   <button
                     style={{ ...connectBtnStyle, backgroundColor: `${colors.functional.alertRed}10`, color: colors.functional.alertRed, cursor: isCancelling ? 'not-allowed' : 'pointer' }}
                     type="button"
@@ -494,6 +586,26 @@ export const MarketplaceSupplyPanel: React.FC = () => {
                     <Icon name="close" size="sm" color={isCancelling ? colors.text.secondary : colors.functional.alertRed} />
                     {isCancelling ? 'Đang hủy...' : 'Hủy yêu cầu'}
                   </button>
+                ) : connInfo?.status === 'accepted' ? (
+                  <div style={{ ...connectBtnStyle, backgroundColor: `${colors.primary.agriGreen}18`, color: colors.primary.agriGreen, cursor: 'default' }}>
+                    <Icon name="check" size="sm" color={colors.primary.agriGreen} />
+                    Đã kết nối
+                  </div>
+                ) : connInfo?.status === 'negotiating' ? (
+                  <div style={{ ...connectBtnStyle, backgroundColor: `${colors.primary.zaloBlue}12`, color: colors.primary.zaloBlue, cursor: 'default' }}>
+                    <Icon name="list" size="sm" color={colors.primary.zaloBlue} />
+                    Đang đàm phán
+                  </div>
+                ) : connInfo?.status === 'signed' ? (
+                  <div style={{ ...connectBtnStyle, backgroundColor: '#9B59B612', color: '#9B59B6', cursor: 'default' }}>
+                    <Icon name="star" size="sm" color="#9B59B6" />
+                    Đã ký kết
+                  </div>
+                ) : connInfo?.status === 'rejected' ? (
+                  <div style={{ ...connectBtnStyle, backgroundColor: `${colors.functional.alertRed}10`, color: colors.functional.alertRed, cursor: 'default' }}>
+                    <Icon name="close" size="sm" color={colors.functional.alertRed} />
+                    Đã từ chối
+                  </div>
                 ) : (
                   <button style={connectBtnStyle} type="button" onClick={() => void handleSendConnectionRequest(farm.ownerId, farm.id)}>
                     <Icon name="users" size="sm" color={colors.primary.zaloBlue} />

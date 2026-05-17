@@ -30,7 +30,8 @@ import { ApiError } from '@/api/errors';
 export interface BuyingRequestDto {
   id: string;
   buyerId: string;
-  buyerName?: string;      // tên người mua (nếu backend trả về hoặc đã resolve)
+  buyerDisplayName?: string | null;
+  buyerName?: string;      // alias cũ — ưu tiên buyerDisplayName
   cropType: string;
   quantity: number;
   unit: string;

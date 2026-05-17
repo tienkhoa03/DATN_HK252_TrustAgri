@@ -17,6 +17,8 @@ import {
 import { StandardEntity } from './entities/standard.entity';
 import { StandardStepEntity } from './entities/standard-step.entity';
 import { ListStandardsQueryDto } from './dto/list-standards-query.dto';
+import { AuthClientService } from '../clients/auth-client.service';
+import { settledValue } from '../clients/settled.util';
 
 @Injectable()
 export class StandardsService {
@@ -27,6 +29,7 @@ export class StandardsService {
     private readonly standardRepo: Repository<StandardEntity>,
     @InjectRepository(StandardStepEntity)
     private readonly stepRepo: Repository<StandardStepEntity>,
+    private readonly authClient: AuthClientService,
   ) {}
 
   async list(query: ListStandardsQueryDto): Promise<ListResponse<StandardDto>> {
@@ -83,12 +86,17 @@ export class StandardsService {
       throw new ConflictException(`Mã tiêu chuẩn '${dto.code}' đã tồn tại`);
     }
 
+    const [ownerTraderNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(traderId),
+    ]);
+
     const standard = this.standardRepo.create({
       code: dto.code,
       name: dto.name,
       description: dto.description,
       cropType: dto.cropType ?? null,
       ownerTraderId: traderId,
+      ownerTraderName: settledValue(ownerTraderNameRes),
     });
     const saved = await this.standardRepo.save(standard);
 
@@ -202,6 +210,7 @@ export class StandardsService {
       cropType: standard.cropType ?? undefined,
       version: standard.version,
       ownerTraderId: standard.ownerTraderId ?? undefined,
+      ownerTraderName: standard.ownerTraderName ?? null,
       steps,
       createdAt: standard.createdAt.toISOString(),
       updatedAt: standard.updatedAt.toISOString(),

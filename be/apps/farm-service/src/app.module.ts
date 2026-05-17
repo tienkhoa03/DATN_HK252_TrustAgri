@@ -12,9 +12,11 @@ import { StandardsModule } from './standards/standards.module';
 import { CareLogsModule } from './care-logs/care-logs.module';
 import { TraceabilityModule } from './traceability/traceability.module';
 import { CarePlansModule } from './care-plans/care-plans.module';
+import { ClientsModule } from './clients/clients.module';
 
 @Module({
   imports: [
+    ClientsModule,
     SharedConfigModule,
     LoggerModule,
     ConfigModule.forFeature(databaseConfig),

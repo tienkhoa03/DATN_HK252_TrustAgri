@@ -44,6 +44,12 @@ export class OrderEntity {
   @Column({ name: 'trader_id' })
   traderId: string;
 
+  @Column({ name: 'buyer_display_name', type: 'varchar', nullable: true })
+  buyerDisplayName: string | null;
+
+  @Column({ name: 'trader_display_name', type: 'varchar', nullable: true })
+  traderDisplayName: string | null;
+
   @Index('idx_orders_product_id')
   @Column({ name: 'product_id' })
   productId: string;

@@ -19,10 +19,14 @@ export interface ContractDto {
   partyFarmerId?: string;
   partyTraderId: string;
   partyBuyerId?: string;
+  partyFarmerName?: string | null;
+  partyTraderName?: string | null;
+  partyBuyerName?: string | null;
   contractType: 'farmer_trader' | 'trader_buyer';
   productId?: string;
   standardId?: string;
   farmId?: string;
+  farmName?: string | null;
   quantity: number;
   unit: string;
   totalPrice: number;

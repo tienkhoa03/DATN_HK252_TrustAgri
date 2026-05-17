@@ -52,6 +52,7 @@ export class FarmLocationInputDto implements FarmLocationDto {
 export interface FarmDto {
   id: string;
   ownerId: string;
+  ownerDisplayName?: string | null;
   name: string;
   location: FarmLocationDto;
   area: number;
@@ -153,6 +154,7 @@ export interface CareLogDto {
   notes?: string;
   performedAt: string;
   performedBy?: string;
+  performedByName?: string | null;
   evidences: EvidenceDto[];
   deviation?: boolean;
   syncStatus: 'synced' | 'pending' | 'conflict';
@@ -239,6 +241,7 @@ export interface StandardDto {
   cropType?: string;
   version: number;
   ownerTraderId?: string;
+  ownerTraderName?: string | null;
   steps: StandardStepDto[];
   createdAt: string;
   updatedAt: string;

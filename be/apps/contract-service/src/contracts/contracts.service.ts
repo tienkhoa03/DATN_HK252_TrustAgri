@@ -21,6 +21,9 @@ import { ContractEntity } from './entities/contract.entity';
 import { ContractQueryDto } from './dto/contract-query.dto';
 import { ContractAuditService } from './contract-audit.service';
 import { ConnectionsService } from '../connections/connections.service';
+import { AuthClientService } from '../clients/auth-client.service';
+import { FarmClientService } from '../clients/farm-client.service';
+import { settledValue } from '../clients/settled.util';
 
 @Injectable()
 export class ContractsService {
@@ -32,6 +35,8 @@ export class ContractsService {
     private readonly contractAudit: ContractAuditService,
     private readonly config: ConfigService,
     private readonly connectionsService: ConnectionsService,
+    private readonly authClient: AuthClientService,
+    private readonly farmClient: FarmClientService,
   ) {}
 
   /**
@@ -283,14 +288,30 @@ export class ContractsService {
 
     this.validateCreateParties(dto);
 
+    const [farmerNameRes, traderNameRes, buyerNameRes, farmNameRes] =
+      await Promise.allSettled([
+        dto.partyFarmerId
+          ? this.authClient.getUserDisplayName(dto.partyFarmerId)
+          : Promise.resolve(null),
+        this.authClient.getUserDisplayName(dto.partyTraderId),
+        dto.partyBuyerId
+          ? this.authClient.getUserDisplayName(dto.partyBuyerId)
+          : Promise.resolve(null),
+        dto.farmId ? this.farmClient.getFarmName(dto.farmId) : Promise.resolve(null),
+      ]);
+
     const entity = this.contractRepo.create({
       partyFarmerId: dto.partyFarmerId ?? null,
       partyTraderId: dto.partyTraderId,
       partyBuyerId: dto.partyBuyerId ?? null,
+      partyFarmerName: settledValue(farmerNameRes),
+      partyTraderName: settledValue(traderNameRes),
+      partyBuyerName: settledValue(buyerNameRes),
       contractType: dto.contractType,
       productId: dto.productId ?? null,
       standardId: dto.standardId ?? null,
       farmId: dto.farmId ?? null,
+      farmName: settledValue(farmNameRes),
       quantity: dto.quantity,
       unit: dto.unit,
       totalPrice: dto.totalPrice,
@@ -435,6 +456,7 @@ export class ContractsService {
       previousStatus: r.previousStatus,
       newStatus: r.newStatus,
       actorUserId: r.actorUserId,
+      actorDisplayName: r.actorDisplayName ?? null,
       occurredAt: r.occurredAt instanceof Date ? r.occurredAt.toISOString() : String(r.occurredAt),
     }));
   }
@@ -445,10 +467,14 @@ export class ContractsService {
       partyFarmerId: entity.partyFarmerId ?? undefined,
       partyTraderId: entity.partyTraderId,
       partyBuyerId: entity.partyBuyerId ?? undefined,
+      partyFarmerName: entity.partyFarmerName ?? null,
+      partyTraderName: entity.partyTraderName ?? null,
+      partyBuyerName: entity.partyBuyerName ?? null,
       contractType: entity.contractType,
       productId: entity.productId ?? undefined,
       standardId: entity.standardId ?? undefined,
       farmId: entity.farmId ?? undefined,
+      farmName: entity.farmName ?? null,
       quantity: Number(entity.quantity),
       unit: entity.unit,
       totalPrice: Number(entity.totalPrice),
@@ -473,5 +499,6 @@ export interface ContractAuditLogEntryDto {
   previousStatus: string | null;
   newStatus: string;
   actorUserId: string | null;
+  actorDisplayName?: string | null;
   occurredAt: string;
 }

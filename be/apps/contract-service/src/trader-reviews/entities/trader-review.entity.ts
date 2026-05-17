@@ -28,6 +28,12 @@ export class TraderReviewEntity {
   @Column({ name: 'buyer_id' })
   buyerId: string;
 
+  @Column({ name: 'trader_display_name', type: 'varchar', nullable: true })
+  traderDisplayName: string | null;
+
+  @Column({ name: 'buyer_display_name', type: 'varchar', nullable: true })
+  buyerDisplayName: string | null;
+
   // FK → orders.id ON DELETE SET NULL; nullable (review may be freeform without order)
   @Column({ name: 'order_id', nullable: true, type: 'uuid' })
   orderId: string | null;

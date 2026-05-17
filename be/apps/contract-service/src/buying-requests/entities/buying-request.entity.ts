@@ -27,6 +27,9 @@ export class BuyingRequestEntity {
   @Column({ name: 'buyer_id' })
   buyerId: string;
 
+  @Column({ name: 'buyer_display_name', type: 'varchar', nullable: true })
+  buyerDisplayName: string | null;
+
   @Column({ name: 'crop_type' })
   cropType: string;
 

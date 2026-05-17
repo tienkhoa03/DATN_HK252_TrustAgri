@@ -41,6 +41,12 @@ export class ProposalEntity {
   @Column({ name: 'farm_id', nullable: true, type: 'varchar' })
   farmId: string | null;
 
+  @Column({ name: 'trader_display_name', type: 'varchar', nullable: true })
+  traderDisplayName: string | null;
+
+  @Column({ name: 'farm_name', type: 'varchar', nullable: true })
+  farmName: string | null;
+
   @Column({ type: 'numeric', precision: 15, scale: 2 })
   price: number;
 

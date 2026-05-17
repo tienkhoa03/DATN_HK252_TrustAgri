@@ -33,9 +33,12 @@ export interface ConnectionDto {
   id: string;
   fromUserId: string;
   toUserId: string;
+  fromUserName?: string | null;
+  toUserName?: string | null;
   fromRole: 'farmer' | 'trader';
   toRole: 'farmer' | 'trader';
   farmId?: string;
+  farmName?: string | null;
   message?: string;
   status: 'pending' | 'accepted' | 'rejected' | 'negotiating' | 'signed';
   createdAt: string;

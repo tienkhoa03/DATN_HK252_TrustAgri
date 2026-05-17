@@ -13,18 +13,22 @@ import {
 } from '@trustagri/shared';
 import { ForecastEntity } from './forecast.entity';
 import { ForecastListQueryDto } from './dto/forecast-list-query.dto';
+import { AuthClientService } from '../clients/auth-client.service';
+import { settledValue } from '../clients/settled.util';
 
 @Injectable()
 export class ForecastsService {
   constructor(
     @InjectRepository(ForecastEntity)
     private readonly repo: Repository<ForecastEntity>,
+    private readonly authClient: AuthClientService,
   ) {}
 
   private toDto(e: ForecastEntity): ForecastDto {
     return {
       id: e.id,
       traderId: e.traderId,
+      traderDisplayName: e.traderDisplayName ?? null,
       region: e.region,
       cropType: e.cropType,
       type: e.type,
@@ -69,8 +73,13 @@ export class ForecastsService {
     traderId: string,
     dto: ForecastCreateDto,
   ): Promise<ForecastDto> {
+    const [traderNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(traderId),
+    ]);
+
     const entity = this.repo.create({
       traderId,
+      traderDisplayName: settledValue(traderNameRes),
       region: dto.region,
       cropType: dto.cropType,
       type: dto.type,

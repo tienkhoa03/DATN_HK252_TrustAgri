@@ -1418,8 +1418,8 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
             const statusColor = getContractStatusColor(c.status);
             const partyLine =
               c.contractType === 'farmer_trader'
-                ? `Nông dân: ${c.partyFarmerId ? partyFarmerLabel(c.partyFarmerId) : '—'}`
-                : `Người mua: ${c.partyBuyerId ? partyBuyerLabel(c.partyBuyerId) : '—'}`;
+                ? `Nông dân: ${c.partyFarmerId ? (c.partyFarmerName ?? partyFarmerLabel(c.partyFarmerId)) : '—'}`
+                : `Người mua: ${c.partyBuyerId ? (c.partyBuyerName ?? partyBuyerLabel(c.partyBuyerId)) : '—'}`;
             const start = new Date(c.startDate).toLocaleDateString('vi-VN');
             const end = new Date(c.endDate).toLocaleDateString('vi-VN');
 

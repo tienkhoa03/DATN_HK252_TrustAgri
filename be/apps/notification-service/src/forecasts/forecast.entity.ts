@@ -23,6 +23,9 @@ export class ForecastEntity {
   @Column({ name: 'trader_id', type: 'uuid' })
   traderId: string;
 
+  @Column({ name: 'trader_display_name', type: 'varchar', nullable: true })
+  traderDisplayName: string | null;
+
   @Index('idx_forecasts_region')
   @Column({ type: 'varchar', length: 128 })
   region: string;

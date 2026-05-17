@@ -284,7 +284,9 @@ const BuyerContractInfoCard: React.FC<{ contract: ContractDto; onTap: () => void
             {contractTypeLabelVi(contract.contractType)}
           </Text>
           <Text.Title size="small" style={{ margin: `${spacing.xs} 0` }}>
-            {contract.partyBuyerId ? partyBuyerLabel(contract.partyBuyerId) : '—'}
+            {contract.partyBuyerId
+              ? (contract.partyBuyerName ?? partyBuyerLabel(contract.partyBuyerId))
+              : '—'}
           </Text.Title>
           <Text size="xSmall" style={{ color: colors.text.secondary, fontSize: fontSize.caption }}>
             {new Date(contract.startDate).toLocaleDateString('vi-VN')} —{' '}

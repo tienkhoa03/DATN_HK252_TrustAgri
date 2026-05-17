@@ -35,6 +35,9 @@ export class AlertEntity {
   @Column({ name: 'farm_id' })
   farmId: string;
 
+  @Column({ name: 'farm_name', type: 'varchar', nullable: true })
+  farmName: string | null;
+
   @Column({ name: 'sensor_type' })
   sensorType: string;
 
@@ -59,6 +62,9 @@ export class AlertEntity {
    */
   @Column({ name: 'acknowledged_by', nullable: true })
   acknowledgedBy?: string;
+
+  @Column({ name: 'acknowledged_by_name', type: 'varchar', nullable: true })
+  acknowledgedByName: string | null;
 
   @Column({ name: 'acknowledged_at', type: 'timestamptz', nullable: true })
   acknowledgedAt?: Date;

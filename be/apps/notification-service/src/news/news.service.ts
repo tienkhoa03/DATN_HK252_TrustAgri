@@ -13,18 +13,22 @@ import {
 } from '@trustagri/shared';
 import { NewsArticleEntity } from './news-article.entity';
 import { NewsListQueryDto } from './dto/news-list-query.dto';
+import { AuthClientService } from '../clients/auth-client.service';
+import { settledValue } from '../clients/settled.util';
 
 @Injectable()
 export class NewsService {
   constructor(
     @InjectRepository(NewsArticleEntity)
     private readonly repo: Repository<NewsArticleEntity>,
+    private readonly authClient: AuthClientService,
   ) {}
 
   private toDto(e: NewsArticleEntity): NewsArticleDto {
     return {
       id: e.id,
       traderId: e.traderId,
+      traderDisplayName: e.traderDisplayName ?? null,
       title: e.title,
       summary: e.summary,
       content: e.content,
@@ -72,9 +76,14 @@ export class NewsService {
     traderId: string,
     dto: NewsArticleCreateDto,
   ): Promise<NewsArticleDto> {
+    const [traderNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(traderId),
+    ]);
+
     const now = new Date();
     const entity = this.repo.create({
       traderId,
+      traderDisplayName: settledValue(traderNameRes),
       title: dto.title,
       summary: dto.summary,
       content: dto.content,

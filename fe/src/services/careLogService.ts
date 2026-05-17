@@ -32,6 +32,8 @@ export interface CareLogDto {
   action: string;          // "watering" | "fertilizing" | "pest_control" | ...
   notes?: string;
   performedAt: string;     // ISO-8601
+  performedBy?: string;
+  performedByName?: string | null;
   evidences: EvidenceDto[];
   deviation?: boolean;     // lệch quy trình (FR-T11)
   syncStatus: 'synced' | 'pending' | 'conflict';

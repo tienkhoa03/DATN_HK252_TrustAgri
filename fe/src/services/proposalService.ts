@@ -18,6 +18,8 @@ export interface ProposalDto {
   buyingRequestId: string;
   traderId: string;
   farmId?: string;
+  traderDisplayName?: string | null;
+  farmName?: string | null;
   price: number;
   quantity: number;
   standardCode?: string;

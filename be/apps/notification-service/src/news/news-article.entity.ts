@@ -20,6 +20,9 @@ export class NewsArticleEntity {
   @Column({ name: 'trader_id', type: 'uuid' })
   traderId: string;
 
+  @Column({ name: 'trader_display_name', type: 'varchar', nullable: true })
+  traderDisplayName: string | null;
+
   @Column({ type: 'varchar', length: 512 })
   title: string;
 

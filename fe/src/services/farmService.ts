@@ -30,6 +30,7 @@ export interface FarmLocation {
 export interface FarmDto {
   id: string;
   ownerId: string;          // userId nông dân
+  ownerDisplayName?: string | null;
   name: string;             // ví dụ: "Farm Lab Đông A"
   location: FarmLocation;
   area: number;             // m²

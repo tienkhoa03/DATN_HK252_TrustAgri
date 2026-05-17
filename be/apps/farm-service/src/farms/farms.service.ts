@@ -11,6 +11,8 @@ import { ConfigService } from '@nestjs/config';
 import { FarmDto, CreateFarmDto, UpdateFarmDto, ListResponse } from '@trustagri/shared';
 import { FarmEntity } from './entities/farm.entity';
 import { ListFarmsQueryDto } from './dto/list-farms-query.dto';
+import { AuthClientService } from '../clients/auth-client.service';
+import { settledValue } from '../clients/settled.util';
 
 @Injectable()
 export class FarmsService {
@@ -20,11 +22,17 @@ export class FarmsService {
     @InjectRepository(FarmEntity)
     private readonly farmRepo: Repository<FarmEntity>,
     private readonly configService: ConfigService,
+    private readonly authClient: AuthClientService,
   ) {}
 
   async create(dto: CreateFarmDto, ownerId: string): Promise<FarmDto> {
+    const [ownerNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(ownerId),
+    ]);
+
     const farm = this.farmRepo.create({
       ownerId,
+      ownerDisplayName: settledValue(ownerNameRes),
       name: dto.name,
       location: dto.location,
       area: dto.area,
@@ -166,6 +174,7 @@ export class FarmsService {
     return {
       id: farm.id,
       ownerId: farm.ownerId,
+      ownerDisplayName: farm.ownerDisplayName ?? null,
       name: farm.name,
       location: farm.location,
       area: farm.area,

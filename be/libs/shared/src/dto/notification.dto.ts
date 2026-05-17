@@ -22,6 +22,7 @@ export interface NotificationDto {
 export interface NewsArticleDto {
   id: string;
   traderId?: string;
+  traderDisplayName?: string | null;
   title: string;
   summary: string;
   content: string;
@@ -87,6 +88,7 @@ export class NewsArticleUpdateDto {
 export interface ForecastDto {
   id: string;
   traderId?: string;
+  traderDisplayName?: string | null;
   region: string;
   cropType: string;
   type: 'price' | 'demand' | 'weather';

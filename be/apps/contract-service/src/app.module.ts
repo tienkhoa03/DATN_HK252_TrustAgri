@@ -16,9 +16,11 @@ import { ContractsModule } from './contracts/contracts.module';
 import { ContractChangeRequestsModule } from './contract-change-requests/contract-change-requests.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { TraderReviewsModule } from './trader-reviews/trader-reviews.module';
+import { ClientsModule } from './clients/clients.module';
 
 @Module({
   imports: [
+    ClientsModule,
     SharedConfigModule,
     LoggerModule,
     ConfigModule.forFeature(databaseConfig),

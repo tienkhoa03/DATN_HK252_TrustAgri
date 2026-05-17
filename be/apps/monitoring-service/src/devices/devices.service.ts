@@ -7,6 +7,8 @@ import {
   UpdateIotDeviceDto,
 } from '@trustagri/shared';
 import { IotDeviceEntity } from './entities/iot-device.entity';
+import { FarmClientService } from '../clients/farm-client.service';
+import { settledValue } from '../clients/settled.util';
 
 @Injectable()
 export class DevicesService {
@@ -15,6 +17,7 @@ export class DevicesService {
   constructor(
     @InjectRepository(IotDeviceEntity)
     private readonly repo: Repository<IotDeviceEntity>,
+    private readonly farmClient: FarmClientService,
   ) {}
 
   /** Lấy danh sách node devices của vườn, sắp xếp theo createdAt mới nhất trước */
@@ -28,8 +31,13 @@ export class DevicesService {
 
   /** Tạo mới IoT node device; mặc định status='offline' nếu không truyền */
   async create(farmId: string, dto: CreateIotDeviceDto): Promise<IotDeviceDto> {
+    const [farmNameRes] = await Promise.allSettled([
+      this.farmClient.getFarmName(farmId),
+    ]);
+
     const device = this.repo.create({
       farmId,
+      farmName: settledValue(farmNameRes),
       name: dto.name,
       status: dto.status ?? 'offline',
       batteryLevel: dto.batteryLevel ?? null,
@@ -78,6 +86,7 @@ export class DevicesService {
     return {
       id: entity.id,
       farmId: entity.farmId,
+      farmName: entity.farmName ?? null,
       name: entity.name,
       status: entity.status,
       batteryLevel: entity.batteryLevel,

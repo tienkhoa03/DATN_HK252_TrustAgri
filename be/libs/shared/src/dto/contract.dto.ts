@@ -19,6 +19,8 @@ export interface ProductDto {
   id: string;
   traderId: string;
   farmId?: string;
+  traderDisplayName?: string | null;
+  farmName?: string | null;
   name: string;
   cropType: string;
   unit: string;
@@ -82,6 +84,7 @@ export class CreateProductDto {
 export interface BuyingRequestDto {
   id: string;
   buyerId: string;
+  buyerDisplayName?: string | null;
   cropType: string;
   quantity: number;
   unit: string;
@@ -142,6 +145,8 @@ export interface OrderDto {
   id: string;
   buyerId: string;
   traderId: string;
+  buyerDisplayName?: string | null;
+  traderDisplayName?: string | null;
   productId: string;
   quantity: number;
   unit: string;
@@ -181,6 +186,8 @@ export interface ProposalDto {
   buyingRequestId: string;
   traderId: string;
   farmId?: string;
+  traderDisplayName?: string | null;
+  farmName?: string | null;
   price: number;
   quantity: number;
   standardCode?: string;
@@ -227,10 +234,14 @@ export interface ContractDto {
   partyFarmerId?: string;
   partyTraderId: string;
   partyBuyerId?: string;
+  partyFarmerName?: string | null;
+  partyTraderName?: string | null;
+  partyBuyerName?: string | null;
   contractType: 'farmer_trader' | 'trader_buyer';
   productId?: string;
   standardId?: string;
   farmId?: string;
+  farmName?: string | null;
   quantity: number;
   unit: string;
   totalPrice: number;
@@ -320,10 +331,12 @@ export interface ContractChangeRequestDto {
   id: string;
   contractId: string;
   requestedBy: string;
+  requestedByName?: string | null;
   changes: Record<string, { oldValue: unknown; newValue: unknown }>;
   reason?: string;
   status: 'pending' | 'accepted' | 'rejected';
   respondedBy?: string;
+  respondedByName?: string | null;
   createdAt: string;
   respondedAt?: string;
 }
@@ -370,9 +383,12 @@ export interface ConnectionDto {
   id: string;
   fromUserId: string;
   toUserId: string;
+  fromUserName?: string | null;
+  toUserName?: string | null;
   fromRole: 'farmer' | 'trader';
   toRole: 'farmer' | 'trader';
   farmId?: string;
+  farmName?: string | null;
   message?: string;
   status: 'pending' | 'accepted' | 'rejected' | 'negotiating' | 'signed';
   createdAt: string;

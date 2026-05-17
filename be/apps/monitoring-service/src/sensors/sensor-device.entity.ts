@@ -27,6 +27,9 @@ export class SensorDeviceEntity {
   @Column({ name: 'farm_id', type: 'uuid' })
   farmId: string;
 
+  @Column({ name: 'farm_name', type: 'varchar', nullable: true })
+  farmName: string | null;
+
   /** Vendor-assigned device identifier / serial number. */
   @Column({ name: 'device_id', type: 'varchar', length: 64, unique: true })
   deviceId: string;

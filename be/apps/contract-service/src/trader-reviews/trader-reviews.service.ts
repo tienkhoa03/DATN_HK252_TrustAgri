@@ -16,6 +16,8 @@ import {
 } from '@trustagri/shared';
 import { TraderReviewEntity } from './entities/trader-review.entity';
 import { OrderEntity } from '../orders/entities/order.entity';
+import { AuthClientService } from '../clients/auth-client.service';
+import { settledValue } from '../clients/settled.util';
 
 // Raw row returned by the list query (snake_case columns from PostgreSQL)
 interface ReviewRawRow {
@@ -40,6 +42,7 @@ export class TraderReviewsService {
     @InjectRepository(OrderEntity)
     private readonly orderRepo: Repository<OrderEntity>,
     private readonly dataSource: DataSource,
+    private readonly authClient: AuthClientService,
   ) {}
 
   async createReview(
@@ -68,9 +71,16 @@ export class TraderReviewsService {
       throw new ConflictException('Bạn đã đánh giá giao dịch này rồi');
     }
 
+    const [traderNameRes, buyerNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(traderId),
+      this.authClient.getUserDisplayName(buyerId),
+    ]);
+
     const review = this.reviewRepo.create({
       traderId,
       buyerId,
+      traderDisplayName: settledValue(traderNameRes),
+      buyerDisplayName: settledValue(buyerNameRes),
       orderId: dto.orderId,
       rating: dto.rating,
       comment: dto.comment ?? null,
@@ -175,7 +185,8 @@ export class TraderReviewsService {
       id: review.id,
       traderId: review.traderId,
       buyerId: review.buyerId,
-      buyerDisplayName,
+      traderDisplayName: review.traderDisplayName ?? null,
+      buyerDisplayName: buyerDisplayName ?? review.buyerDisplayName ?? null,
       orderId: review.orderId ?? undefined,
       rating: review.rating,
       comment: review.comment ?? undefined,
@@ -189,7 +200,7 @@ export class TraderReviewsService {
       id: row.id,
       traderId: row.trader_id,
       buyerId: row.buyer_id,
-      buyerDisplayName: row.buyer_display_name ?? undefined,
+      buyerDisplayName: row.buyer_display_name ?? null,
       orderId: row.order_id ?? undefined,
       rating: Number(row.rating),
       comment: row.comment ?? undefined,

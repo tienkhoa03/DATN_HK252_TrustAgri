@@ -27,6 +27,8 @@ export interface ProductDto {
   id: string;
   traderId: string;
   farmId?: string;
+  traderDisplayName?: string | null;
+  farmName?: string | null;
   name: string;
   cropType: string;
   unit: string;           // "kg"

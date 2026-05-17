@@ -26,6 +26,9 @@ export class IotDeviceEntity {
   @Column({ name: 'farm_id', type: 'uuid' })
   farmId: string;
 
+  @Column({ name: 'farm_name', type: 'varchar', nullable: true })
+  farmName: string | null;
+
   @Column({ name: 'name', type: 'varchar', length: 128 })
   name: string;
 

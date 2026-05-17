@@ -127,8 +127,12 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
   };
 
   const timeline = buildTimeline(contract);
-  const farmerLine = contract.partyFarmerId ? partyFarmerLabel(contract.partyFarmerId) : null;
-  const buyerLine = contract.partyBuyerId ? partyBuyerLabel(contract.partyBuyerId) : null;
+  const farmerLine = contract.partyFarmerId
+    ? (contract.partyFarmerName ?? partyFarmerLabel(contract.partyFarmerId))
+    : null;
+  const buyerLine = contract.partyBuyerId
+    ? (contract.partyBuyerName ?? partyBuyerLabel(contract.partyBuyerId))
+    : null;
   const statusColor =
     contract.status === 'active'
       ? colors.primary.agriGreen

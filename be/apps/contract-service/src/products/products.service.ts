@@ -12,6 +12,9 @@ import { ProductEntity } from './entities/product.entity';
 import { ProductQueryDto } from './dto/product-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ContractsService } from '../contracts/contracts.service';
+import { AuthClientService } from '../clients/auth-client.service';
+import { FarmClientService } from '../clients/farm-client.service';
+import { settledValue } from '../clients/settled.util';
 
 @Injectable()
 export class ProductsService {
@@ -21,6 +24,8 @@ export class ProductsService {
     @InjectRepository(ProductEntity)
     private readonly productRepo: Repository<ProductEntity>,
     private readonly contractsService: ContractsService,
+    private readonly authClient: AuthClientService,
+    private readonly farmClient: FarmClientService,
   ) {}
 
   /**
@@ -109,9 +114,16 @@ export class ProductsService {
     }
     await this.contractsService.assertTraderFarmLinked(traderId, farmId);
 
+    const [traderNameRes, farmNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(traderId),
+      this.farmClient.getFarmName(farmId),
+    ]);
+
     const entity = this.productRepo.create({
       traderId,
       farmId,
+      traderDisplayName: settledValue(traderNameRes),
+      farmName: settledValue(farmNameRes),
       name: dto.name,
       cropType: dto.cropType,
       unit: dto.unit,
@@ -204,6 +216,8 @@ export class ProductsService {
       id: entity.id,
       traderId: entity.traderId,
       farmId: entity.farmId ?? undefined,
+      traderDisplayName: entity.traderDisplayName ?? null,
+      farmName: entity.farmName ?? null,
       name: entity.name,
       cropType: entity.cropType,
       unit: entity.unit,

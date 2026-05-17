@@ -331,7 +331,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <Text size="xSmall" style={{ color: colors.text.secondary }}>Vườn liên quan</Text>
                 <Text size="xSmall" style={{ fontWeight: fontWeight.semibold }}>
-                  ...{connection.farmId.slice(-6)}
+                  {connection.farmName ?? `Vườn #${connection.farmId.slice(0, 8)}`}
                 </Text>
               </div>
             )}

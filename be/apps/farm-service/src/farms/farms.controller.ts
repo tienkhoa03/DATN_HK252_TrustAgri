@@ -19,6 +19,7 @@ import {
   Roles,
   CurrentUser,
   JwtPayload,
+  Public,
 } from '@trustagri/shared';
 import { FarmsService } from './farms.service';
 import { ListFarmsQueryDto } from './dto/list-farms-query.dto';
@@ -64,6 +65,7 @@ export class FarmsController {
    * Chi tiết một vườn.
    */
   @Get(':id')
+  @Public()
   @ApiOperation({ summary: 'Get farm details by ID' })
   @ApiResponse({ status: 200, description: 'Farm details returned' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })

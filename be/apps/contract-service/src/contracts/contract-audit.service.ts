@@ -2,12 +2,15 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { ContractAuditLogEntity } from './entities/contract-audit-log.entity';
+import { AuthClientService } from '../clients/auth-client.service';
+import { settledValue } from '../clients/settled.util';
 
 @Injectable()
 export class ContractAuditService {
   constructor(
     @InjectRepository(ContractAuditLogEntity)
     private readonly auditRepo: Repository<ContractAuditLogEntity>,
+    private readonly authClient: AuthClientService,
   ) {}
 
   /**
@@ -23,11 +26,15 @@ export class ContractAuditService {
     const repo = manager
       ? manager.getRepository(ContractAuditLogEntity)
       : this.auditRepo;
+    const nameRes = await Promise.allSettled([
+      this.authClient.getUserDisplayName(actorUserId),
+    ]);
     const row = repo.create({
       contractId,
       previousStatus,
       newStatus,
       actorUserId,
+      actorDisplayName: settledValue(nameRes[0]),
     });
     await repo.save(row);
   }

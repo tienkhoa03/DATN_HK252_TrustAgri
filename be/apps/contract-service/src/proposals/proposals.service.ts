@@ -14,6 +14,9 @@ import { BuyingRequestEntity } from '../buying-requests/entities/buying-request.
 import { ContractEntity } from '../contracts/entities/contract.entity';
 import { ContractAuditService } from '../contracts/contract-audit.service';
 import { ContractsService } from '../contracts/contracts.service';
+import { AuthClientService } from '../clients/auth-client.service';
+import { FarmClientService } from '../clients/farm-client.service';
+import { settledValue } from '../clients/settled.util';
 
 @Injectable()
 export class ProposalsService {
@@ -28,6 +31,8 @@ export class ProposalsService {
     private readonly contractRepo: Repository<ContractEntity>,
     private readonly contractAudit: ContractAuditService,
     private readonly contractsService: ContractsService,
+    private readonly authClient: AuthClientService,
+    private readonly farmClient: FarmClientService,
   ) {}
 
   /**
@@ -97,10 +102,17 @@ export class ProposalsService {
 
     await this.contractsService.assertTraderFarmLinked(traderId, dto.farmId);
 
+    const [traderNameRes, farmNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(traderId),
+      this.farmClient.getFarmName(dto.farmId),
+    ]);
+
     const entity = this.proposalRepo.create({
       buyingRequestId: dto.buyingRequestId,
       traderId,
       farmId: dto.farmId,
+      traderDisplayName: settledValue(traderNameRes),
+      farmName: settledValue(farmNameRes),
       price: dto.price,
       quantity: dto.quantity,
       standardCode: dto.standardCode ?? null,
@@ -199,14 +211,25 @@ export class ProposalsService {
 
     const totalPrice = Number(proposal.price) * Number(proposal.quantity);
 
+    const [traderNameRes, buyerNameRes, farmNameRes] = await Promise.allSettled([
+      this.authClient.getUserDisplayName(proposal.traderId),
+      this.authClient.getUserDisplayName(buyingRequest.buyerId),
+      proposal.farmId
+        ? this.farmClient.getFarmName(proposal.farmId)
+        : Promise.resolve(null),
+    ]);
+
     const contract = this.contractRepo.create({
       contractType: 'trader_buyer',
       partyTraderId: proposal.traderId,
       partyBuyerId: buyingRequest.buyerId,
       partyFarmerId: null,
+      partyTraderName: settledValue(traderNameRes),
+      partyBuyerName: settledValue(buyerNameRes),
       productId: null,
       standardId: null,
       farmId: proposal.farmId,
+      farmName: settledValue(farmNameRes),
       quantity: proposal.quantity,
       unit: buyingRequest.unit,
       totalPrice,
@@ -230,6 +253,8 @@ export class ProposalsService {
       buyingRequestId: entity.buyingRequestId,
       traderId: entity.traderId,
       farmId: entity.farmId ?? undefined,
+      traderDisplayName: entity.traderDisplayName ?? null,
+      farmName: entity.farmName ?? null,
       price: Number(entity.price),
       quantity: Number(entity.quantity),
       standardCode: entity.standardCode ?? undefined,

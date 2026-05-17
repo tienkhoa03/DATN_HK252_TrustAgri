@@ -37,6 +37,9 @@ export class ContractAuditLogEntity {
   @Column({ name: 'actor_user_id', type: 'varchar', nullable: true })
   actorUserId: string | null;
 
+  @Column({ name: 'actor_display_name', type: 'varchar', nullable: true })
+  actorDisplayName: string | null;
+
   @Index('idx_cal_occurred_at')
   @CreateDateColumn({ name: 'occurred_at' })
   occurredAt: Date;
