@@ -113,6 +113,14 @@ export function proposalFarmDisplay(
   return farmDisplayLabel(proposal.farmName, proposal.farmId);
 }
 
+/** Tên vườn gắn hợp đồng — null nếu không có farmId. */
+export function contractFarmDisplay(
+  contract: Pick<ContractDto, 'farmId' | 'farmName'>,
+): string | null {
+  if (!contract.farmId) return null;
+  return farmDisplayLabel(contract.farmName, contract.farmId);
+}
+
 export function productTraderDisplay(
   product: { traderId: string; traderDisplayName?: string | null; traderPhone?: string | null },
 ): string {

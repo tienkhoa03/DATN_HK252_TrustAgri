@@ -80,8 +80,11 @@ const BuyerOrdersScreen = lazy(() =>
 const FarmerDashboardScreen = lazy(() =>
   import('@/screens/farmer/dashboard').then((m) => ({ default: m.FarmerDashboardScreen })),
 );
-const FarmerGardenScreen = lazy(() =>
-  import('@/screens/farmer/garden').then((m) => ({ default: m.FarmerGardenScreen })),
+const FarmerGardenListScreen = lazy(() =>
+  import('@/screens/farmer/garden').then((m) => ({ default: m.FarmerGardenListScreen })),
+);
+const FarmerGardenMonitorScreen = lazy(() =>
+  import('@/screens/farmer/garden').then((m) => ({ default: m.FarmerGardenMonitorScreen })),
 );
 const FarmerTradeScreen = lazy(() =>
   import('@/screens/farmer/trade').then((m) => ({ default: m.FarmerTradeScreen })),
@@ -253,7 +256,8 @@ export function AppRoutes() {
         {/* ── Farmer ────────────────────────────────────────── */}
         <Route path="/farmer" element={<RoleLayout role="farmer" />}>
           <Route index element={<FarmerDashboardScreen />} />
-          <Route path="garden" element={<FarmerGardenScreen />} />
+          <Route path="garden" element={<FarmerGardenListScreen />} />
+          <Route path="garden/:farmId" element={<FarmerGardenMonitorScreen />} />
           <Route path="trade" element={<FarmerTradeScreen />} />
           <Route path="me" element={<FarmerProfileScreen />} />
           <Route path="connections" element={<ConnectionRequestsScreen role="farmer" />} />

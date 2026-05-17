@@ -288,7 +288,11 @@ export class ContractsService {
     return this.toDto(entity);
   }
 
-  async create(dto: CreateContractDto, user: JwtPayload): Promise<ContractDto> {
+  async create(
+    dto: CreateContractDto,
+    user: JwtPayload,
+    authorization?: string,
+  ): Promise<ContractDto> {
     if (user.role === 'trader' && dto.partyTraderId !== user.sub) {
       throw new ForbiddenException('Thương lái chỉ có thể tạo hợp đồng với partyTraderId là chính mình');
     }
@@ -302,13 +306,16 @@ export class ContractsService {
     const partyTraderId =
       user.role === 'trader' ? user.sub : dto.partyTraderId;
 
-    const denorm = await this.resolveContractPartyDenorm({
-      partyFarmerId: dto.partyFarmerId ?? null,
-      partyTraderId,
-      partyBuyerId: dto.partyBuyerId ?? null,
-      farmId: dto.farmId ?? null,
-      standardId: dto.standardId ?? null,
-    });
+    const denorm = await this.resolveContractPartyDenorm(
+      {
+        partyFarmerId: dto.partyFarmerId ?? null,
+        partyTraderId,
+        partyBuyerId: dto.partyBuyerId ?? null,
+        farmId: dto.farmId ?? null,
+        standardId: dto.standardId ?? null,
+      },
+      authorization,
+    );
 
     const entity = this.contractRepo.create({
       partyFarmerId: dto.partyFarmerId ?? null,
@@ -332,6 +339,7 @@ export class ContractsService {
       deposit: dto.deposit ?? null,
       startDate: dto.startDate,
       endDate: dto.endDate,
+      plantingDate: dto.plantingDate ?? null,
       status: 'pending_signature',
       terms: dto.terms,
       orderId: null,
@@ -347,13 +355,16 @@ export class ContractsService {
   }
 
   /** Gọi Auth Service lấy displayName + phone; Farm Service lấy farmName + standardName — ghi vào INSERT. */
-  private async resolveContractPartyDenorm(parties: {
-    partyFarmerId: string | null;
-    partyTraderId: string;
-    partyBuyerId: string | null;
-    farmId: string | null;
-    standardId: string | null;
-  }): Promise<{
+  private async resolveContractPartyDenorm(
+    parties: {
+      partyFarmerId: string | null;
+      partyTraderId: string;
+      partyBuyerId: string | null;
+      farmId: string | null;
+      standardId: string | null;
+    },
+    authorization?: string,
+  ): Promise<{
     partyFarmerName: string | null;
     partyFarmerPhone: string | null;
     partyTraderName: string | null;
@@ -363,6 +374,12 @@ export class ContractsService {
     farmName: string | null;
     standardName: string | null;
   }> {
+    if (parties.standardId && !authorization?.trim()) {
+      this.logger.warn(
+        'Thiếu header Authorization khi denorm standardName — GET /standards/:id trên farm-service yêu cầu JWT',
+      );
+    }
+
     const [farmerSnapRes, traderSnapRes, buyerSnapRes, standardNameRes, farmNameRes] =
       await Promise.allSettled([
         parties.partyFarmerId
@@ -373,10 +390,10 @@ export class ContractsService {
           ? this.authClient.getUserSnapshot(parties.partyBuyerId)
           : Promise.resolve(null),
         parties.standardId
-          ? this.farmClient.getStandardName(parties.standardId)
+          ? this.farmClient.getStandardName(parties.standardId, authorization)
           : Promise.resolve(null),
         parties.farmId
-          ? this.farmClient.getFarmName(parties.farmId)
+          ? this.farmClient.getFarmName(parties.farmId, authorization)
           : Promise.resolve(null),
       ]);
 
@@ -551,6 +568,17 @@ export class ContractsService {
         );
     }
 
+    // Khi cả hai bên ký xong và hợp đồng có plantingDate → cập nhật ngày bắt đầu quy trình cho vườn
+    if (bothSigned && entity.contractType === 'farmer_trader' && entity.farmId && entity.plantingDate) {
+      await this.farmClient
+        .setPlantingDate(entity.farmId, entity.plantingDate)
+        .catch((err) =>
+          this.logger.warn(
+            `setPlantingDate failed for farm ${entity.farmId}: ${(err as Error).message}`,
+          ),
+        );
+    }
+
     // Khi cả hai bên ký xong hợp đồng farmer_trader → tự động đánh dấu kết nối là 'signed'
     if (bothSigned && entity.contractType === 'farmer_trader') {
       await this.connectionsService
@@ -668,6 +696,7 @@ export class ContractsService {
       deposit: entity.deposit !== null ? Number(entity.deposit) : undefined,
       startDate: entity.startDate,
       endDate: entity.endDate,
+      plantingDate: entity.plantingDate ?? null,
       status: entity.status,
       terms: entity.terms,
       farmerSignedAt: entity.farmerSignedAt?.toISOString(),

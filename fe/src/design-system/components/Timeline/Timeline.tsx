@@ -15,6 +15,8 @@ export interface TimelineNode {
   status: 'pending' | 'in-progress' | 'completed' | 'missed' | 'alert-suggested';
   isAlert?: boolean;
   dueDate?: string;
+  dueDayLabel?: string;
+  completedAt?: string;
   onAction?: () => void;
   actionLabel?: string;
 }
@@ -39,6 +41,13 @@ const STATUS_BG: Record<TimelineNode['status'], string> = {
   missed: `${colors.functional.alertRed}18`,
   'alert-suggested': `${colors.functional.warningYellow}22`,
 };
+
+function formatShortDate(iso: string): string {
+  // Hỗ trợ cả YYYY-MM-DD và ISO-8601 đầy đủ
+  const d = iso.length === 10 ? new Date(`${iso}T00:00:00Z`) : new Date(iso);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
+}
 
 export const Timeline: React.FC<TimelineProps> = ({ nodes, className }) => {
   return (
@@ -147,9 +156,19 @@ export const Timeline: React.FC<TimelineProps> = ({ nodes, className }) => {
               {node.description && (
                 <div style={{ fontSize: fontSize.small, color: colors.text.secondary, marginTop: 2 }}>{node.description}</div>
               )}
-              {node.dueDate && (
-                <div style={{ fontSize: fontSize.small, color: colors.text.secondary, marginTop: spacing.xs }}>
-                  Hạn: {node.dueDate}
+              {(node.dueDate || node.dueDayLabel) && (
+                <div style={{
+                  fontSize: fontSize.small,
+                  color: node.status === 'in-progress' ? colors.primary.zaloBlue : colors.text.disabled,
+                  marginTop: spacing.xs,
+                  fontWeight: node.status === 'in-progress' ? fontWeight.medium : undefined,
+                }}>
+                  Dự kiến: {node.dueDate ? formatShortDate(node.dueDate) : node.dueDayLabel}
+                </div>
+              )}
+              {node.status === 'completed' && node.completedAt && (
+                <div style={{ fontSize: fontSize.small, color: colors.primary.agriGreen, marginTop: spacing.xs, fontWeight: fontWeight.medium }}>
+                  ✓ Đã cập nhật · {formatShortDate(node.completedAt)}
                 </div>
               )}
               {node.onAction && node.actionLabel && (
@@ -159,14 +178,14 @@ export const Timeline: React.FC<TimelineProps> = ({ nodes, className }) => {
                   style={{
                     marginTop: spacing.xs,
                     padding: `${spacing.xs} ${spacing.sm}`,
-                    backgroundColor: dotColor,
-                    border: 'none',
+                    backgroundColor: node.status === 'completed' ? 'transparent' : dotColor,
+                    border: node.status === 'completed' ? `1px solid ${dotColor}` : 'none',
                     borderRadius: 4,
                     fontSize: fontSize.small,
                     fontWeight: fontWeight.medium,
                     cursor: 'pointer',
                     minHeight: 32,
-                    color: colors.text.inverse,
+                    color: node.status === 'completed' ? dotColor : colors.text.inverse,
                   }}
                 >
                   {node.actionLabel}

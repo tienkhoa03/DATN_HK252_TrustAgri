@@ -117,7 +117,7 @@ export class ConnectionsController {
 
   /**
    * DELETE /api/v1/connections/:id
-   * Thu hồi yêu cầu kết nối đang pending — chỉ người gửi (fromUserId).
+   * Hủy kết nối (pending hoặc accepted) — cả hai phía đều được phép.
    */
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
@@ -169,21 +169,4 @@ export class ConnectionsController {
     return this.connectionsService.rejectConnection(id, user.sub);
   }
 
-  /**
-   * POST /api/v1/connections/:id/negotiate
-   * Bắt đầu đàm phán hợp tác (accepted → negotiating). Cả hai bên đều được phép.
-   */
-  @Post(':id/negotiate')
-  @HttpCode(HttpStatus.OK)
-  @Roles('farmer', 'trader')
-  @ApiOperation({ summary: 'Move an accepted connection to negotiating status' })
-  @ApiResponse({ status: 200, description: 'Connection moved to negotiating status' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - only parties to the connection' })
-  negotiate(
-    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
-    @CurrentUser() user: JwtPayload,
-  ): Promise<ConnectionDto> {
-    return this.connectionsService.negotiateConnection(id, user.sub);
-  }
 }

@@ -1,6 +1,6 @@
 /**
  * SelectConnectionModal — Chọn nông dân từ danh sách kết nối đã chấp nhận để tạo hợp đồng.
- * Hiển thị các kết nối có status: accepted | negotiating | signed.
+ * Hiển thị các kết nối có status: accepted.
  */
 import React, { useState, useEffect } from 'react';
 import { Text } from 'zmp-ui';
@@ -40,7 +40,7 @@ interface Props {
   onSelected: (info: SelectedConnectionInfo) => void;
 }
 
-const ELIGIBLE_STATUSES = new Set(['accepted', 'negotiating', 'signed']);
+const ELIGIBLE_STATUSES = new Set(['accepted']);
 
 function getFarmerUserId(conn: ConnectionDto): string {
   return conn.fromRole === 'farmer' ? conn.fromUserId : conn.toUserId;

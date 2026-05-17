@@ -43,8 +43,6 @@ function formatViDate(iso: string): string {
 const STAGES: { key: ConnectionStatus; label: string }[] = [
   { key: 'pending', label: 'Chờ phản hồi' },
   { key: 'accepted', label: 'Đã kết nối' },
-  { key: 'negotiating', label: 'Đàm phán' },
-  { key: 'signed', label: 'Đã ký' },
 ];
 
 function stageIndex(status: ConnectionStatus): number {
@@ -137,15 +135,13 @@ export const FarmerConnectionDetailScreen: React.FC = () => {
     pending: colors.functional.warningYellow,
     accepted: colors.primary.agriGreen,
     rejected: colors.functional.alertRed,
-    negotiating: colors.primary.zaloBlue,
-    signed: '#9B59B6',
+    cancelled: colors.text.disabled,
   };
   const statusLabel: Record<ConnectionStatus, string> = {
     pending: 'Chờ phản hồi',
     accepted: 'Đã kết nối',
     rejected: 'Đã từ chối',
-    negotiating: 'Đang đàm phán',
-    signed: 'Đã ký kết',
+    cancelled: 'Đã hủy',
   };
 
   if (!connection) {
@@ -220,7 +216,7 @@ export const FarmerConnectionDetailScreen: React.FC = () => {
       <div style={{ padding: spacing.md, paddingBottom: 80, overflowY: 'auto' }}>
 
         {/* Status progress bar */}
-        {connection.status !== 'rejected' && (
+        {connection.status !== 'rejected' && connection.status !== 'cancelled' && (
           <div
             style={{
               backgroundColor: colors.background.primary,
@@ -383,46 +379,21 @@ export const FarmerConnectionDetailScreen: React.FC = () => {
           </div>
         )}
 
-        {connection.status === 'negotiating' && (
+        {connection.status === 'cancelled' && (
           <div
             style={{
-              backgroundColor: `${colors.primary.zaloBlue}12`,
+              backgroundColor: `${colors.text.disabled}12`,
               borderRadius: 12,
               padding: spacing.md,
               marginBottom: spacing.md,
-              border: `1px solid ${colors.primary.zaloBlue}30`,
+              border: `1px solid ${colors.text.disabled}30`,
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs }}>
-              <Icon name="list" size="sm" color={colors.primary.zaloBlue} />
-              <Text size="small" style={{ fontWeight: fontWeight.semibold, color: colors.primary.zaloBlue }}>
-                Đang trong quá trình đàm phán
-              </Text>
-            </div>
-            <Text size="xSmall" style={{ color: colors.text.secondary }}>
-              Hợp đồng bao tiêu đang chờ ký. Vào tab <strong>Hợp đồng</strong> để xem và ký hợp đồng.
+            <Text size="small" style={{ fontWeight: fontWeight.semibold, color: colors.text.secondary }}>
+              Kết nối đã bị hủy
             </Text>
-          </div>
-        )}
-
-        {connection.status === 'signed' && (
-          <div
-            style={{
-              backgroundColor: '#9B59B612',
-              borderRadius: 12,
-              padding: spacing.md,
-              marginBottom: spacing.md,
-              border: '1px solid #9B59B630',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs }}>
-              <Icon name="star" size="sm" color="#9B59B6" />
-              <Text size="small" style={{ fontWeight: fontWeight.semibold, color: '#9B59B6' }}>
-                Hợp đồng đã được ký kết
-              </Text>
-            </div>
-            <Text size="xSmall" style={{ color: colors.text.secondary }}>
-              Hợp tác đã chính thức xác nhận. Vào tab <strong>Hợp đồng</strong> để theo dõi quá trình thực hiện.
+            <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.xs }}>
+              Kết nối này đã bị hủy. Bạn có thể tìm thương lái mới trong tab Tìm thương lái.
             </Text>
           </div>
         )}
@@ -450,8 +421,8 @@ export const FarmerConnectionDetailScreen: React.FC = () => {
         )}
       </div>
 
-      {/* Sticky action: navigate to contracts tab when negotiating/signed */}
-      {(connection.status === 'negotiating' || connection.status === 'signed') && (
+      {/* Sticky action: navigate to contracts tab when accepted */}
+      {connection.status === 'accepted' && (
         <div
           style={{
             position: 'fixed',

@@ -39,6 +39,7 @@ import {
   partyTraderDisplay,
   proposalTraderDisplay,
   contractPartyDisplay,
+  contractFarmDisplay,
 } from '@/utils/displayLabels';
 import {
   listContracts,
@@ -539,6 +540,11 @@ export const BuyerOrdersScreen: React.FC = () => {
                     <Text size="xSmall" style={{ color: colors.text.secondary }}>
                       Thương lái: {partyTraderDisplay(c)}
                     </Text>
+                    {contractFarmDisplay(c) && (
+                      <Text size="xSmall" style={{ color: colors.text.primary, marginTop: spacing.xs }}>
+                        Vườn: {contractFarmDisplay(c)}
+                      </Text>
+                    )}
                   </div>
                   <span style={statusBadgeStyle(colors.primary.agriGreen)}>
                     {contractStatusLabelVi(c.status)}

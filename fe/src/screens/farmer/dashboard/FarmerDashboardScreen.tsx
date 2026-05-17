@@ -177,8 +177,9 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
   const handleBannerCta = useCallback(() => {
     if (bannerKind === 'iot-alert') navigate('/farmer/alerts');
     else if (bannerKind === 'contract-pending') navigate('/farmer/trade?tab=search');
+    else if (resolvedFarmId) navigate(`/farmer/garden/${resolvedFarmId}`);
     else navigate('/farmer/garden');
-  }, [bannerKind, navigate]);
+  }, [bannerKind, navigate, resolvedFarmId]);
 
   const todoTasks: TodoTask[] = tasks.map(mapTaskToTodo);
 
@@ -243,10 +244,19 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
           tasks={todoTasks}
           loading={planLoading}
           onUpdateTask={(taskId) => {
-            // Navigate to garden with the task pre-selected
-            navigate(`/farmer/garden?section=timeline&step=${taskId}`);
+            if (resolvedFarmId) {
+              navigate(`/farmer/garden/${resolvedFarmId}?step=${taskId}`);
+            } else {
+              navigate('/farmer/garden');
+            }
           }}
-          onViewAll={() => navigate('/farmer/garden?section=timeline')}
+          onViewAll={() => {
+            if (resolvedFarmId) {
+              navigate(`/farmer/garden/${resolvedFarmId}`);
+            } else {
+              navigate('/farmer/garden');
+            }
+          }}
         />
 
         {/* Block 3: KPI chips */}

@@ -59,6 +59,7 @@ export interface ListResponse<T> {
 export interface ListCareLogsParams {
   page?: number;
   limit?: number;
+  standardStepId?: string;
 }
 
 export type CreateCareLogDto = {

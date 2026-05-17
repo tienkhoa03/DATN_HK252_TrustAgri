@@ -19,7 +19,7 @@ import {
   toContractViMessage,
 } from '@/services/contractService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
-import { partyBuyerDisplay, partyFarmerDisplay } from '@/utils/displayLabels';
+import { contractFarmDisplay, partyBuyerDisplay, partyFarmerDisplay } from '@/utils/displayLabels';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
@@ -165,6 +165,7 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
   const timeline = buildTimeline(contract);
   const farmerLine = contract.partyFarmerId ? partyFarmerDisplay(contract) : null;
   const buyerLine = contract.partyBuyerId ? partyBuyerDisplay(contract) : null;
+  const farmLine = contractFarmDisplay(contract);
   const statusColor =
     contract.status === 'active'
       ? colors.primary.agriGreen
@@ -285,6 +286,7 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
           }}
         >
           <Row label="Loại hợp đồng" value={contractTypeLabelVi(contract.contractType)} />
+          {farmLine && <Row label="Vườn" value={farmLine} />}
           {farmerLine && <Row label="Nông dân" value={farmerLine} />}
           {buyerLine && <Row label="Người mua" value={buyerLine} />}
           {contract.standardId && (
@@ -419,15 +421,6 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
           </div>
         )}
 
-        {/* Standard detail sheet */}
-        {showStandardInfo && contract.standardId && (
-          <StandardInfoModal
-            standardId={contract.standardId}
-            standardName={contract.standardName}
-            onClose={() => setShowStandardInfo(false)}
-          />
-        )}
-
         {/* Timeline */}
         <Text.Title size="small" style={{ marginBottom: spacing.md }}>
           Lịch sử
@@ -495,6 +488,14 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
           ))}
         </div>
       </div>
+
+      {showStandardInfo && contract.standardId && (
+        <StandardInfoModal
+          standardId={contract.standardId}
+          standardName={contract.standardName}
+          onClose={() => setShowStandardInfo(false)}
+        />
+      )}
     </div>
   );
 };

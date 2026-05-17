@@ -14,7 +14,7 @@ import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
-import { orderTraderDisplay } from '@/utils/displayLabels';
+import { contractFarmDisplay, orderTraderDisplay } from '@/utils/displayLabels';
 import {
   listOrders,
   orderStatusLabel,
@@ -583,6 +583,11 @@ export const BuyerTransactionHistoryScreen: React.FC = () => {
                       <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: '4px 0 0' }}>
                         {c.productId ? `Sản phẩm #${c.productId.slice(-6)}` : 'Hợp đồng'}
                       </Text>
+                      {contractFarmDisplay(c) && (
+                        <Text size="small" style={{ color: colors.text.primary, margin: '4px 0 0' }}>
+                          Vườn: {contractFarmDisplay(c)}
+                        </Text>
+                      )}
                       <Text size="small" style={{ color: colors.text.secondary, margin: '4px 0 0' }}>
                         {new Date(c.createdAt).toLocaleString('vi-VN')}
                       </Text>

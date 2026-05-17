@@ -123,6 +123,9 @@ export class ContractEntity {
   @Column({ name: 'end_date', type: 'date' })
   endDate: string;
 
+  @Column({ name: 'planting_date', type: 'date', nullable: true })
+  plantingDate: string | null;
+
   @Index('idx_contracts_status')
   @Column({ type: 'varchar', length: 20, default: 'active' })
   status: ContractStatus;

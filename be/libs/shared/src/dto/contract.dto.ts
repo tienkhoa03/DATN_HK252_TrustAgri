@@ -7,6 +7,7 @@ import {
   IsObject,
   IsUUID,
   MaxLength,
+  IsDateString,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -257,6 +258,7 @@ export interface ContractDto {
   deposit?: number;
   startDate: string;
   endDate: string;
+  plantingDate?: string | null;
   status: 'pending_signature' | 'active' | 'pending_change' | 'in_settlement' | 'completed' | 'cancelled';
   terms: string;
   /** ISO timestamp — nông dân đã ký (farmer_trader contracts). */
@@ -327,6 +329,11 @@ export class CreateContractDto {
   @ApiProperty({ description: 'Contract end date (ISO 8601)', example: '2024-09-30' })
   @IsString()
   endDate: string;
+
+  @ApiPropertyOptional({ description: 'Farm care-plan start date (ISO 8601 date)', example: '2024-04-01' })
+  @IsOptional()
+  @IsDateString()
+  plantingDate?: string;
 
   @ApiProperty({ description: 'Contract terms and conditions', example: 'Delivery to warehouse, moisture < 14%, grade A only' })
   @IsString()
@@ -403,7 +410,7 @@ export interface ConnectionDto {
   farmId?: string;
   farmName?: string | null;
   message?: string;
-  status: 'pending' | 'accepted' | 'rejected' | 'negotiating' | 'signed';
+  status: 'pending' | 'accepted' | 'rejected' | 'cancelled';
   createdAt: string;
   respondedAt?: string;
 }

@@ -7,7 +7,11 @@ import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
-import { createCareLog } from '@/services/careLogService';
+import {
+  createCareLogWithEvidence,
+  MAX_EVIDENCE_PHOTOS,
+  pickEvidenceImages,
+} from '@/services/evidenceUploadService';
 
 export interface QuickUpdateSheetProps {
   open: boolean;
@@ -18,7 +22,12 @@ export interface QuickUpdateSheetProps {
   onSuccess?: () => void;
 }
 
-const MAX_PHOTOS = 3;
+function evidenceSnackbarExtra(uploaded: number, failed: number): string {
+  if (uploaded === 0 && failed === 0) return '';
+  if (failed === 0) return ` Đã lưu ${uploaded} ảnh minh chứng.`;
+  if (uploaded === 0) return ' Nhật ký đã lưu nhưng ảnh minh chứng chưa tải được.';
+  return ` Đã lưu ${uploaded}/${uploaded + failed} ảnh minh chứng.`;
+}
 
 export const QuickUpdateSheet: React.FC<QuickUpdateSheetProps> = ({
   open,
@@ -30,32 +39,61 @@ export const QuickUpdateSheet: React.FC<QuickUpdateSheetProps> = ({
 }) => {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [photoCount, setPhotoCount] = useState(0);
+  const [photos, setPhotos] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openSnackbar = useStableOpenSnackbar();
 
+  const resetForm = () => {
+    setNote('');
+    setPhotos([]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handlePickPhotos = async () => {
+    try {
+      const picked = await pickEvidenceImages(MAX_EVIDENCE_PHOTOS);
+      if (picked.length > 0) {
+        setPhotos(picked);
+        return;
+      }
+    } catch {
+      // fallback file input
+    }
+    fileInputRef.current?.click();
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files) setPhotoCount(Math.min(files.length, MAX_PHOTOS));
+    setPhotos(Array.from(e.target.files ?? []).slice(0, MAX_EVIDENCE_PHOTOS));
   };
 
   const handleSubmit = async () => {
     setSubmitting(true);
     try {
-      await createCareLog(farmId, {
-        action: 'inspection',
-        notes: note.trim() || undefined,
-        performedAt: new Date().toISOString(),
-        standardStepId: standardStepId || undefined,
-        clientRecordId: `qu-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      const { evidenceUploaded, evidenceFailed } = await createCareLogWithEvidence(
+        farmId,
+        {
+          action: 'inspection',
+          notes: note.trim() || undefined,
+          performedAt: new Date().toISOString(),
+          standardStepId: standardStepId || undefined,
+          clientRecordId: `qu-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        },
+        photos,
+      );
+      const extra = evidenceSnackbarExtra(evidenceUploaded, evidenceFailed);
+      const hasEvidenceIssue = evidenceFailed > 0 && evidenceUploaded === 0 && photos.length > 0;
+      openSnackbar({
+        type: hasEvidenceIssue ? 'error' : 'success',
+        text: `Cập nhật bước quy trình thành công!${extra}`,
+        duration: hasEvidenceIssue ? 4000 : 2500,
+        icon: true,
       });
-      openSnackbar({ type: 'success', text: 'Cập nhật bước quy trình thành công!', duration: 2500, icon: true });
-      setNote('');
-      setPhotoCount(0);
+      resetForm();
       onSuccess?.();
       onClose();
-    } catch {
-      openSnackbar({ type: 'error', text: 'Không thể ghi nhật ký. Vui lòng thử lại.', duration: 3500, icon: true });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Không thể ghi nhật ký. Vui lòng thử lại.';
+      openSnackbar({ type: 'error', text: msg, duration: 3500, icon: true });
     } finally {
       setSubmitting(false);
     }
@@ -79,7 +117,6 @@ export const QuickUpdateSheet: React.FC<QuickUpdateSheetProps> = ({
         maxHeight: '80vh',
         overflowY: 'auto',
       }}>
-        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
           <span style={{ fontSize: fontSize.h2, fontWeight: fontWeight.semibold, color: colors.text.primary }}>
             Cập nhật bước quy trình
@@ -92,7 +129,6 @@ export const QuickUpdateSheet: React.FC<QuickUpdateSheetProps> = ({
           </button>
         </div>
 
-        {/* Step chip */}
         {stepTitle && (
           <div style={{
             display: 'inline-flex', alignItems: 'center', gap: spacing.xs,
@@ -107,23 +143,22 @@ export const QuickUpdateSheet: React.FC<QuickUpdateSheetProps> = ({
           </div>
         )}
 
-        {/* Photo upload */}
         <div style={{ marginBottom: spacing.md }}>
           <label style={{ display: 'block', fontSize: fontSize.caption, fontWeight: fontWeight.medium, color: colors.text.secondary, marginBottom: spacing.xs }}>
-            Ảnh minh chứng (tối đa {MAX_PHOTOS} ảnh)
+            Ảnh minh chứng (tối đa {MAX_EVIDENCE_PHOTOS} ảnh)
           </label>
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => void handlePickPhotos()}
             style={{
               width: '100%', padding: spacing.sm,
               border: `1px dashed ${colors.background.secondary}`,
               borderRadius: 8, fontSize: fontSize.caption,
-              color: photoCount > 0 ? colors.primary.agriGreen : colors.text.secondary,
+              color: photos.length > 0 ? colors.primary.agriGreen : colors.text.secondary,
               backgroundColor: colors.background.secondary, cursor: 'pointer', minHeight: 44,
             }}
           >
-            📷  {photoCount > 0 ? `Đã chọn ${photoCount} ảnh` : 'Chọn ảnh'}
+            📷  {photos.length > 0 ? `Đã chọn ${photos.length} ảnh` : 'Chọn ảnh'}
           </button>
           <input
             ref={fileInputRef}
@@ -135,7 +170,6 @@ export const QuickUpdateSheet: React.FC<QuickUpdateSheetProps> = ({
           />
         </div>
 
-        {/* Note textarea */}
         <div style={{ marginBottom: spacing.md }}>
           <label style={{ display: 'block', fontSize: fontSize.caption, fontWeight: fontWeight.medium, color: colors.text.secondary, marginBottom: spacing.xs }}>
             Ghi chú
@@ -155,10 +189,9 @@ export const QuickUpdateSheet: React.FC<QuickUpdateSheetProps> = ({
           />
         </div>
 
-        {/* Submit */}
         <button
           type="button"
-          onClick={handleSubmit}
+          onClick={() => void handleSubmit()}
           disabled={submitting}
           style={{
             width: '100%', padding: spacing.md,

@@ -130,8 +130,9 @@ export class ContractsController {
   createContract(
     @Body() dto: CreateContractDto,
     @CurrentUser() user: JwtPayload,
+    @Headers('authorization') authorization?: string,
   ): Promise<ContractDto> {
-    return this.contractsService.create(dto, user);
+    return this.contractsService.create(dto, user, authorization);
   }
 
   /**

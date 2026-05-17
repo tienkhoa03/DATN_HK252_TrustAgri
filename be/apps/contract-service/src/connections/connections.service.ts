@@ -350,7 +350,7 @@ export class ConnectionsService implements OnModuleInit {
       .where('c.fromUserId = :from', { from: userId })
       .andWhere('c.toUserId = :to', { to: dto.toUserId })
       .andWhere('c.status IN (:...statuses)', {
-        statuses: ['pending', 'accepted', 'negotiating', 'signed'],
+        statuses: ['pending', 'accepted'],
       });
 
     if (farmId === null) {
@@ -444,33 +444,6 @@ export class ConnectionsService implements OnModuleInit {
   }
 
   /**
-   * POST /api/v1/connections/:id/negotiate
-   * Bắt đầu đàm phán — chỉ thương lái gửi yêu cầu (fromUserId) hoặc nhận yêu cầu mới được accepted.
-   * Yêu cầu kết nối phải ở trạng thái accepted.
-   */
-  async negotiateConnection(
-    connectionId: string,
-    userId: string,
-  ): Promise<ConnectionDto> {
-    const connection = await this.requireConnection(connectionId);
-    this.ensureParticipant(connection, userId);
-
-    if (connection.status !== 'accepted') {
-      throw new ConflictException(
-        `Chỉ có thể bắt đầu đàm phán khi kết nối ở trạng thái "accepted", hiện tại: "${connection.status}"`,
-      );
-    }
-
-    connection.status = 'negotiating';
-    const saved = await this.connectionRepo.save(connection);
-    const dto = this.toDto(saved);
-
-    await this.publisher.publishConnectionUpdated(dto);
-    this.logger.log(`Connection negotiating: id=${saved.id} by userId=${userId}`);
-    return dto;
-  }
-
-  /**
    * Tự động đặt kết nối farmer↔trader thành 'signed' khi hợp đồng farmer_trader trở thành active.
    * Không throw nếu không tìm thấy kết nối — chỉ log cảnh báo.
    */
@@ -487,7 +460,7 @@ export class ConnectionsService implements OnModuleInit {
         { farmerId, traderId },
       )
       .andWhere('c.status IN (:...statuses)', {
-        statuses: ['accepted', 'negotiating'],
+        statuses: ['accepted'],
       })
       .andWhere('c.deletedAt IS NULL');
 
@@ -495,7 +468,7 @@ export class ConnectionsService implements OnModuleInit {
 
     if (candidates.length === 0) {
       this.logger.warn(
-        `markConnectionSignedByContract: không tìm thấy kết nối accepted/negotiating giữa farmer=${farmerId} trader=${traderId}`,
+        `markConnectionSignedByContract: không tìm thấy kết nối accepted giữa farmer=${farmerId} trader=${traderId}`,
       );
       return;
     }
@@ -505,39 +478,33 @@ export class ConnectionsService implements OnModuleInit {
       (farmId !== null && candidates.find((c) => c.farmId === farmId)) ||
       candidates[0];
 
-    connection.status = 'signed';
-    const saved = await this.connectionRepo.save(connection);
-    const dto = this.toDto(saved);
-
-    await this.publisher.publishConnectionUpdated(dto);
     this.logger.log(
-      `Connection auto-signed by contract: id=${saved.id} farmer=${farmerId} trader=${traderId}`,
+      `Contract signed, connection remains accepted: id=${connection.id} farmer=${farmerId} trader=${traderId}`,
     );
   }
 
   /**
    * DELETE /api/v1/connections/:id
-   * Thu hồi yêu cầu đang pending — chỉ người gửi; xóa mềm để có thể gửi lại sau.
+   * Hủy kết nối (pending hoặc accepted) — cả hai phía đều được phép.
    */
   async deleteConnection(
     connectionId: string,
     userId: string,
   ): Promise<{ success: boolean }> {
     const connection = await this.requireConnection(connectionId);
-    if (connection.fromUserId !== userId) {
-      throw new ForbiddenException(
-        'Chỉ người gửi yêu cầu mới có thể thu hồi',
-      );
+    if (connection.fromUserId !== userId && connection.toUserId !== userId) {
+      throw new ForbiddenException('Chỉ người trong kết nối mới có thể hủy');
     }
-    if (connection.status !== 'pending') {
+    if (connection.status !== 'pending' && connection.status !== 'accepted') {
       throw new ConflictException(
-        'Chỉ có thể hủy yêu cầu đang chờ phản hồi (pending)',
+        `Không thể hủy kết nối ở trạng thái "${connection.status}"`,
       );
     }
-    await this.connectionRepo.softDelete(connectionId);
-    this.logger.log(
-      `Connection withdrawn (soft-deleted): id=${connectionId} by=${userId}`,
-    );
+    connection.status = 'cancelled';
+    const saved = await this.connectionRepo.save(connection);
+    const dto = this.toDto(saved);
+    await this.publisher.publishConnectionUpdated(dto);
+    this.logger.log(`Connection cancelled: id=${connectionId} by=${userId}`);
     return { success: true };
   }
 
@@ -555,14 +522,6 @@ export class ConnectionsService implements OnModuleInit {
     if (connection.toUserId !== userId) {
       throw new ForbiddenException(
         'Chỉ người nhận mới có thể chấp nhận hoặc từ chối yêu cầu kết nối',
-      );
-    }
-  }
-
-  private ensureParticipant(connection: ConnectionEntity, userId: string): void {
-    if (connection.fromUserId !== userId && connection.toUserId !== userId) {
-      throw new ForbiddenException(
-        'Chỉ người tham gia kết nối mới có thể thực hiện thao tác này',
       );
     }
   }

@@ -63,6 +63,7 @@ import {
   orderBuyerDisplay,
   partyBuyerDisplay,
   partyFarmerDisplay,
+  contractFarmDisplay,
 } from '@/utils/displayLabels';
 import { ContractChangeRequestsPanel } from '@/screens/shared/contract-change-requests';
 import { useAtomValue } from 'jotai';
@@ -1442,6 +1443,11 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
                     <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.xs }}>
                       {partyLine}
                     </Text>
+                    {contractFarmDisplay(c) && (
+                      <Text size="xSmall" style={{ color: colors.text.primary, marginTop: spacing.xs }}>
+                        Vườn: {contractFarmDisplay(c)}
+                      </Text>
+                    )}
                   </div>
                   <span
                     style={{

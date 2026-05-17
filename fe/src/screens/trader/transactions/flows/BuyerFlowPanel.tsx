@@ -26,7 +26,7 @@ import {
   type ContractDto,
 } from '@/services/contractService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
-import { orderBuyerDisplay, partyBuyerDisplay } from '@/utils/displayLabels';
+import { contractFarmDisplay, orderBuyerDisplay, partyBuyerDisplay } from '@/utils/displayLabels';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
@@ -292,6 +292,11 @@ const BuyerContractInfoCard: React.FC<{ contract: ContractDto; onTap: () => void
               ? partyBuyerDisplay(contract)
               : '—'}
           </Text.Title>
+          {contractFarmDisplay(contract) && (
+            <Text size="xSmall" style={{ color: colors.text.primary, fontSize: fontSize.caption, marginTop: 2 }}>
+              Vườn: {contractFarmDisplay(contract)}
+            </Text>
+          )}
           <Text size="xSmall" style={{ color: colors.text.secondary, fontSize: fontSize.caption }}>
             {new Date(contract.startDate).toLocaleDateString('vi-VN')} —{' '}
             {new Date(contract.endDate).toLocaleDateString('vi-VN')}

@@ -15,6 +15,11 @@ export class FarmClientService {
     );
   }
 
+  private forwardAuth(authorization?: string): Record<string, string> | undefined {
+    const value = authorization?.trim();
+    return value ? { Authorization: value } : undefined;
+  }
+
   async applyStandardToFarm(farmId: string, standardId: string): Promise<void> {
     const base = this.farmBase();
     const url = `${base}/api/v1/farms/${farmId}/standard`;
@@ -35,11 +40,38 @@ export class FarmClientService {
     }
   }
 
-  async getFarmName(farmId: string): Promise<string | null> {
+  async setPlantingDate(farmId: string, plantingDate: string): Promise<void> {
+    const base = this.farmBase();
+    const url = `${base}/api/v1/farms/${farmId}/planting-date`;
+    try {
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plantingDate }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) {
+        this.logger.warn(`farm PATCH /farms/${farmId}/planting-date → ${res.status}`);
+      }
+    } catch (err) {
+      this.logger.warn(
+        `farm setPlantingDate ${farmId} thất bại: ${(err as Error).message}`,
+      );
+    }
+  }
+
+  async getFarmName(
+    farmId: string,
+    authorization?: string,
+  ): Promise<string | null> {
     const base = this.farmBase();
     const url = `${base}/api/v1/farms/${farmId}`;
+    const headers = this.forwardAuth(authorization);
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(3000),
+        ...(headers ? { headers } : {}),
+      });
       if (!res.ok) {
         this.logger.warn(`farm GET /farms/${farmId} → ${res.status}`);
         return null;
@@ -54,11 +86,18 @@ export class FarmClientService {
     }
   }
 
-  async getStandardName(standardId: string): Promise<string | null> {
+  async getStandardName(
+    standardId: string,
+    authorization?: string,
+  ): Promise<string | null> {
     const base = this.farmBase();
     const url = `${base}/api/v1/standards/${standardId}`;
+    const headers = this.forwardAuth(authorization);
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      const res = await fetch(url, {
+        signal: AbortSignal.timeout(3000),
+        ...(headers ? { headers } : {}),
+      });
       if (!res.ok) {
         this.logger.warn(`farm GET /standards/${standardId} → ${res.status}`);
         return null;

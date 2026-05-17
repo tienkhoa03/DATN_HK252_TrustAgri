@@ -27,7 +27,8 @@
       "Bash(xargs grep -l \"standard\")",
       "Bash(xargs grep -l \"farm.*standard\\\\|standard.*farm\")",
       "Bash(xargs grep -l \"ContractDto\\\\|contractStatusLabelVi\\\\|contractTypeLabelVi\")",
-      "Bash(powershell *)"
+      "Bash(powershell *)",
+      "Bash(xargs grep -l \"export.*CreateContractDto\")"
     ]
   }
 }

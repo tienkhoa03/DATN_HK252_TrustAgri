@@ -21,7 +21,7 @@ import {
   type ContractDto,
 } from '@/services/contractService';
 import { productDisplayName } from '@/services/orderService';
-import { partyTraderDisplay } from '@/utils/displayLabels';
+import { contractFarmDisplay, partyTraderDisplay } from '@/utils/displayLabels';
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
@@ -137,6 +137,11 @@ export const BuyerLiveMonitorScreen: React.FC = () => {
                 <Text size="xSmall" style={{ color: colors.text.secondary, margin: `${spacing.xs} 0 0` }}>
                   {partyTraderDisplay(c)}
                 </Text>
+                {contractFarmDisplay(c) && (
+                  <Text size="xSmall" style={{ color: colors.text.primary, margin: `${spacing.xs} 0 0` }}>
+                    Vườn: {contractFarmDisplay(c)}
+                  </Text>
+                )}
               </div>
               <span
                 style={{

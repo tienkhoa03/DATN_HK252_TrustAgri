@@ -69,6 +69,7 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
   const [deposit, setDeposit] = useState('');
   const [startDate, setStartDate] = useState(todayStr);
   const [endDate, setEndDate] = useState(oneYearLaterStr);
+  const [plantingDate, setPlantingDate] = useState('');
   const [terms, setTerms] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -126,6 +127,7 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
         deposit: deposit ? Number(deposit) : undefined,
         startDate,
         endDate,
+        plantingDate: plantingDate || undefined,
         terms:
           terms.trim() ||
           `Hợp đồng bao tiêu với ${userDisplayLabel(farmerDisplayName, farmerUserId, 'Nông dân', farmerPhone)}`,
@@ -250,6 +252,21 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
             </Text>
           )}
         </FormField>
+
+        {/* Ngày bắt đầu quy trình — chỉ hiển thị khi đã chọn tiêu chuẩn */}
+        {standardId && (
+          <FormField label="Ngày bắt đầu quy trình (tùy chọn)">
+            <input
+              type="date"
+              value={plantingDate}
+              onChange={(e) => setPlantingDate(e.target.value)}
+              style={inputStyle()}
+            />
+            <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: 4 }}>
+              Ngày nông dân bắt đầu thực hiện quy trình sản xuất theo tiêu chuẩn.
+            </Text>
+          </FormField>
+        )}
 
         {/* Quantity + Unit */}
         <FormField label="Số lượng *">

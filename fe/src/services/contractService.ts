@@ -46,6 +46,7 @@ export interface ContractDto {
   deposit?: number;
   startDate: string;
   endDate: string;
+  plantingDate?: string | null;
   status: 'pending_signature' | 'active' | 'pending_change' | 'completed' | 'cancelled';
   terms: string;
   farmerSignedAt?: string;
@@ -148,12 +149,22 @@ export interface CreateContractDto {
   deposit?: number;
   startDate: string;
   endDate: string;
+  plantingDate?: string;
   terms: string;
 }
 
 function normalizeContract(raw: ContractDto): ContractDto {
+  const r = raw as unknown as Record<string, unknown>;
   return {
     ...raw,
+    farmName:
+      raw.farmName ??
+      (typeof r.farm_name === 'string' ? r.farm_name : null) ??
+      null,
+    standardName:
+      raw.standardName ??
+      (typeof r.standard_name === 'string' ? r.standard_name : null) ??
+      null,
     quantity: Number(raw.quantity),
     totalPrice: Number(raw.totalPrice),
     deposit: raw.deposit != null ? Number(raw.deposit) : undefined,

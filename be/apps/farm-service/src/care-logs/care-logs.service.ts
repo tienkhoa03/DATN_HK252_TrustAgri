@@ -5,7 +5,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Repository } from 'typeorm';
+import { Between, FindOptionsWhere, Repository } from 'typeorm';
 import {
   CareLogDto,
   CareLogSyncResponse,
@@ -52,8 +52,11 @@ export class CareLogsService {
     const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
 
+    const where: FindOptionsWhere<CareLogEntity> = { farmId };
+    if (query.standardStepId) where.standardStepId = query.standardStepId;
+
     const [rows, total] = await this.careLogRepo.findAndCount({
-      where: { farmId },
+      where,
       relations: ['evidences'],
       order: { performedAt: 'DESC' },
       skip,

@@ -51,16 +51,14 @@ const STATUS_LABEL: Record<ConnectionDto['status'], string> = {
   pending: 'Chờ phản hồi',
   accepted: 'Đã kết nối',
   rejected: 'Đã từ chối',
-  negotiating: 'Đang đàm phán',
-  signed: 'Đã ký kết',
+  cancelled: 'Đã hủy',
 };
 
 const STATUS_COLOR: Record<ConnectionDto['status'], string> = {
   pending: colors.functional.warningYellow,
   accepted: colors.primary.agriGreen,
   rejected: colors.functional.alertRed,
-  negotiating: colors.primary.zaloBlue,
-  signed: '#9B59B6',
+  cancelled: colors.text.disabled,
 };
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -358,7 +356,7 @@ export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> =
             ) : (
               outgoing.map((conn) => {
                 const name = counterpartLabel(conn, role, 'outgoing');
-                const isClickable = conn.status === 'accepted' || conn.status === 'negotiating' || conn.status === 'signed';
+                const isClickable = conn.status === 'accepted';
                 const detailPath = role === 'trader'
                   ? `/trader/connections/${conn.id}`
                   : `/farmer/connections/${conn.id}`;
@@ -409,21 +407,10 @@ export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> =
                             <Icon name="chevron-right" size="sm" color={colors.text.secondary} />
                           </div>
                         )}
-                        {conn.status === 'negotiating' && (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs }}>
-                            <Text size="xSmall" style={{ color: colors.primary.zaloBlue }}>
-                              📋 Đang đàm phán — nhấn để xem chi tiết
-                            </Text>
-                            <Icon name="chevron-right" size="sm" color={colors.text.secondary} />
-                          </div>
-                        )}
-                        {conn.status === 'signed' && (
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs }}>
-                            <Text size="xSmall" style={{ color: '#9B59B6' }}>
-                              ✍️ Đã ký kết hợp đồng
-                            </Text>
-                            <Icon name="chevron-right" size="sm" color={colors.text.secondary} />
-                          </div>
+                        {conn.status === 'cancelled' && (
+                          <Text size="xSmall" style={{ color: colors.text.disabled, marginTop: spacing.xs }}>
+                            Kết nối đã bị hủy
+                          </Text>
                         )}
                         {conn.status === 'rejected' && (
                           <Text size="xSmall" style={{ color: colors.functional.alertRed, marginTop: spacing.xs }}>

@@ -32,6 +32,11 @@ class ApplyStandardDto {
   standardId: string;
 }
 
+class SetPlantingDateDto {
+  @IsString()
+  plantingDate: string;
+}
+
 @ApiTags('farms')
 @ApiBearerAuth()
 @Controller('farms')
@@ -115,6 +120,22 @@ export class FarmsController {
     @Body() dto: ApplyStandardDto,
   ): Promise<void> {
     return this.farmsService.applyStandard(id, dto.standardId);
+  }
+
+  /**
+   * PATCH /api/v1/farms/:id/planting-date
+   * Cập nhật ngày bắt đầu quy trình cho vườn khi hợp đồng được ký — gọi nội bộ từ contract-service.
+   */
+  @Patch(':id/planting-date')
+  @Public()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Set farm planting date (internal, called by contract-service on sign)' })
+  @ApiResponse({ status: 204, description: 'Planting date set' })
+  async setPlantingDate(
+    @Param('id') id: string,
+    @Body() dto: SetPlantingDateDto,
+  ): Promise<void> {
+    return this.farmsService.setPlantingDate(id, dto.plantingDate);
   }
 
   /**

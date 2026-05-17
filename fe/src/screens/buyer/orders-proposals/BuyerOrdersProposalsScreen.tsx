@@ -19,7 +19,12 @@ import { EmptyState } from '../../../design-system/components/EmptyState';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
-import { partyTraderDisplay, proposalTraderDisplay, orderTraderDisplay } from '@/utils/displayLabels';
+import {
+  contractFarmDisplay,
+  partyTraderDisplay,
+  proposalTraderDisplay,
+  orderTraderDisplay,
+} from '@/utils/displayLabels';
 import {
   listProposals,
   acceptProposal,
@@ -693,6 +698,11 @@ export const BuyerOrdersProposalsScreen: React.FC<BuyerOrdersProposalsScreenProp
                     <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.xs }}>
                       {traderLine}
                     </Text>
+                    {contractFarmDisplay(c) && (
+                      <Text size="xSmall" style={{ color: colors.text.primary, marginTop: spacing.xs }}>
+                        Vườn: {contractFarmDisplay(c)}
+                      </Text>
+                    )}
                   </div>
                   <span style={statusBadgeStyle(cColor)}>{contractStatusLabelVi(c.status)}</span>
                 </div>
