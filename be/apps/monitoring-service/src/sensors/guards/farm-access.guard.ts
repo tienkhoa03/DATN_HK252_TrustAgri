@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
-import { JwtPayload } from '@trustagri/shared';
+import { JwtPayload, resolveServiceUrl, SERVICE_URL_KEYS } from '@trustagri/shared';
 
 /**
  * Kiểm soát truy cập dữ liệu cảm biến của một vườn.
@@ -80,9 +80,9 @@ export class FarmAccessGuard implements CanActivate {
     userId: string,
     authorization?: string | string[],
   ): Promise<boolean> {
-    const baseUrl = this.config.get<string>(
-      'FARM_SERVICE_URL',
-      'http://farm-service:3003',
+    const baseUrl = resolveServiceUrl(
+      this.config.get<string>(SERVICE_URL_KEYS.FARM),
+      SERVICE_URL_KEYS.FARM,
     );
     try {
       const res = await fetch(`${baseUrl}/api/v1/farms/${farmId}`, {
@@ -106,9 +106,9 @@ export class FarmAccessGuard implements CanActivate {
     traderId: string,
     authorization?: string | string[],
   ): Promise<boolean> {
-    const baseUrl = this.config.get<string>(
-      'CONTRACT_SERVICE_URL',
-      'http://contract-service:3004',
+    const baseUrl = resolveServiceUrl(
+      this.config.get<string>(SERVICE_URL_KEYS.CONTRACT),
+      SERVICE_URL_KEYS.CONTRACT,
     );
     try {
       const url = `${baseUrl}/api/v1/contracts?farmId=${farmId}&traderId=${traderId}&status=active&limit=1`;
@@ -142,9 +142,9 @@ export class FarmAccessGuard implements CanActivate {
     buyerId: string,
     authorization?: string | string[],
   ): Promise<boolean> {
-    const baseUrl = this.config.get<string>(
-      'CONTRACT_SERVICE_URL',
-      'http://contract-service:3004',
+    const baseUrl = resolveServiceUrl(
+      this.config.get<string>(SERVICE_URL_KEYS.CONTRACT),
+      SERVICE_URL_KEYS.CONTRACT,
     );
     try {
       // Kiểm tra hợp đồng active

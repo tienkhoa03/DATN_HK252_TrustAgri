@@ -108,6 +108,7 @@ services:
       PORT: 3003
       POSTGRES_HOST: postgres
       AUTH_SERVICE_URL: http://auth-service:3001
+      CONTRACT_SERVICE_URL: http://contract-service:3004
       MONITORING_SERVICE_URL: http://monitoring-service:3005
     ports:
       - '3003:3003'
@@ -150,6 +151,7 @@ services:
       REDIS_HOST: redis
       AUTH_SERVICE_URL: http://auth-service:3001
       FARM_SERVICE_URL: http://farm-service:3003
+      CONTRACT_SERVICE_URL: http://contract-service:3004
       INFLUXDB_URL: http://influxdb:8086
     ports:
       - '3005:3005'

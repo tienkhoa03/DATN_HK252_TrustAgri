@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { resolveServiceUrl, SERVICE_URL_KEYS } from '@trustagri/shared';
 
 @Injectable()
 export class FarmClientService {
@@ -8,9 +9,10 @@ export class FarmClientService {
   constructor(private readonly config: ConfigService) {}
 
   async getFarmName(farmId: string): Promise<string | null> {
-    const base = this.config
-      .get<string>('FARM_SERVICE_URL', 'http://localhost:3003')
-      .replace(/\/$/, '');
+    const base = resolveServiceUrl(
+      this.config.get<string>(SERVICE_URL_KEYS.FARM),
+      SERVICE_URL_KEYS.FARM,
+    );
     const url = `${base}/api/v1/farms/${farmId}`;
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(3000) });

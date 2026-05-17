@@ -17,6 +17,8 @@ import {
   JwtPayload,
   BuyerTransactionSummaryDto,
   FarmDto,
+  resolveServiceUrl,
+  SERVICE_URL_KEYS,
 } from '@trustagri/shared';
 import { ContractEntity } from './entities/contract.entity';
 import { ContractQueryDto } from './dto/contract-query.dto';
@@ -89,9 +91,9 @@ export class ContractsService {
       return [];
     }
 
-    const farmBase = this.config.get<string>(
-      'FARM_SERVICE_URL',
-      'http://farm-service:3003',
+    const farmBase = resolveServiceUrl(
+      this.config.get<string>(SERVICE_URL_KEYS.FARM),
+      SERVICE_URL_KEYS.FARM,
     );
     const headers: Record<string, string> = {
       Accept: 'application/json',
@@ -305,6 +307,7 @@ export class ContractsService {
       partyTraderId,
       partyBuyerId: dto.partyBuyerId ?? null,
       farmId: dto.farmId ?? null,
+      standardId: dto.standardId ?? null,
     });
 
     const entity = this.contractRepo.create({
@@ -322,6 +325,7 @@ export class ContractsService {
       standardId: dto.standardId ?? null,
       farmId: dto.farmId ?? null,
       farmName: denorm.farmName,
+      standardName: denorm.standardName,
       quantity: dto.quantity,
       unit: dto.unit,
       totalPrice: dto.totalPrice,
@@ -342,12 +346,13 @@ export class ContractsService {
     return this.toDto(saved);
   }
 
-  /** Gọi Auth Service lấy displayName + phone; Farm Service lấy farmName — ghi vào INSERT. */
+  /** Gọi Auth Service lấy displayName + phone; Farm Service lấy farmName + standardName — ghi vào INSERT. */
   private async resolveContractPartyDenorm(parties: {
     partyFarmerId: string | null;
     partyTraderId: string;
     partyBuyerId: string | null;
     farmId: string | null;
+    standardId: string | null;
   }): Promise<{
     partyFarmerName: string | null;
     partyFarmerPhone: string | null;
@@ -356,8 +361,9 @@ export class ContractsService {
     partyBuyerName: string | null;
     partyBuyerPhone: string | null;
     farmName: string | null;
+    standardName: string | null;
   }> {
-    const [farmerSnapRes, traderSnapRes, buyerSnapRes, farmNameRes] =
+    const [farmerSnapRes, traderSnapRes, buyerSnapRes, standardNameRes, farmNameRes] =
       await Promise.allSettled([
         parties.partyFarmerId
           ? this.authClient.getUserSnapshot(parties.partyFarmerId)
@@ -365,6 +371,9 @@ export class ContractsService {
         this.authClient.getUserSnapshot(parties.partyTraderId),
         parties.partyBuyerId
           ? this.authClient.getUserSnapshot(parties.partyBuyerId)
+          : Promise.resolve(null),
+        parties.standardId
+          ? this.farmClient.getStandardName(parties.standardId)
           : Promise.resolve(null),
         parties.farmId
           ? this.farmClient.getFarmName(parties.farmId)
@@ -387,6 +396,7 @@ export class ContractsService {
       partyBuyerName: buyerSnap?.displayName ?? null,
       partyBuyerPhone: buyerSnap?.phone ?? null,
       farmName: settledValue(farmNameRes),
+      standardName: settledValue(standardNameRes),
     };
   }
 
@@ -651,6 +661,7 @@ export class ContractsService {
       standardId: entity.standardId ?? undefined,
       farmId: entity.farmId ?? undefined,
       farmName: entity.farmName ?? null,
+      standardName: entity.standardName ?? null,
       quantity: Number(entity.quantity),
       unit: entity.unit,
       totalPrice: Number(entity.totalPrice),

@@ -1,4 +1,5 @@
 import { registerAs } from '@nestjs/config';
+import { resolveInfluxUrl } from './service-urls.config';
 
 export const databaseConfig = registerAs('database', () => ({
   host: process.env.POSTGRES_HOST ?? 'localhost',
@@ -14,7 +15,7 @@ export const redisConfig = registerAs('redis', () => ({
 }));
 
 export const influxConfig = registerAs('influx', () => ({
-  url: process.env.INFLUXDB_URL ?? 'http://localhost:8086',
+  url: resolveInfluxUrl(process.env.INFLUXDB_URL),
   token: process.env.INFLUXDB_TOKEN,
   org: process.env.INFLUXDB_ORG ?? 'trustagri',
   bucket: process.env.INFLUXDB_BUCKET ?? 'sensor_data',

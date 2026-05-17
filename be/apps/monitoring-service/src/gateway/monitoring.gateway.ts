@@ -11,7 +11,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Logger, UseGuards } from '@nestjs/common';
 import { WsJwtGuard } from './guards/ws-jwt.guard';
-import { corsOrigins } from '@trustagri/shared';
+import { corsOrigins, serviceUrlFromEnv, SERVICE_URL_KEYS } from '@trustagri/shared';
 import type { JwtPayload } from '@trustagri/shared';
 
 /**
@@ -82,7 +82,7 @@ export class MonitoringGateway
 
     // Farm owner check via farm-service
     try {
-      const farmServiceUrl = process.env.FARM_SERVICE_URL ?? 'http://farm-service:3003';
+      const farmServiceUrl = serviceUrlFromEnv(SERVICE_URL_KEYS.FARM);
       const res = await fetch(`${farmServiceUrl}/api/v1/farms/${farmId}`, {
         signal: AbortSignal.timeout(3000),
         headers,
@@ -98,7 +98,7 @@ export class MonitoringGateway
 
     // Contract / order check via contract-service
     try {
-      const contractServiceUrl = process.env.CONTRACT_SERVICE_URL ?? 'http://contract-service:3004';
+      const contractServiceUrl = serviceUrlFromEnv(SERVICE_URL_KEYS.CONTRACT);
       const url = `${contractServiceUrl}/api/v1/contracts?farmId=${farmId}&status=active&limit=1`;
       const res = await fetch(url, { signal: AbortSignal.timeout(3000), headers });
       if (res.ok) {

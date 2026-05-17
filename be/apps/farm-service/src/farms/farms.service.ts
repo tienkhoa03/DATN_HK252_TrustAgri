@@ -8,7 +8,14 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
-import { FarmDto, CreateFarmDto, UpdateFarmDto, ListResponse } from '@trustagri/shared';
+import {
+  FarmDto,
+  CreateFarmDto,
+  UpdateFarmDto,
+  ListResponse,
+  resolveServiceUrl,
+  SERVICE_URL_KEYS,
+} from '@trustagri/shared';
 import { FarmEntity } from './entities/farm.entity';
 import { ListFarmsQueryDto } from './dto/list-farms-query.dto';
 import { AuthClientService } from '../clients/auth-client.service';
@@ -155,9 +162,9 @@ export class FarmsService {
    * Gọi sang contract-service; nếu service chưa sẵn sàng thì bỏ qua (fail-open).
    */
   private async checkNoActiveContracts(farmId: string): Promise<void> {
-    const contractServiceUrl = this.configService.get<string>(
-      'CONTRACT_SERVICE_URL',
-      'http://contract-service:3004',
+    const contractServiceUrl = resolveServiceUrl(
+      this.configService.get<string>(SERVICE_URL_KEYS.CONTRACT),
+      SERVICE_URL_KEYS.CONTRACT,
     );
 
     try {

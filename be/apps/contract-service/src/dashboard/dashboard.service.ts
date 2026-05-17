@@ -18,6 +18,8 @@ import {
   FarmDto,
   JwtPayload,
   ListResponse,
+  resolveServiceUrl,
+  SERVICE_URL_KEYS,
 } from '@trustagri/shared';
 import { OrderEntity } from '../orders/entities/order.entity';
 import { BuyingRequestEntity } from '../buying-requests/entities/buying-request.entity';
@@ -191,13 +193,13 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
     const { from, to, periodFrom, periodTo } = this.defaultPeriod();
     const authHeaders = this.forwardAuth(authorization);
 
-    const farmBase = this.config.get<string>(
-      'FARM_SERVICE_URL',
-      'http://farm-service:3003',
+    const farmBase = resolveServiceUrl(
+      this.config.get<string>(SERVICE_URL_KEYS.FARM),
+      SERVICE_URL_KEYS.FARM,
     );
-    const monitoringBase = this.config.get<string>(
-      'MONITORING_SERVICE_URL',
-      'http://monitoring-service:3005',
+    const monitoringBase = resolveServiceUrl(
+      this.config.get<string>(SERVICE_URL_KEYS.MONITORING),
+      SERVICE_URL_KEYS.MONITORING,
     );
 
     const activeContracts = await this.contractRepo.count({

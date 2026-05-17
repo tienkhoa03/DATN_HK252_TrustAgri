@@ -25,7 +25,9 @@
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(Select-String \"fe/src\")",
       "Bash(xargs grep -l \"standard\")",
-      "Bash(xargs grep -l \"farm.*standard\\\\|standard.*farm\")"
+      "Bash(xargs grep -l \"farm.*standard\\\\|standard.*farm\")",
+      "Bash(xargs grep -l \"ContractDto\\\\|contractStatusLabelVi\\\\|contractTypeLabelVi\")",
+      "Bash(powershell *)"
     ]
   }
 }

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InfluxDB, QueryApi } from '@influxdata/influxdb-client';
-import { SensorReadingDto } from '@trustagri/shared';
+import { resolveInfluxUrl, SensorReadingDto } from '@trustagri/shared';
 
 /** Đơn vị mặc định theo loại cảm biến */
 const UNIT_MAP: Record<string, string> = {
@@ -25,7 +25,7 @@ export class InfluxSensorService {
   private readonly bucket: string;
 
   constructor(private readonly config: ConfigService) {
-    const url = config.get<string>('INFLUXDB_URL', 'http://localhost:8086');
+    const url = resolveInfluxUrl(config.get<string>('INFLUXDB_URL'));
     const token = config.get<string>('INFLUXDB_TOKEN', '');
     const org = config.get<string>('INFLUXDB_ORG', 'trustagri');
     this.bucket = config.get<string>('INFLUXDB_BUCKET', 'sensor_data');

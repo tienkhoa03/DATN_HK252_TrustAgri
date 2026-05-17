@@ -285,6 +285,11 @@ const ContractInfoCard: React.FC<{ contract: ContractDto; onTap: () => void }> =
             {new Date(contract.startDate).toLocaleDateString('vi-VN')} —{' '}
             {new Date(contract.endDate).toLocaleDateString('vi-VN')}
           </Text>
+          {contract.standardName && (
+            <Text size="xSmall" style={{ color: colors.primary.agriGreen, fontSize: fontSize.caption, marginTop: 2 }}>
+              📋 {contract.standardName}
+            </Text>
+          )}
         </div>
         <span
           style={{

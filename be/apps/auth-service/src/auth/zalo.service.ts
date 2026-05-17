@@ -1,4 +1,6 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { resolveZaloGraphMeUrl } from '@trustagri/shared';
 
 export interface ZaloUserInfo {
   id: string;
@@ -17,15 +19,20 @@ export interface ZaloUserInfo {
 @Injectable()
 export class ZaloService {
   private readonly logger = new Logger(ZaloService.name);
-  private readonly ZALO_API_URL =
-    'https://graph.zalo.me/v2.0/me?fields=id,name,picture';
+  private readonly zaloGraphMeUrl: string;
+
+  constructor(private readonly config: ConfigService) {
+    this.zaloGraphMeUrl = resolveZaloGraphMeUrl(
+      this.config.get<string>('ZALO_GRAPH_ME_URL'),
+    );
+  }
 
   async getUserInfo(zaloAccessToken: string): Promise<ZaloUserInfo> {
     let response: Response;
     try {
       // access_token goes in the query string — this is Zalo's documented method
       // and avoids leaking the token in proxy/load-balancer access logs
-      const url = `${this.ZALO_API_URL}&access_token=${encodeURIComponent(zaloAccessToken)}`;
+      const url = `${this.zaloGraphMeUrl}&access_token=${encodeURIComponent(zaloAccessToken)}`;
       response = await fetch(url);
     } catch (err) {
       this.logger.error('Lỗi kết nối tới Zalo API', err);

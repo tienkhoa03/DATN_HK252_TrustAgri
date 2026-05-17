@@ -6,7 +6,11 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { TraceabilityDto } from '@trustagri/shared';
+import {
+  TraceabilityDto,
+  resolveServiceUrl,
+  SERVICE_URL_KEYS,
+} from '@trustagri/shared';
 import { FarmEntity } from '../farms/entities/farm.entity';
 import { CareLogEntity } from '../care-logs/entities/care-log.entity';
 import { StandardEntity } from '../standards/entities/standard.entity';
@@ -87,9 +91,9 @@ export class TraceabilityService {
   private async fetchSensorChart(
     farmId: string,
   ): Promise<TraceabilityDto['sensorChart']> {
-    const base = this.configService.get<string>(
-      'MONITORING_SERVICE_URL',
-      'http://monitoring-service:3005',
+    const base = resolveServiceUrl(
+      this.configService.get<string>(SERVICE_URL_KEYS.MONITORING),
+      SERVICE_URL_KEYS.MONITORING,
     );
     const to = new Date();
     const from = new Date(to.getTime() - 7 * 24 * 60 * 60 * 1000);

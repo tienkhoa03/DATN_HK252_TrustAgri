@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { UserDenormSnapshot } from '@trustagri/shared';
+import {
+  resolveServiceUrl,
+  SERVICE_URL_KEYS,
+  type UserDenormSnapshot,
+} from '@trustagri/shared';
 
 @Injectable()
 export class AuthClientService {
@@ -9,9 +13,10 @@ export class AuthClientService {
   constructor(private readonly config: ConfigService) {}
 
   async getUserSnapshot(userId: string): Promise<UserDenormSnapshot> {
-    const base = this.config
-      .get<string>('AUTH_SERVICE_URL', 'http://localhost:3001')
-      .replace(/\/$/, '');
+    const base = resolveServiceUrl(
+      this.config.get<string>(SERVICE_URL_KEYS.AUTH),
+      SERVICE_URL_KEYS.AUTH,
+    );
     const url = `${base}/api/v1/auth/users/${userId}`;
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(3000) });

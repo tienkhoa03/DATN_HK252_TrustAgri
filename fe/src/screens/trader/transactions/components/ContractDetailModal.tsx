@@ -4,6 +4,7 @@
  */
 import React, { useState } from 'react';
 import { Modal, Text } from 'zmp-ui';
+import { StandardInfoModal } from '@/screens/shared/standards/StandardInfoModal';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
@@ -96,6 +97,7 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
+  const [showStandardInfo, setShowStandardInfo] = useState(false);
 
   if (!visible) return null;
 
@@ -285,6 +287,13 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
           <Row label="Loại hợp đồng" value={contractTypeLabelVi(contract.contractType)} />
           {farmerLine && <Row label="Nông dân" value={farmerLine} />}
           {buyerLine && <Row label="Người mua" value={buyerLine} />}
+          {contract.standardId && (
+            <ClickableRow
+              label="Tiêu chuẩn"
+              value={contract.standardName ?? contract.standardId.slice(0, 8) + '…'}
+              onClick={() => setShowStandardInfo(true)}
+            />
+          )}
           <Row label="Hiệu lực từ" value={formatDate(contract.startDate)} />
           <Row label="Đến ngày" value={formatDate(contract.endDate)} />
           <Row label="Khối lượng" value={`${contract.quantity} ${contract.unit}`} />
@@ -410,6 +419,15 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
           </div>
         )}
 
+        {/* Standard detail sheet */}
+        {showStandardInfo && contract.standardId && (
+          <StandardInfoModal
+            standardId={contract.standardId}
+            standardName={contract.standardName}
+            onClose={() => setShowStandardInfo(false)}
+          />
+        )}
+
         {/* Timeline */}
         <Text.Title size="small" style={{ marginBottom: spacing.md }}>
           Lịch sử
@@ -489,6 +507,32 @@ const Row: React.FC<{ label: string; value: string }> = ({ label, value }) => (
     <Text size="small" style={{ fontWeight: fontWeight.medium, fontSize: fontSize.caption }}>
       {value}
     </Text>
+  </div>
+);
+
+const ClickableRow: React.FC<{ label: string; value: string; onClick: () => void }> = ({ label, value, onClick }) => (
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
+    <Text size="xSmall" style={{ color: colors.text.secondary, fontSize: fontSize.caption }}>
+      {label}
+    </Text>
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        background: 'none',
+        border: 'none',
+        cursor: 'pointer',
+        padding: 0,
+        color: colors.primary.zaloBlue,
+        fontSize: fontSize.caption,
+        fontWeight: fontWeight.semibold,
+        textDecoration: 'underline',
+        textDecorationStyle: 'dotted',
+        minHeight: 24,
+      }}
+    >
+      {value}
+    </button>
   </div>
 );
 

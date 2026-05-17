@@ -16,6 +16,8 @@ import {
   ListResponse,
   SensorReadingDto,
   StandardDto,
+  resolveServiceUrl,
+  SERVICE_URL_KEYS,
 } from '@trustagri/shared';
 import { ContractsService } from './contracts.service';
 
@@ -72,13 +74,13 @@ export class ComplianceService implements OnModuleInit, OnModuleDestroy {
       );
     }
 
-    const farmBase = this.config.get<string>(
-      'FARM_SERVICE_URL',
-      'http://farm-service:3003',
+    const farmBase = resolveServiceUrl(
+      this.config.get<string>(SERVICE_URL_KEYS.FARM),
+      SERVICE_URL_KEYS.FARM,
     );
-    const monitoringBase = this.config.get<string>(
-      'MONITORING_SERVICE_URL',
-      'http://monitoring-service:3005',
+    const monitoringBase = resolveServiceUrl(
+      this.config.get<string>(SERVICE_URL_KEYS.MONITORING),
+      SERVICE_URL_KEYS.MONITORING,
     );
 
     const authHeaders = this.forwardAuth(authorization);

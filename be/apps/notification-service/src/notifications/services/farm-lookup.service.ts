@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { FarmDto } from '@trustagri/shared';
+import { FarmDto, resolveServiceUrl, SERVICE_URL_KEYS } from '@trustagri/shared';
 
 /**
  * Lấy ownerId của vườn từ farm-service (GET /api/v1/farms/:id public).
@@ -12,9 +12,10 @@ export class FarmLookupService {
   constructor(private readonly config: ConfigService) {}
 
   async getOwnerIdByFarmId(farmId: string): Promise<string | null> {
-    const base = this.config
-      .get<string>('FARM_SERVICE_URL', 'http://localhost:3003')
-      .replace(/\/$/, '');
+    const base = resolveServiceUrl(
+      this.config.get<string>(SERVICE_URL_KEYS.FARM),
+      SERVICE_URL_KEYS.FARM,
+    );
     const url = `${base}/api/v1/farms/${encodeURIComponent(farmId)}`;
 
     try {

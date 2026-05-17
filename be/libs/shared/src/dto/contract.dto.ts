@@ -250,6 +250,7 @@ export interface ContractDto {
   standardId?: string;
   farmId?: string;
   farmName?: string | null;
+  standardName?: string | null;
   quantity: number;
   unit: string;
   totalPrice: number;

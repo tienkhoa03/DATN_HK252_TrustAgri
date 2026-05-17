@@ -37,6 +37,7 @@ export interface ContractDto {
   contractType: 'farmer_trader' | 'trader_buyer';
   productId?: string;
   standardId?: string;
+  standardName?: string | null;
   farmId?: string;
   farmName?: string | null;
   quantity: number;

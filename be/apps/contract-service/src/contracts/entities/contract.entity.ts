@@ -74,6 +74,9 @@ export class ContractEntity {
   @Column({ name: 'standard_id', nullable: true, type: 'varchar' })
   standardId: string | null;
 
+  @Column({ name: 'standard_name', type: 'varchar', nullable: true })
+  standardName: string | null;
+
   /**
    * Cross-service FK → farms.id (farm-service).
    */
