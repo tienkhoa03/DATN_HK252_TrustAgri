@@ -358,11 +358,14 @@ export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> =
             ) : (
               outgoing.map((conn) => {
                 const name = counterpartLabel(conn, role, 'outgoing');
-                const isClickable = role === 'trader' && (conn.status === 'accepted' || conn.status === 'negotiating' || conn.status === 'signed');
+                const isClickable = conn.status === 'accepted' || conn.status === 'negotiating' || conn.status === 'signed';
+                const detailPath = role === 'trader'
+                  ? `/trader/connections/${conn.id}`
+                  : `/farmer/connections/${conn.id}`;
                 return (
                   <div
                     key={conn.id}
-                    onClick={isClickable ? () => navigate(`/trader/connections/${conn.id}`, { state: { connection: conn } }) : undefined}
+                    onClick={isClickable ? () => navigate(detailPath, { state: { connection: conn } }) : undefined}
                     style={{
                       padding: spacing.md,
                       backgroundColor: colors.background.primary,
@@ -401,9 +404,9 @@ export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> =
                         {conn.status === 'accepted' && (
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.xs }}>
                             <Text size="xSmall" style={{ color: colors.primary.agriGreen }}>
-                              ✓ Kết nối thành công — nhấn để đàm phán
+                              ✓ Kết nối thành công — nhấn để xem chi tiết
                             </Text>
-                            {role === 'trader' && <Icon name="chevron-right" size="sm" color={colors.text.secondary} />}
+                            <Icon name="chevron-right" size="sm" color={colors.text.secondary} />
                           </div>
                         )}
                         {conn.status === 'negotiating' && (
@@ -411,7 +414,7 @@ export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> =
                             <Text size="xSmall" style={{ color: colors.primary.zaloBlue }}>
                               📋 Đang đàm phán — nhấn để xem chi tiết
                             </Text>
-                            {role === 'trader' && <Icon name="chevron-right" size="sm" color={colors.text.secondary} />}
+                            <Icon name="chevron-right" size="sm" color={colors.text.secondary} />
                           </div>
                         )}
                         {conn.status === 'signed' && (
@@ -419,7 +422,7 @@ export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> =
                             <Text size="xSmall" style={{ color: '#9B59B6' }}>
                               ✍️ Đã ký kết hợp đồng
                             </Text>
-                            {role === 'trader' && <Icon name="chevron-right" size="sm" color={colors.text.secondary} />}
+                            <Icon name="chevron-right" size="sm" color={colors.text.secondary} />
                           </div>
                         )}
                         {conn.status === 'rejected' && (

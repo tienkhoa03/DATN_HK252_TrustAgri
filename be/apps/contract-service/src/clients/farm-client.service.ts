@@ -7,6 +7,28 @@ export class FarmClientService {
 
   constructor(private readonly config: ConfigService) {}
 
+  async applyStandardToFarm(farmId: string, standardId: string): Promise<void> {
+    const base = this.config
+      .get<string>('FARM_SERVICE_URL', 'http://localhost:3003')
+      .replace(/\/$/, '');
+    const url = `${base}/api/v1/farms/${farmId}/standard`;
+    try {
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ standardId }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) {
+        this.logger.warn(`farm PATCH /farms/${farmId}/standard → ${res.status}`);
+      }
+    } catch (err) {
+      this.logger.warn(
+        `farm applyStandard ${farmId} thất bại: ${(err as Error).message}`,
+      );
+    }
+  }
+
   async getFarmName(farmId: string): Promise<string | null> {
     const base = this.config
       .get<string>('FARM_SERVICE_URL', 'http://localhost:3003')

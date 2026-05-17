@@ -123,6 +123,9 @@ const TraderProfileNewsScreen = lazy(() =>
 const TraderConnectionDetailScreen = lazy(() =>
   import('@/screens/trader/connections').then((m) => ({ default: m.TraderConnectionDetailScreen })),
 );
+const FarmerConnectionDetailScreen = lazy(() =>
+  import('@/screens/farmer/connections').then((m) => ({ default: m.FarmerConnectionDetailScreen })),
+);
 
 const ProfileScreen = lazy(() =>
   import('@/screens/shared/profile').then((m) => ({ default: m.ProfileScreen })),
@@ -254,6 +257,7 @@ export function AppRoutes() {
           <Route path="trade" element={<FarmerTradeScreen />} />
           <Route path="me" element={<FarmerProfileScreen />} />
           <Route path="connections" element={<ConnectionRequestsScreen role="farmer" />} />
+          <Route path="connections/:id" element={<FarmerConnectionDetailScreen />} />
           <Route path="alerts" element={<FarmerAlertListScreen />} />
           {/* Legacy redirects */}
           <Route path="farm" element={<RedirectTo to="/farmer/me?section=farm-lab" />} />

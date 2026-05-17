@@ -1,25 +1,22 @@
 /**
- * TraderConnectionDetailScreen — FR-T08
+ * FarmerConnectionDetailScreen — FR-F03
  *
- * Hiển thị chi tiết một kết nối đã được chấp nhận và cho phép thương lái
- * chuyển trạng thái: accepted → negotiating → signed.
+ * Hiển thị chi tiết một kết nối với thương lái, tiến trình hợp tác, và
+ * hướng dẫn bước tiếp theo (farmer không tạo hợp đồng — trader tạo).
  *
- * Data: nhận từ navigation state (khi navigate từ ConnectionRequestsScreen)
- *       hoặc fetch lại từ listConnections khi cần.
+ * Data: nhận từ navigation state khi navigate từ ConnectionRequestsScreen.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Page, Text, useNavigate, useParams } from 'zmp-ui';
 import { useLocation } from 'react-router-dom';
-import { Icon } from '../../../design-system/components/Icon';
-import { Button } from '../../../design-system/components/Button';
-import { colors } from '../../../design-system/tokens/colors';
-import { spacing } from '../../../design-system/tokens/spacing';
-import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import { Icon } from '@/design-system/components/Icon';
+import { Button } from '@/design-system/components/Button';
+import { colors } from '@/design-system/tokens/colors';
+import { spacing } from '@/design-system/tokens/spacing';
+import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import type { ConnectionDto } from '@/services/connectionService';
-import { CreateFarmerContractModal } from '../transactions/components/CreateFarmerContractModal';
-import { listContracts, type ContractDto } from '@/services/contractService';
-import { connectionFarmerDisplay, farmDisplayLabel } from '@/utils/displayLabels';
+import { connectionTraderDisplay, farmDisplayLabel } from '@/utils/displayLabels';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -127,84 +124,15 @@ const StatusProgressBar: React.FC<{ status: ConnectionStatus }> = ({ status }) =
   );
 };
 
-// ── Props ─────────────────────────────────────────────────────────────────────
-
-export interface TraderConnectionDetailScreenProps {
-  connection?: ConnectionDto;
-}
-
 // ── Screen ────────────────────────────────────────────────────────────────────
 
-export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreenProps> = ({
-  connection: connectionProp,
-}) => {
+export const FarmerConnectionDetailScreen: React.FC = () => {
   const navigate = useNavigate();
   const params = useParams<{ id?: string }>();
   const location = useLocation();
-  // Ưu tiên prop, rồi đến navigation state (khi navigate từ ConnectionRequestsScreen)
   const stateConnection = (location.state as { connection?: ConnectionDto } | null)?.connection;
-  const [connection, setConnection] = useState<ConnectionDto | null>(connectionProp ?? stateConnection ?? null);
-  const [showCreateContract, setShowCreateContract] = useState(false);
-  const [farmHasOngoingContract, setFarmHasOngoingContract] = useState(false);
+  const [connection] = useState<ConnectionDto | null>(stateConnection ?? null);
 
-  useEffect(() => {
-    const farmId = connection?.farmId;
-    if (!farmId) return;
-    Promise.all([
-      listContracts({ role: 'trader', status: 'active', limit: 100 }),
-      listContracts({ role: 'trader', status: 'pending_signature', limit: 100 }),
-    ])
-      .then(([activeRes, pendingRes]) => {
-        const busy = [
-          ...activeRes.items.map((c) => c.farmId),
-          ...pendingRes.items.map((c) => c.farmId),
-        ].filter(Boolean);
-        setFarmHasOngoingContract(busy.includes(farmId));
-      })
-      .catch(() => {});
-  }, [connection?.farmId]);
-
-  const farmerUserId = connection
-    ? (connection.fromRole === 'farmer' ? connection.fromUserId : connection.toUserId)
-    : '';
-
-  const handleContractCreated = (contract: ContractDto) => {
-    setShowCreateContract(false);
-    // Optionally move connection to negotiating visually
-    if (connection && connection.status === 'accepted') {
-      setConnection({ ...connection, status: 'negotiating' });
-    }
-    void contract; // used by caller via onCreated if needed
-  };
-
-  if (!connection) {
-    return (
-      <Page>
-        <div style={{ padding: spacing.md, display: 'flex', alignItems: 'center', gap: spacing.md, borderBottom: `1px solid ${colors.background.secondary}` }}>
-          <button
-            onClick={() => navigate('/trader/connections')}
-            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: spacing.xs, display: 'flex' }}
-          >
-            <Icon name="chevron-left" size="md" color={colors.text.primary} />
-          </button>
-          <Text.Title size="small" style={{ margin: 0 }}>Chi tiết kết nối</Text.Title>
-        </div>
-        <div style={{ padding: spacing.xl, textAlign: 'center' }}>
-          <Icon name="users" size="lg" color={colors.text.secondary} />
-          <Text size="small" style={{ color: colors.text.secondary, marginTop: spacing.md }}>
-            Không tìm thấy thông tin kết nối (ID: {params.id})
-          </Text>
-          <div style={{ marginTop: spacing.md }}>
-            <Button variant="outline" size="small" onClick={() => navigate('/trader/connections')}>
-              Quay lại danh sách
-            </Button>
-          </div>
-        </div>
-      </Page>
-    );
-  }
-
-  const farmerLabel = connectionFarmerDisplay(connection);
   const statusColor: Record<ConnectionStatus, string> = {
     pending: colors.functional.warningYellow,
     accepted: colors.primary.agriGreen,
@@ -220,8 +148,37 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
     signed: 'Đã ký kết',
   };
 
+  if (!connection) {
+    return (
+      <Page>
+        <div style={{ padding: spacing.md, display: 'flex', alignItems: 'center', gap: spacing.md, borderBottom: `1px solid ${colors.background.secondary}` }}>
+          <button
+            onClick={() => navigate('/farmer/connections')}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: spacing.xs, display: 'flex' }}
+          >
+            <Icon name="chevron-left" size="md" color={colors.text.primary} />
+          </button>
+          <Text.Title size="small" style={{ margin: 0 }}>Chi tiết kết nối</Text.Title>
+        </div>
+        <div style={{ padding: spacing.xl, textAlign: 'center' }}>
+          <Icon name="users" size="lg" color={colors.text.secondary} />
+          <Text size="small" style={{ color: colors.text.secondary, marginTop: spacing.md }}>
+            Không tìm thấy thông tin kết nối (ID: {params.id})
+          </Text>
+          <div style={{ marginTop: spacing.md }}>
+            <Button variant="outline" size="small" onClick={() => navigate('/farmer/connections')}>
+              Quay lại danh sách
+            </Button>
+          </div>
+        </div>
+      </Page>
+    );
+  }
+
+  const traderLabel = connectionTraderDisplay(connection);
+
   return (
-    <Page className="trader-connection-detail-screen">
+    <Page className="farmer-connection-detail-screen">
       {/* Header */}
       <div
         style={{
@@ -234,7 +191,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
         }}
       >
         <button
-          onClick={() => navigate('/trader/connections')}
+          onClick={() => navigate('/farmer/connections')}
           style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: spacing.xs, display: 'flex', alignItems: 'center' }}
           aria-label="Quay lại"
         >
@@ -243,7 +200,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
         <div style={{ flex: 1 }}>
           <Text.Title size="small" style={{ margin: 0 }}>Chi tiết kết nối</Text.Title>
           <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-            {farmerLabel}
+            {traderLabel}
           </Text>
         </div>
         <span
@@ -260,7 +217,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
         </span>
       </div>
 
-      <div style={{ padding: spacing.md, paddingBottom: 100, overflowY: 'auto' }}>
+      <div style={{ padding: spacing.md, paddingBottom: 80, overflowY: 'auto' }}>
 
         {/* Status progress bar */}
         {connection.status !== 'rejected' && (
@@ -295,7 +252,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
                 height: 52,
                 minWidth: 52,
                 borderRadius: '50%',
-                backgroundColor: colors.primary.agriGreen,
+                backgroundColor: colors.primary.zaloBlue,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -304,14 +261,14 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
                 fontSize: fontSize.h2,
               }}
             >
-              N
+              T
             </div>
             <div style={{ flex: 1 }}>
               <Text size="normal" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-                {farmerLabel}
+                {traderLabel}
               </Text>
               <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                Nông dân
+                Thương lái
               </Text>
             </div>
           </div>
@@ -372,7 +329,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
               }}
             >
               <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 2 }}>
-                Lời nhắn từ nông dân:
+                Lời nhắn đã gửi:
               </Text>
               <Text size="small" style={{ fontStyle: 'italic' }}>
                 "{connection.message}"
@@ -381,7 +338,29 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
           )}
         </div>
 
-        {/* Stage-specific action guidance */}
+        {/* Stage-specific guidance */}
+        {connection.status === 'pending' && (
+          <div
+            style={{
+              backgroundColor: `${colors.functional.warningYellow}12`,
+              borderRadius: 12,
+              padding: spacing.md,
+              marginBottom: spacing.md,
+              border: `1px solid ${colors.functional.warningYellow}30`,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs }}>
+              <Icon name="clock" size="sm" color={colors.functional.warningYellow} />
+              <Text size="small" style={{ fontWeight: fontWeight.semibold, color: colors.functional.warningYellow }}>
+                Đang chờ thương lái phản hồi
+              </Text>
+            </div>
+            <Text size="xSmall" style={{ color: colors.text.secondary }}>
+              Thương lái sẽ xem xét hồ sơ năng lực của bạn và phản hồi trong thời gian sớm nhất.
+            </Text>
+          </div>
+        )}
+
         {connection.status === 'accepted' && (
           <div
             style={{
@@ -399,7 +378,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
               </Text>
             </div>
             <Text size="xSmall" style={{ color: colors.text.secondary }}>
-              Tạo hợp đồng bao tiêu để chính thức hóa điều khoản hợp tác với nông dân này.
+              Thương lái sẽ soạn hợp đồng bao tiêu. Khi có hợp đồng chờ ký, bạn sẽ thấy trong tab <strong>Hợp đồng</strong>.
             </Text>
           </div>
         )}
@@ -421,7 +400,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
               </Text>
             </div>
             <Text size="xSmall" style={{ color: colors.text.secondary }}>
-              Đã có hợp đồng đang chờ ký. Bạn có thể tạo thêm hợp đồng bao tiêu cho mùa vụ mới.
+              Hợp đồng bao tiêu đang chờ ký. Vào tab <strong>Hợp đồng</strong> để xem và ký hợp đồng.
             </Text>
           </div>
         )}
@@ -443,14 +422,36 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
               </Text>
             </div>
             <Text size="xSmall" style={{ color: colors.text.secondary }}>
-              Hợp tác đã chính thức xác nhận. Bạn có thể theo dõi quá trình thực hiện.
+              Hợp tác đã chính thức xác nhận. Vào tab <strong>Hợp đồng</strong> để theo dõi quá trình thực hiện.
+            </Text>
+          </div>
+        )}
+
+        {connection.status === 'rejected' && (
+          <div
+            style={{
+              backgroundColor: `${colors.functional.alertRed}12`,
+              borderRadius: 12,
+              padding: spacing.md,
+              marginBottom: spacing.md,
+              border: `1px solid ${colors.functional.alertRed}30`,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs }}>
+              <Icon name="close" size="sm" color={colors.functional.alertRed} />
+              <Text size="small" style={{ fontWeight: fontWeight.semibold, color: colors.functional.alertRed }}>
+                Yêu cầu không được chấp nhận
+              </Text>
+            </div>
+            <Text size="xSmall" style={{ color: colors.text.secondary }}>
+              Thương lái đã từ chối kết nối. Bạn có thể tìm thương lái khác trong tab Tìm thương lái.
             </Text>
           </div>
         )}
       </div>
 
-      {/* Sticky action bar — tạo hợp đồng khi accepted hoặc negotiating */}
-      {(connection.status === 'accepted' || connection.status === 'negotiating') && (
+      {/* Sticky action: navigate to contracts tab when negotiating/signed */}
+      {(connection.status === 'negotiating' || connection.status === 'signed') && (
         <div
           style={{
             position: 'fixed',
@@ -463,56 +464,27 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
             boxShadow: '0 -4px 12px rgba(0,0,0,0.08)',
           }}
         >
-          {farmHasOngoingContract && (
-            <Text
-              size="xSmall"
-              style={{
-                color: colors.functional.warningYellow,
-                textAlign: 'center',
-                display: 'block',
-                marginBottom: spacing.sm,
-              }}
-            >
-              Vườn này đã có hợp đồng đang thực hiện
-            </Text>
-          )}
           <button
-            onClick={() => !farmHasOngoingContract && setShowCreateContract(true)}
-            disabled={farmHasOngoingContract}
+            onClick={() => navigate('/farmer/trade?tab=contracts')}
             style={{
               width: '100%',
               padding: `${spacing.md} ${spacing.lg}`,
-              backgroundColor: farmHasOngoingContract
-                ? colors.background.secondary
-                : colors.primary.agriGreen,
-              color: farmHasOngoingContract ? colors.text.secondary : '#fff',
+              backgroundColor: colors.primary.zaloBlue,
+              color: '#fff',
               border: 'none',
               borderRadius: 12,
               fontSize: fontSize.body,
               fontWeight: fontWeight.semibold,
-              cursor: farmHasOngoingContract ? 'not-allowed' : 'pointer',
+              cursor: 'pointer',
               minHeight: 44,
             }}
           >
-            📄 Tạo hợp đồng bao tiêu
+            📄 Xem hợp đồng
           </button>
         </div>
-      )}
-
-      {showCreateContract && (
-        <CreateFarmerContractModal
-          visible
-          farmerUserId={farmerUserId}
-          farmerDisplayName={farmerLabel}
-          farmerPhone={connection.fromRole === 'farmer' ? connection.fromUserPhone : connection.toUserPhone}
-          farmId={connection.farmId ?? null}
-          farmName={connection.farmName}
-          onClose={() => setShowCreateContract(false)}
-          onCreated={handleContractCreated}
-        />
       )}
     </Page>
   );
 };
 
-export default TraderConnectionDetailScreen;
+export default FarmerConnectionDetailScreen;

@@ -121,6 +121,21 @@ export class FarmsService {
     return this.toDto(saved);
   }
 
+  /**
+   * Gắn tiêu chuẩn vào vườn khi hợp đồng farmer_trader được ký kết.
+   * Gọi nội bộ từ contract-service — không kiểm tra ownership.
+   */
+  async applyStandard(farmId: string, standardId: string): Promise<void> {
+    const farm = await this.farmRepo.findOne({ where: { id: farmId } });
+    if (!farm) {
+      this.logger.warn(`applyStandard: vườn ${farmId} không tìm thấy`);
+      return;
+    }
+    farm.standardId = standardId;
+    await this.farmRepo.save(farm);
+    this.logger.log(`applyStandard: vườn ${farmId} → standard ${standardId}`);
+  }
+
   async remove(id: string, requesterId: string): Promise<void> {
     const farm = await this.farmRepo.findOne({ where: { id } });
     if (!farm) {

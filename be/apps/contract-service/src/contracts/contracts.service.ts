@@ -293,6 +293,10 @@ export class ContractsService {
 
     this.validateCreateParties(dto);
 
+    if (dto.farmId) {
+      await this.assertFarmHasNoOngoingContract(dto.farmId);
+    }
+
     const partyTraderId =
       user.role === 'trader' ? user.sub : dto.partyTraderId;
 
@@ -397,6 +401,35 @@ export class ContractsService {
     );
   }
 
+  /**
+   * Mỗi vườn chỉ được có 1 hợp đồng farmer_trader chưa kết thúc tại một thời điểm.
+   * excludeContractId: loại trừ hợp đồng đang xét (dùng khi kiểm tra lúc ký).
+   */
+  private async assertFarmHasNoOngoingContract(
+    farmId: string,
+    excludeContractId?: string,
+  ): Promise<void> {
+    const qb = this.contractRepo
+      .createQueryBuilder('c')
+      .where('c.farmId = :farmId', { farmId })
+      .andWhere('c.contractType = :ctype', { ctype: 'farmer_trader' })
+      .andWhere('c.status NOT IN (:...terminal)', {
+        terminal: ['completed', 'cancelled'],
+      })
+      .andWhere('c.deletedAt IS NULL');
+
+    if (excludeContractId) {
+      qb.andWhere('c.id != :eid', { eid: excludeContractId });
+    }
+
+    const count = await qb.getCount();
+    if (count > 0) {
+      throw new ConflictException(
+        'Vườn đã có hợp đồng đang thực hiện. Mỗi vườn chỉ được có một hợp đồng tại một thời điểm.',
+      );
+    }
+  }
+
   private validateCreateParties(dto: CreateContractDto): void {
     if (dto.contractType === 'farmer_trader') {
       if (!dto.partyFarmerId) {
@@ -483,6 +516,9 @@ export class ContractsService {
 
     const previousStatus = entity.status;
     if (bothSigned) {
+      if (entity.farmId && entity.contractType === 'farmer_trader') {
+        await this.assertFarmHasNoOngoingContract(entity.farmId, entity.id);
+      }
       entity.status = 'active';
     }
 
@@ -493,6 +529,17 @@ export class ContractsService {
     }
 
     this.logger.log(`Contract ${id} signed by ${user.sub} (${user.role}); both_signed=${bothSigned}`);
+
+    // Khi cả hai bên ký xong hợp đồng farmer_trader → gắn standard vào vườn (nếu có)
+    if (bothSigned && entity.contractType === 'farmer_trader' && entity.farmId && entity.standardId) {
+      await this.farmClient
+        .applyStandardToFarm(entity.farmId, entity.standardId)
+        .catch((err) =>
+          this.logger.warn(
+            `applyStandardToFarm failed for farm ${entity.farmId}: ${(err as Error).message}`,
+          ),
+        );
+    }
 
     // Khi cả hai bên ký xong hợp đồng farmer_trader → tự động đánh dấu kết nối là 'signed'
     if (bothSigned && entity.contractType === 'farmer_trader') {

@@ -5,7 +5,7 @@
  * - Lists active-contract farms with compliance traffic-light cards
  * - Supports `?filter=alert` URL param to show only non-green farms
  * - Tapping a card opens FarmMonitoringDetail inline (slide-down below list)
- * - Header button navigates to /trader/standards for the standard library
+ * - Header CTA navigates to /trader/standards (Thư viện quy trình)
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -227,25 +227,30 @@ export function TraderFarmMonitoringScreen() {
               ↺
             </button>
 
-            {/* Standards library navigation button */}
+            {/* Thư viện quy trình — CTA nổi bật */}
             <button
               type="button"
               onClick={() => navigate('/trader/standards')}
-              aria-label="Thư viện tiêu chuẩn"
+              aria-label="Thư viện quy trình"
               style={{
-                background: 'none',
-                border: `1px solid ${colors.background.tertiary}`,
-                borderRadius: '8px',
-                padding: spacing.xs,
-                minWidth: '44px',
-                minHeight: '44px',
-                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
+                gap: spacing.xs,
+                padding: `${spacing.xs} ${spacing.md}`,
+                backgroundColor: colors.primary.agriGreen,
+                color: colors.text.inverse,
+                border: 'none',
+                borderRadius: 8,
+                minHeight: 44,
+                cursor: 'pointer',
+                fontSize: fontSize.caption,
+                fontWeight: fontWeight.semibold,
+                whiteSpace: 'nowrap',
+                boxShadow: '0 2px 8px rgba(46, 125, 50, 0.35)',
               }}
             >
-              <Icon name="book" size="sm" color={colors.primary.zaloBlue} />
+              <Icon name="book" size="sm" color={colors.text.inverse} />
+              Thư viện quy trình
             </button>
           </div>
         </div>

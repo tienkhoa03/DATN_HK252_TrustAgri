@@ -68,6 +68,13 @@ export function connectionFarmerDisplay(conn: ConnectionDto): string {
   return userDisplayLabel(name, id, 'Nông dân', phone);
 }
 
+export function connectionTraderDisplay(conn: ConnectionDto): string {
+  const id = conn.fromRole === 'trader' ? conn.fromUserId : conn.toUserId;
+  const name = conn.fromRole === 'trader' ? conn.fromUserName : conn.toUserName;
+  const phone = conn.fromRole === 'trader' ? conn.fromUserPhone : conn.toUserPhone;
+  return userDisplayLabel(name, id, 'Thương lái', phone);
+}
+
 /** Bên đối tác trên danh sách kết nối (incoming = người gửi, outgoing = người nhận). */
 export function connectionCounterpartDisplay(
   conn: ConnectionDto,

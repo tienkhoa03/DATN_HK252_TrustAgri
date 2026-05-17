@@ -219,6 +219,12 @@ export function toContractViMessage(err: unknown, context: ContractCtx = 'list')
       case 'NOT_FOUND':
         return 'Không tìm thấy hợp đồng.';
       case 'CONFLICT':
+        if (context === 'create') {
+          return (
+            err.message?.trim() ||
+            'Vườn đã có hợp đồng đang thực hiện. Mỗi vườn chỉ được có một hợp đồng tại một thời điểm.'
+          );
+        }
         return 'Trạng thái hợp đồng đã thay đổi. Vui lòng tải lại.';
       case 'INVALID_INPUT':
         return err.message?.trim() || 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.';

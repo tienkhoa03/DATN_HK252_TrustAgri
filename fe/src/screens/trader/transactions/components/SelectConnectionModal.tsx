@@ -9,6 +9,7 @@ import {
   toConnectionViMessage,
   type ConnectionDto,
 } from '@/services/connectionService';
+import { listContracts } from '@/services/contractService';
 import { getUserById } from '@/services/authService';
 import { getFarm } from '@/services/farmService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
@@ -111,11 +112,26 @@ export const SelectConnectionModal: React.FC<Props> = ({ visible, onClose, onSel
 
     void (async () => {
       try {
-        const res = await listConnections({ status: 'all', limit: 100 });
-        const eligible = res.items.filter(
+        const [connectionsRes, activeRes, pendingRes] = await Promise.all([
+          listConnections({ status: 'all', limit: 100 }),
+          listContracts({ role: 'trader', status: 'active', limit: 100 }),
+          listContracts({ role: 'trader', status: 'pending_signature', limit: 100 }),
+        ]);
+
+        // Các farmId đang có hợp đồng chưa kết thúc (active hoặc chờ ký)
+        const busyFarmIds = new Set(
+          [
+            ...activeRes.items.map((c) => c.farmId),
+            ...pendingRes.items.map((c) => c.farmId),
+          ].filter((id): id is string => Boolean(id)),
+        );
+
+        const eligible = connectionsRes.items.filter(
           (c) =>
             ELIGIBLE_STATUSES.has(c.status) &&
-            (c.fromRole === 'farmer' || c.toRole === 'farmer'),
+            (c.fromRole === 'farmer' || c.toRole === 'farmer') &&
+            // Ẩn kết nối nếu vườn liên kết đã có hợp đồng đang thực hiện
+            (!c.farmId || !busyFarmIds.has(c.farmId)),
         );
         const enriched = await enrichConnections(eligible);
         if (!cancelled) setItems(enriched);

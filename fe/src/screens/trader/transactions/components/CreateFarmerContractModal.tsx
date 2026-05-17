@@ -2,7 +2,7 @@
  * CreateFarmerContractModal — Trader tạo hợp đồng bao tiêu với nông dân (FR-T09)
  * POST /api/v1/contracts  { contractType: 'farmer_trader', partyFarmerId, partyTraderId, ... }
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Text } from 'zmp-ui';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
@@ -11,6 +11,7 @@ import {
   toContractViMessage,
   type ContractDto,
 } from '@/services/contractService';
+import { listStandards, type StandardDto } from '@/services/standardService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { farmDisplayLabel, userDisplayLabel } from '@/utils/displayLabels';
 import { colors } from '@/design-system/tokens/colors';
@@ -59,6 +60,9 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
   const session = useAtomValue(authSessionAtom);
 
   const [farmId, setFarmId] = useState(initialFarmId ?? '');
+  const [standardId, setStandardId] = useState('');
+  const [myStandards, setMyStandards] = useState<StandardDto[]>([]);
+  const [systemStandards, setSystemStandards] = useState<StandardDto[]>([]);
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState('kg');
   const [totalPrice, setTotalPrice] = useState('');
@@ -67,6 +71,22 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
   const [endDate, setEndDate] = useState(oneYearLaterStr);
   const [terms, setTerms] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!visible || !session?.userId) return;
+    Promise.all([
+      listStandards({ ownerTraderId: session.userId, limit: 100 }),
+      listStandards({ ownerTraderId: 'null', limit: 100 }),
+    ])
+      .then(([mine, system]) => {
+        setMyStandards(mine.items);
+        setSystemStandards(system.items);
+      })
+      .catch(() => {
+        setMyStandards([]);
+        setSystemStandards([]);
+      });
+  }, [visible, session?.userId]);
 
   if (!visible) return null;
 
@@ -99,6 +119,7 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
         partyFarmerId: farmerUserId,
         partyTraderId: session!.userId,
         farmId: farmId.trim() || undefined,
+        standardId: standardId || undefined,
         quantity: Number(quantity),
         unit,
         totalPrice: Number(totalPrice),
@@ -192,6 +213,40 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
           {initialFarmId && (
             <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: 4 }}>
               Tự động lấy từ yêu cầu kết nối
+            </Text>
+          )}
+        </FormField>
+
+        {/* Standard */}
+        <FormField label="Bộ tiêu chuẩn sản xuất (tùy chọn)">
+          <select
+            value={standardId}
+            onChange={(e) => setStandardId(e.target.value)}
+            style={{ ...inputStyle(), cursor: 'pointer' }}
+          >
+            <option value="">— Không gắn tiêu chuẩn —</option>
+            {myStandards.length > 0 && (
+              <optgroup label="Tiêu chuẩn của bạn">
+                {myStandards.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.code} · {s.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {systemStandards.length > 0 && (
+              <optgroup label="Tiêu chuẩn hệ thống">
+                {systemStandards.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.code} · {s.name}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+          {standardId && (
+            <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: 4 }}>
+              Tiêu chuẩn sẽ tự động áp dụng cho vườn khi hợp đồng được ký kết.
             </Text>
           )}
         </FormField>

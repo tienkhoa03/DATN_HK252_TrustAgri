@@ -24,6 +24,8 @@ import { ApiError } from '@/api/errors';
 import {
   createConnection,
   cancelConnection,
+  acceptConnection,
+  rejectConnection,
   listConnections,
   toConnectionViMessage,
   searchFarmers,
@@ -114,6 +116,8 @@ const STATUS_COLOR: Record<FarmConnectionFilter, string> = {
 interface ConnectionInfo {
   status: ConnectionStatus;
   connectionId: string;
+  /** 'outgoing' = trader gửi đến farmer; 'incoming' = farmer gửi đến trader */
+  direction: 'outgoing' | 'incoming';
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -205,6 +209,7 @@ export const MarketplaceSupplyPanel: React.FC = () => {
   // Connection status: keyed by farmId (ConnectionDto.farmId) → { status, connectionId }
   const [connectionStatusMap, setConnectionStatusMap] = useState<Record<string, ConnectionInfo>>({});
   const [cancellingFarmId, setCancellingFarmId] = useState<string | null>(null);
+  const [acceptingFarmId, setAcceptingFarmId] = useState<string | null>(null);
 
   const inFlightRef = useRef(false);
   const loadedKeyRef = useRef<string | null>(null);
@@ -285,13 +290,16 @@ export const MarketplaceSupplyPanel: React.FC = () => {
     if (!session?.accessToken) return;
     try {
       const res = await listConnections({ limit: 100 });
+      const myUserId = session?.userId ?? '';
       const map: Record<string, ConnectionInfo> = {};
       res.items.forEach((conn) => {
         if (!conn.farmId) return;
         const farmId = conn.farmId;
+        const direction: 'outgoing' | 'incoming' =
+          conn.fromUserId === myUserId ? 'outgoing' : 'incoming';
         const existing = map[farmId];
         if (!existing || STATUS_PRIORITY[conn.status] > STATUS_PRIORITY[existing.status]) {
-          map[farmId] = { status: conn.status, connectionId: conn.id };
+          map[farmId] = { status: conn.status, connectionId: conn.id, direction };
         }
       });
       setConnectionStatusMap(map);
@@ -327,10 +335,46 @@ export const MarketplaceSupplyPanel: React.FC = () => {
   const handleSendConnectionRequest = async (farmOwnerId: string, farmId: string) => {
     try {
       const conn = await createConnection({ toUserId: farmOwnerId, farmId });
-      setConnectionStatusMap((prev) => ({ ...prev, [farmId]: { status: 'pending', connectionId: conn.id } }));
+      setConnectionStatusMap((prev) => ({
+        ...prev,
+        [farmId]: { status: 'pending', connectionId: conn.id, direction: 'outgoing' },
+      }));
       openSnackbar({ type: 'success', text: 'Đã gửi yêu cầu kết nối tới nông dân.', duration: 3000, icon: true });
     } catch (err) {
       openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'create'), duration: 3000, icon: true });
+    }
+  };
+
+  const handleAcceptConnectionRequest = async (farmId: string) => {
+    const info = connectionStatusMap[farmId];
+    if (!info || info.status !== 'pending' || info.direction !== 'incoming') return;
+    setAcceptingFarmId(farmId);
+    try {
+      await acceptConnection(info.connectionId);
+      setConnectionStatusMap((prev) => ({
+        ...prev,
+        [farmId]: { ...prev[farmId], status: 'accepted' },
+      }));
+      openSnackbar({ type: 'success', text: 'Đã chấp nhận kết nối với nông dân.', duration: 3000, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'respond'), duration: 3000, icon: true });
+    } finally {
+      setAcceptingFarmId(null);
+    }
+  };
+
+  const handleRejectConnectionRequest = async (farmId: string) => {
+    const info = connectionStatusMap[farmId];
+    if (!info || info.status !== 'pending' || info.direction !== 'incoming') return;
+    try {
+      await rejectConnection(info.connectionId);
+      setConnectionStatusMap((prev) => ({
+        ...prev,
+        [farmId]: { ...prev[farmId], status: 'rejected' },
+      }));
+      openSnackbar({ type: 'success', text: 'Đã từ chối yêu cầu kết nối.', duration: 3000, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'respond'), duration: 3000, icon: true });
     }
   };
 
@@ -577,7 +621,29 @@ export const MarketplaceSupplyPanel: React.FC = () => {
                 )}
 
                 {/* Connection button / status */}
-                {connInfo?.status === 'pending' ? (
+                {connInfo?.status === 'pending' && connInfo.direction === 'incoming' ? (
+                  // Farmer gửi đến trader → trader có thể chấp nhận hoặc từ chối
+                  <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.md }}>
+                    <button
+                      type="button"
+                      disabled={acceptingFarmId === farm.id}
+                      onClick={() => void handleAcceptConnectionRequest(farm.id)}
+                      style={{ ...connectBtnStyle, flex: 1, marginTop: 0, backgroundColor: acceptingFarmId === farm.id ? colors.background.secondary : colors.primary.agriGreen, color: acceptingFarmId === farm.id ? colors.text.secondary : '#fff', cursor: acceptingFarmId === farm.id ? 'not-allowed' : 'pointer' }}
+                    >
+                      <Icon name="check" size="sm" color={acceptingFarmId === farm.id ? colors.text.secondary : '#fff'} />
+                      {acceptingFarmId === farm.id ? 'Đang xử lý...' : 'Chấp nhận'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleRejectConnectionRequest(farm.id)}
+                      style={{ ...connectBtnStyle, flex: 1, marginTop: 0, backgroundColor: `${colors.functional.alertRed}10`, color: colors.functional.alertRed, cursor: 'pointer' }}
+                    >
+                      <Icon name="close" size="sm" color={colors.functional.alertRed} />
+                      Từ chối
+                    </button>
+                  </div>
+                ) : connInfo?.status === 'pending' ? (
+                  // Trader gửi đến farmer → có thể hủy
                   <button
                     style={{ ...connectBtnStyle, backgroundColor: `${colors.functional.alertRed}10`, color: colors.functional.alertRed, cursor: isCancelling ? 'not-allowed' : 'pointer' }}
                     type="button"

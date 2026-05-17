@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
@@ -10,6 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { IsString, IsUUID } from 'class-validator';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import {
   FarmDto,
@@ -23,6 +25,12 @@ import {
 } from '@trustagri/shared';
 import { FarmsService } from './farms.service';
 import { ListFarmsQueryDto } from './dto/list-farms-query.dto';
+
+class ApplyStandardDto {
+  @IsString()
+  @IsUUID()
+  standardId: string;
+}
 
 @ApiTags('farms')
 @ApiBearerAuth()
@@ -90,6 +98,23 @@ export class FarmsController {
     @CurrentUser() user: JwtPayload,
   ): Promise<FarmDto> {
     return this.farmsService.update(id, dto, user.sub);
+  }
+
+  /**
+   * PATCH /api/v1/farms/:id/standard
+   * Gắn tiêu chuẩn vào vườn khi hợp đồng được ký kết — gọi nội bộ từ contract-service.
+   * Endpoint không yêu cầu JWT (internal service-to-service call).
+   */
+  @Patch(':id/standard')
+  @Public()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Apply standard to farm (internal, called by contract-service on sign)' })
+  @ApiResponse({ status: 204, description: 'Standard applied' })
+  async applyStandard(
+    @Param('id') id: string,
+    @Body() dto: ApplyStandardDto,
+  ): Promise<void> {
+    return this.farmsService.applyStandard(id, dto.standardId);
   }
 
   /**
