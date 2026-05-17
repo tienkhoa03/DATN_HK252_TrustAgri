@@ -5,11 +5,14 @@ import {
   ConnectedSocket,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  OnGatewayInit,
   WebSocketServer,
   WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards } from '@nestjs/common';
+import { Injectable, Logger, UseGuards } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { WsJwtGuard } from './guards/ws-jwt.guard';
 import { corsOrigins, serviceUrlFromEnv, SERVICE_URL_KEYS } from '@trustagri/shared';
 import type { JwtPayload } from '@trustagri/shared';
@@ -21,24 +24,44 @@ import type { JwtPayload } from '@trustagri/shared';
  *
  * Auth: token phải được truyền trong handshake.auth.token (Bearer <jwt>).
  */
+@Injectable()
 @WebSocketGateway({
-  namespace: '/ws/monitoring',
+  // path (không phải namespace) để nginx prefix /ws/monitoring khớp đúng với socket.io handshake
+  path: '/ws/monitoring/socket.io/',
   cors: { origin: corsOrigins, credentials: true },
 })
 export class MonitoringGateway
-  implements OnGatewayConnection, OnGatewayDisconnect
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
   @WebSocketServer()
   server: Server;
 
   private readonly logger = new Logger(MonitoringGateway.name);
 
+  constructor(
+    private readonly jwtService: JwtService,
+    private readonly config: ConfigService,
+  ) {}
+
+  afterInit(server: Server): void {
+    // Validate JWT at connection time so client.data.user is set before handleConnection fires.
+    server.use(async (socket, next) => {
+      const raw: string | undefined = socket.handshake.auth?.token ?? socket.handshake.headers?.authorization;
+      const token = typeof raw === 'string' && raw.startsWith('Bearer ') ? raw.slice(7) : raw;
+      if (!token) return next(new Error('UNAUTHORIZED'));
+      try {
+        const secret = this.config.getOrThrow<string>('JWT_SECRET');
+        const payload = await this.jwtService.verifyAsync<JwtPayload>(token, { secret });
+        socket.data.user = payload;
+        next();
+      } catch {
+        next(new Error('UNAUTHORIZED'));
+      }
+    });
+  }
+
   handleConnection(client: Socket): void {
-    if (!client.data.user) {
-      // Reject connections that bypassed the guard (e.g. namespace-level middleware)
-      client.disconnect(true);
-      return;
-    }
+    // user đã được set bởi middleware afterInit; nếu thiếu thì đã bị reject trước đó
     const user = client.data.user as JwtPayload;
     this.logger.log(`WS client connected: ${client.id} userId=${user.sub}`);
   }

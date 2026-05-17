@@ -27,11 +27,12 @@ const CROP_OPTIONS = [
 
 interface FarmCardProps {
   farm: FarmDto;
+  isLocked?: boolean;
   onUpdate: (id: string, body: UpdateFarmDto) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }
 
-const FarmCard: React.FC<FarmCardProps> = ({ farm, onUpdate, onDelete }) => {
+const FarmCard: React.FC<FarmCardProps> = ({ farm, isLocked, onUpdate, onDelete }) => {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<UpdateFarmDto>({
@@ -152,7 +153,16 @@ const FarmCard: React.FC<FarmCardProps> = ({ farm, onUpdate, onDelete }) => {
 
           {/* Action buttons */}
           <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.sm }}>
-            {!editing ? (
+            {isLocked ? (
+              <div style={{
+                width: '100%', padding: spacing.sm, textAlign: 'center',
+                backgroundColor: `${colors.functional.warningYellow}18`,
+                border: `1px solid ${colors.functional.warningYellow}`,
+                borderRadius: 8, fontSize: fontSize.caption, color: colors.text.secondary,
+              }}>
+                🔒 Vườn đang có hợp đồng hoạt động — không thể sửa hoặc xóa
+              </div>
+            ) : !editing ? (
               <>
                 <button
                   type="button"
@@ -261,9 +271,13 @@ const CreateFarmForm: React.FC<CreateFarmFormProps> = ({ onCancel, onSubmit }) =
 
 export interface FarmLabSectionProps {
   ownerId?: string;
+  /** Farm IDs bị khóa (có hợp đồng đang hoạt động) — không cho sửa/xóa. */
+  lockedFarmIds?: Set<string>;
+  /** Hiển thị trong modal/sheet — dùng nút inline thay vì FAB fixed. */
+  inModal?: boolean;
 }
 
-export const FarmLabSection: React.FC<FarmLabSectionProps> = ({ ownerId }) => {
+export const FarmLabSection: React.FC<FarmLabSectionProps> = ({ ownerId, lockedFarmIds, inModal }) => {
   const navigate = useNavigate();
   const openSnackbar = useStableOpenSnackbar();
   const { farms, isLoading, isMutating, error, clearError, loadFarms, createFarm, updateFarm, deleteFarm } = useFarms();
@@ -322,13 +336,30 @@ export const FarmLabSection: React.FC<FarmLabSectionProps> = ({ ownerId }) => {
         <FarmCard
           key={farm.id}
           farm={farm}
+          isLocked={lockedFarmIds?.has(farm.id)}
           onUpdate={handleUpdate}
           onDelete={handleDelete}
         />
       ))}
 
-      {/* FAB */}
-      {!showCreate && (
+      {/* Thêm vườn — inline khi trong modal, FAB fixed khi độc lập */}
+      {!showCreate && inModal && (
+        <button
+          type="button"
+          onClick={() => setShowCreate(true)}
+          style={{
+            width: '100%', padding: spacing.sm, marginTop: spacing.sm,
+            backgroundColor: colors.primary.agriGreen, color: colors.text.inverse,
+            border: 'none', borderRadius: 8,
+            fontSize: fontSize.caption, fontWeight: fontWeight.semibold,
+            cursor: 'pointer', minHeight: 44,
+          }}
+        >
+          + Thêm vườn mới
+        </button>
+      )}
+
+      {!showCreate && !inModal && (
         <button
           type="button"
           onClick={() => setShowCreate(true)}

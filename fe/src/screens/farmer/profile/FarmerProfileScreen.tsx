@@ -17,7 +17,6 @@ import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import { ConnectionStatusBanner } from '@/components/ConnectionStatusBanner';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
-import { FarmLabSection } from './FarmLabSection';
 import { SeasonHistorySection } from './SeasonHistorySection';
 import { useFarms } from '@/hooks/useFarms';
 
@@ -94,18 +93,10 @@ export const FarmerProfileScreen: React.FC = () => {
           ))}
         </div>
 
-        {/* Divider label */}
-        <div style={{ padding: `${spacing.md} ${spacing.md} ${spacing.xs}` }}>
-          <Text.Title size="small" style={{ margin: 0 }}>Quản lý vườn</Text.Title>
-        </div>
-
-        {/* Section 2: Farm Lab */}
-        <FarmLabSection ownerId={session?.userId} />
-
         {/* Divider */}
         <div style={{ height: 8, backgroundColor: colors.background.secondary, margin: `${spacing.md} 0` }} />
 
-        {/* Section 3: Season history */}
+        {/* Section 2: Season history */}
         <SeasonHistorySection farmId={firstFarmId} />
       </div>
     </Page>

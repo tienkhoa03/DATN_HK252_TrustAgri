@@ -1,17 +1,20 @@
 /**
  * FarmerGardenListScreen — danh sách vườn của nông dân (FR-F07, FR-F09)
  * Bấm vào vườn → màn giám sát chi tiết.
+ * Nút "Quản lý vườn" → bottom sheet CRUD (chỉ sửa/xóa vườn không có contract active).
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Page, Text, useNavigate } from 'zmp-ui';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
 import { listFarms, type FarmDto } from '@/services/farmService';
+import { listContracts } from '@/services/contractService';
 import { getTodayPlan } from '@/services/carePlanService';
 import { listAlerts } from '@/services/monitoringService';
 import { listStandards } from '@/services/standardService';
 import { EmptyState } from '@/design-system/components/EmptyState';
 import { ConnectionStatusBanner } from '@/components/ConnectionStatusBanner';
+import { FarmLabSection } from '@/screens/farmer/profile/FarmLabSection';
 import { CROP_TYPE_LABELS } from '@/screens/trader/farm-monitoring/components/FarmTrafficLightCard';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
@@ -164,6 +167,10 @@ export const FarmerGardenListScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const loadedRef = useRef(false);
 
+  const [showManage, setShowManage] = useState(false);
+  const [lockedFarmIds, setLockedFarmIds] = useState<Set<string>>(new Set());
+  const [manageLoading, setManageLoading] = useState(false);
+
   const loadFarms = useCallback(async () => {
     if (!session?.userId) return;
     setLoading(true);
@@ -199,14 +206,51 @@ export const FarmerGardenListScreen: React.FC = () => {
     navigate(`/farmer/garden/${farmId}`);
   };
 
+  const handleOpenManage = async () => {
+    setManageLoading(true);
+    try {
+      const res = await listContracts({ role: 'farmer', status: 'active', limit: 100 });
+      const ids = new Set<string>();
+      for (const c of res.items) {
+        if (c.farmId) ids.add(c.farmId);
+      }
+      setLockedFarmIds(ids);
+    } catch {
+      setLockedFarmIds(new Set());
+    } finally {
+      setManageLoading(false);
+    }
+    setShowManage(true);
+  };
+
   return (
     <Page className="farmer-garden-list-screen">
       <style>{`@keyframes skeleton-pulse{0%,100%{opacity:1}50%{opacity:.45}}.skeleton-pulse{animation:skeleton-pulse 1.4s ease-in-out infinite}`}</style>
       <ConnectionStatusBanner />
       <div style={{ padding: spacing.md, paddingBottom: 80 }}>
-        <Text.Title size="normal" style={{ margin: `0 0 ${spacing.md}` }}>
-          Vườn trồng
-        </Text.Title>
+        {/* Header row */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
+          <Text.Title size="normal" style={{ margin: 0 }}>
+            Vườn trồng
+          </Text.Title>
+          <button
+            type="button"
+            onClick={handleOpenManage}
+            disabled={manageLoading}
+            style={{
+              padding: `${spacing.xs} ${spacing.sm}`,
+              backgroundColor: colors.primary.agriGreen,
+              color: colors.text.inverse,
+              border: 'none', borderRadius: 8,
+              fontSize: fontSize.caption, fontWeight: fontWeight.medium,
+              cursor: manageLoading ? 'not-allowed' : 'pointer',
+              minHeight: 36, display: 'flex', alignItems: 'center', gap: spacing.xs,
+            }}
+          >
+            {manageLoading ? '…' : '🌿 Quản lý vườn'}
+          </button>
+        </div>
+
         <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: spacing.md, display: 'block' }}>
           Chọn vườn để xem cảm biến và quy trình chăm sóc
         </Text>
@@ -223,8 +267,8 @@ export const FarmerGardenListScreen: React.FC = () => {
           <EmptyState
             icon="🌱"
             title="Chưa có vườn nào"
-            description="Tạo hồ sơ vườn để theo dõi quy trình và cảm biến."
-            cta={{ label: 'Tạo vườn ngay', onClick: () => navigate('/farmer/me?section=farm-lab') }}
+            description={'Nhấn "Quản lý vườn" để tạo hồ sơ vườn đầu tiên.'}
+            cta={{ label: 'Tạo vườn ngay', onClick: handleOpenManage }}
           />
         )}
 
@@ -233,6 +277,58 @@ export const FarmerGardenListScreen: React.FC = () => {
             <FarmCard key={item.farm.id} item={item} onSelect={handleSelectFarm} />
           ))}
       </div>
+
+      {/* Bottom sheet: Quản lý vườn */}
+      {showManage && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            backgroundColor: 'rgba(0,0,0,0.45)',
+            display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+          }}
+          onClick={() => setShowManage(false)}
+        >
+          <div
+            style={{
+              backgroundColor: colors.background.primary,
+              borderRadius: '16px 16px 0 0',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              paddingBottom: 32,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Sheet header */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: `${spacing.md} ${spacing.md} ${spacing.sm}`,
+              borderBottom: `1px solid ${colors.background.secondary}`,
+              position: 'sticky', top: 0, backgroundColor: colors.background.primary, zIndex: 1,
+            }}>
+              <Text.Title size="small" style={{ margin: 0 }}>Quản lý vườn</Text.Title>
+              <button
+                type="button"
+                onClick={() => setShowManage(false)}
+                style={{
+                  width: 32, height: 32, borderRadius: '50%',
+                  backgroundColor: colors.background.secondary,
+                  border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: fontSize.caption, color: colors.text.secondary,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <FarmLabSection
+              ownerId={session?.userId}
+              lockedFarmIds={lockedFarmIds}
+              inModal
+            />
+          </div>
+        </div>
+      )}
     </Page>
   );
 };

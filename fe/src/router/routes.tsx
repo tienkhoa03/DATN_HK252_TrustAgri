@@ -264,7 +264,7 @@ export function AppRoutes() {
           <Route path="connections/:id" element={<FarmerConnectionDetailScreen />} />
           <Route path="alerts" element={<FarmerAlertListScreen />} />
           {/* Legacy redirects */}
-          <Route path="farm" element={<RedirectTo to="/farmer/me?section=farm-lab" />} />
+          <Route path="farm" element={<RedirectTo to="/farmer/garden" />} />
           <Route path="process" element={<RedirectTo to="/farmer/garden?section=timeline" />} />
           <Route path="connect" element={<RedirectTo to="/farmer/trade?tab=search" />} />
           <Route path="contracts" element={<RedirectTo to="/farmer/trade?tab=contracts" />} />

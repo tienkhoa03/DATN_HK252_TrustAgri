@@ -25,6 +25,10 @@ import { ENV } from '@/config/env';
 // Ví dụ: "http://localhost:3006/api/v1" → "http://localhost:3006"
 const WS_ORIGIN = ENV.API_BASE_URL.replace(/\/api\/v1\/?$/, '');
 
+// Socket.IO path — phải khớp với nginx prefix location /ws/monitoring và BE gateway path option.
+// Dùng path thay vì namespace để nginx có thể route bằng URI prefix.
+const WS_MONITORING_PATH = '/ws/monitoring/socket.io/';
+
 export type SensorUpdateCallback = (reading: SensorReadingDto) => void;
 export type AlertCreatedCallback = (alert: AlertDto) => void;
 export type ConnectionStatus = 'connected' | 'reconnecting' | 'disconnected';
@@ -66,7 +70,8 @@ function getOrCreateSocket(): Socket {
   const store = getDefaultStore();
   const token = store.get(accessTokenAtom);
 
-  socket = io(`${WS_ORIGIN}/ws/monitoring`, {
+  socket = io(WS_ORIGIN, {
+    path: WS_MONITORING_PATH,
     transports: ['websocket'],
     auth: token ? { token: `Bearer ${token}` } : undefined,
     autoConnect: true,
