@@ -19,6 +19,7 @@ export interface ProposalDto {
   buyingRequestId: string;
   traderId: string;
   farmId?: string;
+  sourceContractId?: string;
   traderDisplayName?: string | null;
   traderPhone?: string | null;
   farmName?: string | null;
@@ -46,7 +47,7 @@ export interface ListProposalsParams {
 
 export interface CreateProposalDto {
   buyingRequestId: string;
-  farmId: string;
+  sourceContractId: string;
   price: number;
   quantity: number;
   standardCode?: string;

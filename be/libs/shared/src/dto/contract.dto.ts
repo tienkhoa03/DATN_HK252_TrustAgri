@@ -34,13 +34,15 @@ export interface ProductDto {
   description?: string;
   status: 'active' | 'inactive';
   createdAt: string;
+  sourceContractId?: string;
+  standardId?: string;
+  standardName?: string | null;
 }
 
 export class CreateProductDto {
-  @ApiPropertyOptional({ description: 'Farm ID sourcing this product', example: 'a1b2c3d4-...' })
-  @IsOptional()
-  @IsString()
-  farmId?: string;
+  @ApiProperty({ description: 'Active farmer_trader contract ID that links to the farm', example: 'a1b2c3d4-...' })
+  @IsUUID('4')
+  sourceContractId: string;
 
   @ApiProperty({ description: 'Product name', example: 'Gao ST25 An Giang' })
   @IsString()
@@ -200,6 +202,9 @@ export interface ProposalDto {
   note?: string;
   status: 'pending' | 'accepted' | 'rejected';
   createdAt: string;
+  sourceContractId?: string;
+  standardId?: string;
+  standardName?: string | null;
 }
 
 export class CreateProposalDto {
@@ -207,9 +212,9 @@ export class CreateProposalDto {
   @IsString()
   buyingRequestId: string;
 
-  @ApiProperty({ description: 'Farm ID supplying the goods', example: 'a1b2c3d4-e5f6-...' })
+  @ApiProperty({ description: 'Active farmer_trader contract ID', example: 'a1b2c3d4-...' })
   @IsUUID('4')
-  farmId: string;
+  sourceContractId: string;
 
   @ApiProperty({ description: 'Proposed price per unit in VND', example: 23000 })
   @IsNumber()
@@ -240,6 +245,7 @@ export interface ContractDto {
   partyFarmerId?: string;
   partyTraderId: string;
   partyBuyerId?: string;
+  sourceContractId?: string;
   partyFarmerName?: string | null;
   partyFarmerPhone?: string | null;
   partyTraderName?: string | null;

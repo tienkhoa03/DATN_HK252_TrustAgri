@@ -27,6 +27,9 @@ export interface ProductDto {
   id: string;
   traderId: string;
   farmId?: string;
+  sourceContractId?: string;
+  standardId?: string;
+  standardName?: string | null;
   traderDisplayName?: string | null;
   traderPhone?: string | null;
   farmName?: string | null;
@@ -63,7 +66,7 @@ export interface ListProductsParams {
 }
 
 export interface CreateProductDto {
-  farmId?: string;
+  sourceContractId: string;
   name: string;
   cropType: string;
   unit: string;

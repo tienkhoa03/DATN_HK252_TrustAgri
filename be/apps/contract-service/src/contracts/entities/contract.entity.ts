@@ -150,6 +150,11 @@ export class ContractEntity {
   @JoinColumn({ name: 'proposal_id' })
   proposal: ProposalEntity | null;
 
+  /** FK → contracts.id — hợp đồng farmer_trader gốc (cho trader_buyer contracts). */
+  @Index('idx_contracts_source_contract_id')
+  @Column({ name: 'source_contract_id', nullable: true, type: 'uuid' })
+  sourceContractId: string | null;
+
   /** Nông dân đã ký (farmer_trader contracts). */
   @Column({ name: 'farmer_signed_at', type: 'timestamptz', nullable: true })
   farmerSignedAt: Date | null;

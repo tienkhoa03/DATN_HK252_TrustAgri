@@ -69,6 +69,10 @@ export class FarmEntity {
   @Column({ name: 'traceability_code', nullable: true, unique: true })
   traceabilityCode: string | null;
 
+  /** Cross-service FK → contracts.id (contract-service) — hợp đồng đang active hiện tại */
+  @Column({ name: 'current_contract_id', nullable: true, type: 'uuid' })
+  currentContractId: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

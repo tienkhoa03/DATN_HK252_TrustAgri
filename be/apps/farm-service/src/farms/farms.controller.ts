@@ -37,6 +37,10 @@ class SetPlantingDateDto {
   plantingDate: string;
 }
 
+class SetCurrentContractDto {
+  contractId: string | null;
+}
+
 @ApiTags('farms')
 @ApiBearerAuth()
 @Controller('farms')
@@ -136,6 +140,23 @@ export class FarmsController {
     @Body() dto: SetPlantingDateDto,
   ): Promise<void> {
     return this.farmsService.setPlantingDate(id, dto.plantingDate);
+  }
+
+  /**
+   * PATCH /api/v1/farms/:id/current-contract
+   * Gắn currentContractId cho vườn khi hợp đồng farmer_trader được ký kết — gọi nội bộ từ contract-service.
+   * Endpoint không yêu cầu JWT (internal service-to-service call).
+   */
+  @Patch(':id/current-contract')
+  @Public()
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Set current contract for farm (internal, called by contract-service on sign)' })
+  @ApiResponse({ status: 204, description: 'Current contract set' })
+  async setCurrentContract(
+    @Param('id') id: string,
+    @Body() dto: SetCurrentContractDto,
+  ): Promise<void> {
+    return this.farmsService.setCurrentContract(id, dto.contractId ?? null);
   }
 
   /**

@@ -47,6 +47,35 @@ export class ContractsService {
   ) {}
 
   /**
+   * Lấy hợp đồng farmer_trader active của trader — dùng khi tạo product/proposal.
+   * Throw BadRequestException nếu không tìm thấy hoặc không khớp.
+   */
+  async getActiveFarmerTraderContract(
+    contractId: string,
+    traderId: string,
+  ): Promise<ContractEntity> {
+    const contract = await this.contractRepo.findOne({
+      where: { id: contractId },
+    });
+    if (!contract) {
+      throw new BadRequestException('Hợp đồng với nông dân không tồn tại.');
+    }
+    if (contract.contractType !== 'farmer_trader') {
+      throw new BadRequestException('Hợp đồng không phải loại farmer_trader.');
+    }
+    if (contract.status !== 'active') {
+      throw new BadRequestException('Hợp đồng với nông dân chưa có hiệu lực (chỉ chấp nhận hợp đồng đang active).');
+    }
+    if (contract.partyTraderId !== traderId) {
+      throw new ForbiddenException('Hợp đồng này không thuộc về bạn.');
+    }
+    if (contract.deletedAt) {
+      throw new BadRequestException('Hợp đồng đã bị xóa.');
+    }
+    return contract;
+  }
+
+  /**
    * Vườn có hợp đồng farmer_trader trạng thái active (đã ký, đang hiệu lực) với thương lái.
    */
   async assertTraderFarmLinked(traderId: string, farmId: string): Promise<void> {
@@ -579,6 +608,17 @@ export class ContractsService {
         );
     }
 
+    // Khi cả hai bên ký xong hợp đồng farmer_trader → gắn currentContractId cho vườn
+    if (bothSigned && entity.contractType === 'farmer_trader' && entity.farmId) {
+      await this.farmClient
+        .setCurrentContract(entity.farmId, entity.id)
+        .catch((err) =>
+          this.logger.warn(
+            `setCurrentContract failed for farm ${entity.farmId}: ${(err as Error).message}`,
+          ),
+        );
+    }
+
     // Khi cả hai bên ký xong hợp đồng farmer_trader → tự động đánh dấu kết nối là 'signed'
     if (bothSigned && entity.contractType === 'farmer_trader') {
       await this.connectionsService
@@ -704,6 +744,7 @@ export class ContractsService {
       buyerSignedAt: entity.buyerSignedAt?.toISOString(),
       createdAt: entity.createdAt.toISOString(),
       updatedAt: entity.updatedAt.toISOString(),
+      sourceContractId: entity.sourceContractId ?? undefined,
     };
   }
 }

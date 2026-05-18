@@ -1,331 +1,222 @@
-# Hướng dẫn: Denormalize displayName và farmName vào các Service
+# Kế hoạch: Hoàn thiện tương tác Trader ↔ Buyer + Truy xuất Standard/Farm/CareLog theo Contract
 
-## Bối cảnh kỹ thuật (đọc trước khi làm)
-
-- **TypeORM `synchronize: true`** đang bật ở tất cả service trong môi trường dev → **không cần viết migration**. Chỉ cần thêm field vào entity class, service tự sync DB khi restart.
-- **`@nestjs/axios` chưa cài** → dùng **native `fetch()`** (Node 20 global, không cần install thêm gì).
-- **Auth endpoint** `GET /api/v1/auth/users/:userId` đã `@Public()` → gọi trực tiếp, không cần token.
-- **Farm endpoint** `GET /api/v1/farms/:id` **yêu cầu JWT** → cần thêm `@Public()` vào endpoint đó trước.
+> Trạng thái: done.
+> Phạm vi: BE (`contract-service`, `farm-service`, `libs/shared`) + FE (`fe/src/screens/buyer`, `fe/src/screens/trader`, services liên quan).
+> Mục tiêu: gắn mọi giao dịch trader↔buyer (product, proposal, contract `trader_buyer`) vào một contract `farmer_trader` gốc, để tự động suy ra `farm`, `standard`, `standardStep`, `careLog`, `evidence` mà buyer/trader có thể truy xuất; đồng thời thêm `contractId` vào `care_log` để truy xuất theo đúng vụ/hợp đồng.
 
 ---
 
-## Quyết định thiết kế
+## 1. Hiện trạng đã có (không cần làm lại)
 
-| Vấn đề | Quyết định |
-|--------|-----------|
-| Stale data (user đổi tên sau khi tạo entity) | Chấp nhận — không xử lý trong scope này |
-| Cross-service call thất bại | Graceful: lưu `null`, không reject request tạo entity |
-| Cột mới | Tất cả `nullable: true` — entity cũ có null là bình thường, frontend fallback về label ID |
-| Backfill data cũ | Không cần — dev data thưa, null là chấp nhận được |
+### 1.1. Tương tác Trader ↔ Farmer (đã hoàn thành)
+- `connections` (farmer ↔ trader) với CRUD + accept/reject + auto-mark `signed` khi cả hai bên ký contract `farmer_trader`.
+- `contracts` type `farmer_trader`: tạo, ký 2 bên → `active`; khi `active` → `applyStandardToFarm` và `setPlantingDate` (đã có trong `contracts.service.ts` `sign()`).
+- `farm-service` care-logs (CRUD, sync offline, evidence) ràng buộc với `farmId`, `standardStepId`.
 
----
+### 1.2. Tương tác Trader ↔ Buyer hiện có
+**BE (`contract-service`):**
+- `buying-requests`: buyer CRUD nhu cầu mua (`BuyingRequestEntity`); trader xem list không lọc; buyer chỉ thấy của mình.
+- `products`: trader đăng tin bán, **đã ràng buộc `farmId` phải thuộc contract `farmer_trader` active của trader** qua `ContractsService.assertTraderFarmLinked()`. Nhưng **không lưu `sourceContractId`**; `standardCode` lưu thủ công, không suy ra từ contract gốc.
+- `proposals`: trader trả lời buying-request, cũng gọi `assertTraderFarmLinked(farmId)`. **Không lưu `sourceContractId`**, `standardCode` cũng tự nhập.
+- `orders`: buyer đặt từ product → trader accept → auto-create `ContractEntity{contractType:'trader_buyer', productId, farmId=null, standardId=null}`. **Không kế thừa farm/standard từ contract gốc**.
+- `proposals.acceptProposal`: buyer accept proposal → auto-create `ContractEntity{contractType:'trader_buyer', proposalId, farmId=proposal.farmId, standardId=null}`. **Không kế thừa standardId**.
 
-## Phạm vi: Cột cần thêm vào từng entity
+**FE:**
+- Buyer: `marketplace`, `product-detail`, `post-buying-request`, `sourcing` (inbox proposal), `orders-proposals`, `live-monitor` (xem contract active của buyer), `transaction-history`, `digital-twin-monitor`.
+- Trader: `marketplace` (feed/news/supply), `transactions` (`BuyerFlowPanel`, `FarmerFlowPanel`), `trading-orders`, `supply-monitor`, `farm-monitoring`, `library`.
 
-### Contract Service
-
-| Entity (bảng) | Cột mới |
-|---------------|---------|
-| `contracts` | `partyFarmerName`, `partyTraderName`, `partyBuyerName`, `farmName` |
-| `connections` | `fromUserName`, `toUserName`, `farmName` |
-| `orders` | `buyerDisplayName`, `traderDisplayName` |
-| `products` | `traderDisplayName`, `farmName` |
-| `proposals` | `traderDisplayName`, `farmName` |
-| `buying_requests` | `buyerDisplayName` |
-| `trader_reviews` | `traderDisplayName`, `buyerDisplayName` |
-| `contract_audit_logs` | `actorDisplayName` |
-| `contract_change_requests` | `requestedByName`, `respondedByName` |
-
-### Farm Service
-
-| Entity (bảng) | Cột mới |
-|---------------|---------|
-| `farms` | `ownerDisplayName` |
-| `care_logs` | `performedByName` |
-| `standards` | `ownerTraderName` |
-
-### Monitoring Service
-
-| Entity (bảng) | Cột mới |
-|---------------|---------|
-| `alerts` | `farmName`, `acknowledgedByName` |
-| `iot_devices` | `farmName` |
-| `sensor_devices` | `farmName` |
-
-### Notification Service
-
-| Entity (bảng) | Cột mới |
-|---------------|---------|
-| `forecasts` | `traderDisplayName` |
-| `news_articles` | `traderDisplayName` |
+### 1.3. Khoảng trống (gap) — phần cần làm
+1. **Product / Proposal** chưa lưu `sourceContractId` (id contract `farmer_trader` đã ký) → không truy ngược được farm/standard/step thực tế.
+2. **Contract `trader_buyer` auto-tạo** từ order/proposal có `farmId=null` hoặc chỉ có `farmId` rời rạc; `standardId` luôn `null`; không có `sourceContractId`. Khi buyer mở chi tiết, không suy ra được `standard`, `standardSteps`, `careLog`, `evidence` của vườn đang phục vụ hợp đồng đó.
+3. **CareLog** trong `farm-service` không có `contractId` → khi vườn quay vòng nhiều hợp đồng/vụ, không tách được care log của một contract cụ thể (live-monitor của buyer trộn lẫn dữ liệu vụ cũ + vụ hiện tại).
+4. FE buyer (`BuyerLiveMonitorScreen`, `BuyerLiveMonitorDetailScreen`, `BuyerProductDetailScreen` tab traceability) hiện chỉ hiển thị farm theo `contract.farmId` (nếu có); chưa load `standardSteps` + `careLogs` lọc theo contract.
 
 ---
 
-## Thứ tự thực hiện
+## 2. Yêu cầu nghiệp vụ (chi tiết)
 
-```
-Bước 1 → Mở public farm endpoint
-Bước 2 → Tạo AuthClientService và FarmClientService
-Bước 3 → Cập nhật Entity classes (TypeORM tự sync DB)
-Bước 4 → Cập nhật Shared DTOs + rebuild
-Bước 5 → Cập nhật Service create/update methods
-Bước 6 → Cập nhật Response builders (toDto)
-Bước 7 → Cập nhật Frontend
-```
+| # | Yêu cầu | Lý do |
+|---|---------|-------|
+| R1 | Mỗi `product` (trader đăng bán) bắt buộc gắn với 1 `contract` type `farmer_trader` đã ký, đang `active`. Suy ra `farmId`, `standardId`, `farmName`, `standardName` từ contract đó. | Đảm bảo nông sản trader bán có nguồn gốc rõ và buyer thấy được chuẩn canh tác. |
+| R2 | Mỗi `proposal` (trader trả buying-request) cũng gắn với 1 `contract farmer_trader` đã ký. Suy ra farm/standard tương tự. | Đề xuất từ trader phải đính kèm vườn + chuẩn để buyer ra quyết định. |
+| R3 | Khi auto-create `contract trader_buyer` từ `order` hoặc `proposal.accept`: copy `sourceContractId`, `farmId`, `standardId`, `farmName`, `standardName` từ contract `farmer_trader` gốc. | Buyer mở contract → có đủ thông tin truy xuất. |
+| R4 | `care_logs` trong farm-service thêm `contract_id` (nullable, FK cross-service tới `contracts.id`). Khi farmer ghi log: nếu vườn đang có contract `farmer_trader` `active` thì auto gán `contractId` đó. | Truy xuất care log theo contract khi vườn có nhiều vụ. |
+| R5 | Endpoint `GET /api/v1/care-logs` thêm filter `contractId`, `farmId`. Endpoint cho buyer/trader (cross-service): `GET /api/v1/contracts/:id/care-logs` (qua `contract-service` → gọi `farm-service`). | Buyer xem live-monitor một contract chỉ thấy log của contract đó. |
+| R6 | FE Buyer `live-monitor` + `product-detail` truy xuất care log theo `contractId`; hiển thị standard step progression và evidences. | Trải nghiệm truy xuất nguồn gốc end-to-end. |
+| R7 | FE Trader khi tạo product/proposal: bước chọn "vườn" thay bằng "chọn contract farmer_trader active"; FE tự điền farm, standard. | Đồng bộ ràng buộc backend, giảm lỗi user. |
 
----
-
-## Bước 1 — Mở public farm endpoint
-
-File: `be/apps/farm-service/src/farms/farms.controller.ts`
-
-Tìm handler `GET /api/v1/farms/:id` và thêm decorator `@Public()` vào (import từ `@trustagri/shared`).
-
-Mục đích: để các service khác gọi lấy farm name mà không cần JWT. Farm name không phải thông tin nhạy cảm.
+> **Nguyên tắc:** Không thêm endpoint ngoài `/specs/backend-api-specification/`; chỉ mở rộng tham số/response cho endpoint sẵn có. Nếu phải bổ sung endpoint nội bộ (vd `contract → care-log proxy`) phải đăng ký rõ trong design + log trong commit.
 
 ---
 
-## Bước 2 — Tạo HTTP client services
+## 3. Các bước thực hiện
 
-Tạo 2 file dùng chung ở **mỗi service** cần (contract-service, monitoring-service, notification-service, farm-service):
+### Bước 0 — Trước khi code
 
-### `src/clients/auth-client.service.ts`
+- [ ] Đọc lại `.claude/docs/business-logic.md` (mục trader-buyer, traceability) và `.claude/docs/architecture.md` (cross-service FK).
+- [ ] Kiểm tra `/specs/backend-api-specification/design.md` để chắc chắn các trường mới (`sourceContractId`, `contractId` trên care log) khớp spec; nếu không, **dừng và cảnh báo user** (theo `.claude/rules/00-context-loading.md`).
+- [ ] Xác nhận với user về:
+  - Tên cột (`source_contract_id` vs `farmer_trader_contract_id`).
+  - Quy tắc khi product gắn vào contract `farmer_trader` đã `completed`/`cancelled`: tự ẩn product? hay chỉ chặn tạo mới?
+  - Khi farm có >1 contract `farmer_trader` cùng `active` (hệ thống hiện cấm — `assertFarmHasNoOngoingContract`): vẫn giữ nguyên 1-vườn-1-contract-active.
 
-- Class `AuthClientService`, decorator `@Injectable()`
-- Inject `ConfigService` để đọc `AUTH_SERVICE_URL` (default: `http://localhost:3001`)
-- Method `getUserDisplayName(userId: string): Promise<string | null>`:
-  - Gọi `fetch(`${AUTH_SERVICE_URL}/api/v1/auth/users/${userId}`)`
-  - Parse JSON, trả về `data.displayName`
-  - Bọc toàn bộ trong `try/catch`, khi lỗi trả về `null` (không throw)
-  - Set `signal: AbortSignal.timeout(3000)` để giới hạn 3 giây
+### Bước 1 — Shared DTO + Constants (`be/libs/shared/src/dto/contract.dto.ts`)
 
-### `src/clients/farm-client.service.ts`
+- [ ] Thêm field optional vào `ProductDto`, `CreateProductDto`, `UpdateProductDto`:
+  - `sourceContractId?: string` (UUID, required khi create).
+  - `standardId?: string`, `standardName?: string | null` (denorm, server tự điền).
+- [ ] Thêm field tương tự vào `ProposalDto`, `CreateProposalDto`:
+  - `sourceContractId: string` (bắt buộc).
+  - `standardId?: string`, `standardName?: string | null` (denorm).
+- [ ] Thêm `sourceContractId?: string` vào `ContractDto` (contract `trader_buyer` mới).
+- [ ] Thêm `contractId?: string` vào `CareLogDto`, `CreateCareLogDto`, `SyncCareLogsDto.items[]` (trong `farm.dto.ts`).
+- [ ] Rebuild shared lib (`npm run build` trong workspace shared) — turbo sẽ pick up khi dev.
 
-- Class `FarmClientService`, decorator `@Injectable()`
-- Inject `ConfigService` để đọc `FARM_SERVICE_URL` (default: `http://localhost:3002`)
-- Method `getFarmName(farmId: string): Promise<string | null>`:
-  - Gọi `fetch(`${FARM_SERVICE_URL}/api/v1/farms/${farmId}`)`
-  - Parse JSON, trả về `data.name`
-  - Bọc trong `try/catch`, khi lỗi trả về `null`
-  - Set timeout 3 giây
+### Bước 2 — Backend `contract-service`
 
-### Đăng ký vào module
+#### 2.1. Migration mới
+- [ ] Tạo migration `apps/contract-service/src/migrations/<timestamp>-add-source-contract-id.ts`:
+  - `products`: thêm `source_contract_id uuid NULL`, index, **không** FK TypeORM (cross-table cùng service nhưng vẫn tránh ManyToOne nặng).
+  - `proposals`: thêm `source_contract_id uuid NULL`, index.
+  - `contracts`: thêm `source_contract_id uuid NULL`, index (cho contract type `trader_buyer`).
+  - Backfill: với product/proposal hiện có, set `source_contract_id` = contract `farmer_trader` active hiện tại của trader cùng `farmId` (nếu có; nếu không thì để NULL và log warning).
 
-Trong `app.module.ts` (hoặc từng domain module nếu dùng scoped), thêm `AuthClientService` và `FarmClientService` vào `providers`. Không cần import `HttpModule`.
+#### 2.2. Entities
+- [ ] `ProductEntity`: thêm `sourceContractId` column + index `idx_products_source_contract_id`.
+- [ ] `ProposalEntity`: thêm `sourceContractId` + index.
+- [ ] `ContractEntity`: thêm `sourceContractId` + index `idx_contracts_source_contract_id`.
 
-### Thêm env vars
+#### 2.3. `ContractsService` (helper mới)
+- [ ] Thêm method `getActiveFarmerTraderContract(contractId, traderId)`:
+  - Tải contract theo `id`, đảm bảo `contractType='farmer_trader'`, `status='active'`, `partyTraderId=traderId`, chưa `deletedAt`.
+  - Throw `BadRequestException` nếu không khớp.
+  - Return entity (đã có `farmId`, `standardId`, `farmName`, `standardName`).
+- [ ] Giữ `assertTraderFarmLinked` cho tương thích nhưng đánh dấu deprecated trong comment (nếu chỉ còn 1 nơi dùng thì xóa luôn).
 
-Vào file `.env` của từng service thêm:
-```
-AUTH_SERVICE_URL=http://localhost:3001
-FARM_SERVICE_URL=http://localhost:3002
-```
+#### 2.4. `ProductsService.createProduct`
+- [ ] Nhận `sourceContractId` từ DTO. Gọi `getActiveFarmerTraderContract(sourceContractId, traderId)`.
+- [ ] Lưu `sourceContractId`, `farmId = sourceContract.farmId`, `farmName = sourceContract.farmName`, `standardCode/standardId = sourceContract.standardId`, `standardName = sourceContract.standardName`.
+- [ ] `updateProduct`: cho phép đổi `sourceContractId` (re-validate); cấm đổi `farmId` rời rạc.
+- [ ] Xem xét tự ẩn (`status='inactive'`) khi source contract chuyển sang `completed`/`cancelled` — **thực hiện ở event publisher** nếu đã có, hoặc skip nếu user chỉ muốn enforce lúc tạo.
 
----
+#### 2.5. `ProposalsService.createProposal`
+- [ ] Yêu cầu `sourceContractId` thay (hoặc bổ sung) `farmId` trong DTO. Gọi `getActiveFarmerTraderContract`.
+- [ ] Suy ra `farmId`, `farmName`, `standardId`, `standardName` từ contract; lưu vào proposal.
 
-## Bước 3 — Cập nhật Entity classes
+#### 2.6. `OrdersService.createContractFromOrder`
+- [ ] Khi auto-create contract `trader_buyer` từ order: load `product.sourceContractId`; nếu có → tải contract gốc → copy `farmId`, `standardId`, `farmName`, `standardName` vào contract mới; gán `contract.sourceContractId`.
+- [ ] Nếu product không có `sourceContractId` (legacy) → để `null` và log warning.
 
-Với mỗi entity trong danh sách phạm vi, thêm các TypeORM column mới. Tất cả `nullable: true`, type `varchar`.
+#### 2.7. `ProposalsService.createContractFromProposal`
+- [ ] Tương tự, copy `sourceContractId` + standard từ proposal.sourceContract.
 
-**Ví dụ cho `contract.entity.ts`:**
-```typescript
-@Column({ name: 'party_farmer_name', type: 'varchar', nullable: true })
-partyFarmerName: string | null;
+#### 2.8. Controllers
+- [ ] Cập nhật Swagger `@ApiProperty` cho các DTO mới.
+- [ ] Thêm/giữ endpoint `GET /api/v1/contracts/:id/care-logs` (proxy tới farm-service) hoặc tận dụng `GET /api/v1/care-logs?contractId=...` (xem 3.3).
 
-@Column({ name: 'party_trader_name', type: 'varchar', nullable: true })
-partyTraderName: string | null;
+### Bước 3 — Backend `farm-service`
 
-@Column({ name: 'party_buyer_name', type: 'varchar', nullable: true })
-partyBuyerName: string | null;
+#### 3.1. Migration
+- [ ] `apps/farm-service/src/migrations/<timestamp>-add-care-log-contract-id.ts`: thêm `care_logs.contract_id uuid NULL`, index `idx_care_logs_contract_id`.
+- [ ] Không thêm FK TypeORM (cross-service); FK enforce ở mức DB nếu cùng cluster hoặc bỏ qua nếu khác cluster (xem `architecture.md`).
+- [ ] Backfill: với care log hiện có, set `contract_id` = contract `farmer_trader` `active` của vườn nếu duy nhất; nếu không xác định thì để NULL.
 
-@Column({ name: 'farm_name', type: 'varchar', nullable: true })
-farmName: string | null;
-```
+#### 3.2. Entity + DTO
+- [ ] `CareLogEntity`: thêm `contractId: string | null` + index.
+- [ ] `ListCareLogsQueryDto`: thêm `contractId?: string` (UUID v4).
 
-Làm tương tự cho tất cả entity theo bảng phạm vi ở trên.
+#### 3.3. `CareLogsService`
+- [ ] `listCareLogs(farmId, query)`: nếu `query.contractId` có → `where.contractId = ...`.
+- [ ] `createCareLog`: sau khi `requireFarmOwner`, nếu farm có contract `farmer_trader` `active` duy nhất → tự gán `entity.contractId = activeContract.id`.
+  - Cần gọi cross-service `contract-service` (qua HTTP client). Tránh round-trip mỗi lần ghi: có thể cache theo `farmId` (TTL ngắn) hoặc denorm `current_contract_id` lên `farm.entity.ts` khi contract chuyển sang `active` (lúc đó `contracts.service.sign()` đã gọi `farmClient.applyStandardToFarm` → mở rộng thêm `setCurrentContract`).
+  - **Khuyến nghị:** thêm cột `farms.current_contract_id` + farm-service method `setCurrentContract(farmId, contractId | null)`; gọi từ `contract-service.contracts.service.sign()` (khi `active`) và khi contract chuyển sang `completed/cancelled` (set `null`).
+- [ ] `syncCareLogs`: tương tự, áp `contractId` mặc định từ farm.currentContractId.
+- [ ] `toDto`: trả `contractId`.
 
-Sau khi sửa entity, **restart service** → TypeORM tự động `ALTER TABLE ... ADD COLUMN`.
+#### 3.4. FarmClientService (contract-service)
+- [ ] Thêm method `setCurrentContract(farmId, contractId | null, authorization?)` gọi farm-service.
+- [ ] `farm-service` mở endpoint internal: `PATCH /api/v1/internal/farms/:id/current-contract` (đã có pattern `applyStandardToFarm` ở `2e3b3ef`, làm tương tự).
 
----
+#### 3.5. Hooks trong `ContractsService.sign()`
+- [ ] Khi contract `farmer_trader` chuyển sang `active`: gọi `setCurrentContract(farmId, contract.id)`.
+- [ ] Khi `farmer_trader` chuyển sang `completed`/`cancelled` (cần điểm thoát trạng thái — kiểm tra `contract-change-requests` và logic hoàn tất hợp đồng): gọi `setCurrentContract(farmId, null)`.
 
-## Bước 4 — Cập nhật Shared DTOs
+### Bước 4 — Frontend (`fe/src`)
 
-File: `be/libs/shared/src/dto/`
+#### 4.1. Services
+- [ ] `services/marketplaceService.ts` (hoặc `productService.ts`): expose `sourceContractId` ở `ProductDto`; thêm form field khi tạo product.
+- [ ] `services/proposalService.ts`: thêm `sourceContractId` vào `CreateProposalDto`.
+- [ ] `services/careLogService.ts` (FE): thêm `contractId` vào query params và DTO.
+- [ ] Thêm helper `listTraderActiveFarmerContracts()` gọi `GET /api/v1/contracts?role=trader&status=active&contractType=farmer_trader` (nếu chưa có; tận dụng `contracts.controller`).
 
-Thêm optional field vào từng DTO:
+#### 4.2. Màn Trader — tạo Product / Proposal
+- [ ] `MarketplaceSupplyPanel` / `TraderTradingOrdersScreen` (chỗ trader tạo tin bán): thay phần chọn "vườn" bằng combobox "chọn hợp đồng với nông dân" (hiển thị `farmName — standardName — startDate`).
+- [ ] Khi chọn xong → đổ readonly farm + standard.
+- [ ] Trong `BuyerFlowPanel` (trader trả buying-request) cũng dùng cùng combobox.
 
-**`contract.dto.ts`:**
-- `ContractDto`: thêm `partyFarmerName?: string | null`, `partyTraderName?: string | null`, `partyBuyerName?: string | null`, `farmName?: string | null`
-- `ConnectionDto`: thêm `fromUserName?: string | null`, `toUserName?: string | null`, `farmName?: string | null`
-- `OrderDto`: thêm `buyerDisplayName?: string | null`, `traderDisplayName?: string | null`
-- `ProductDto`: thêm `traderDisplayName?: string | null`, `farmName?: string | null`
-- `ProposalDto`: thêm `traderDisplayName?: string | null`, `farmName?: string | null`
-- `BuyingRequestDto`: thêm `buyerDisplayName?: string | null`
-- `TraderReviewDto`: thêm `traderDisplayName?: string | null`, `buyerDisplayName?: string | null`
-- `ContractAuditLogDto`: thêm `actorDisplayName?: string | null`
-- `ContractChangeRequestDto`: thêm `requestedByName?: string | null`, `respondedByName?: string | null`
+#### 4.3. Màn Buyer — Live Monitor + Product Detail
+- [ ] `BuyerLiveMonitorDetailScreen`: dùng `contract.sourceContractId` (hoặc trực tiếp `contract.farmId/standardId`) để fetch:
+  - `GET /api/v1/standards/:id` để render danh sách step.
+  - `GET /api/v1/care-logs?farmId=&contractId=` (qua proxy nếu cần) để render timeline + evidence.
+- [ ] `BuyerProductDetailScreen.ProductDetailTabs`: tab "Nguồn gốc" hiện chỉ có UI mẫu — kết nối thật theo `product.sourceContractId` để hiển thị standard + care log mới nhất.
 
-**`farm.dto.ts`:**
-- `FarmDto`: thêm `ownerDisplayName?: string | null`
-- `CareLogDto`: thêm `performedByName?: string | null`
-- `StandardDto`: thêm `ownerTraderName?: string | null`
+#### 4.4. Buyer Live Monitor (list)
+- [ ] Lọc contract type `trader_buyer` `active` + có `sourceContractId` để vào màn detail; cảnh báo "chưa truy xuất được" nếu legacy contract thiếu `sourceContractId`.
 
-**`monitoring.dto.ts`** (hoặc file DTO tương ứng trong monitoring-service):
-- `AlertDto`: thêm `farmName?: string | null`, `acknowledgedByName?: string | null`
-- `IotDeviceDto`: thêm `farmName?: string | null`
+#### 4.5. Validation/Hiển thị UX
+- [ ] Thông báo lỗi tiếng Việt khi trader chọn contract không hợp lệ ("Hợp đồng với nông dân đã hết hiệu lực").
+- [ ] Snackbar khi tải care-log lỗi (giữ pattern `useStableOpenSnackbar`).
+- [ ] Empty state cho live monitor (không có care log).
 
-Sau khi sửa, rebuild shared lib:
-```
-npm run build -w @trustagri/shared
-```
+### Bước 5 — Test
 
----
-
-## Bước 5 — Cập nhật Service create/update methods
-
-Đây là bước core. Với mỗi method `create()` trong service:
-
-**Nguyên tắc:**
-1. Inject `AuthClientService` và/hoặc `FarmClientService` vào constructor của domain service
-2. Sau khi validate input, gọi các client **song song** bằng `Promise.allSettled()`
-3. Extract kết quả từ settled promises (chỉ lấy khi `status === 'fulfilled'`)
-4. Gán vào entity trước khi `save()`
-
-**Mapping cần làm theo service:**
-
-`ContractsService.create()`:
-- Gọi `authClient.getUserDisplayName(partyFarmerId)` → `partyFarmerName`
-- Gọi `authClient.getUserDisplayName(partyTraderId)` → `partyTraderName`
-- Gọi `authClient.getUserDisplayName(partyBuyerId)` nếu có → `partyBuyerName`
-- Gọi `farmClient.getFarmName(farmId)` nếu có → `farmName`
-
-`ConnectionsService.create()`:
-- Gọi `authClient.getUserDisplayName(fromUserId)` → `fromUserName`
-- Gọi `authClient.getUserDisplayName(toUserId)` → `toUserName`
-- Gọi `farmClient.getFarmName(farmId)` nếu có → `farmName`
-
-`OrdersService.create()`:
-- Gọi `authClient.getUserDisplayName(buyerId)` → `buyerDisplayName`
-- Gọi `authClient.getUserDisplayName(traderId)` → `traderDisplayName`
-
-`OrdersService.accept()` (khi trader accept order để tạo contract):
-- Contract tự động tạo ở đây — đảm bảo contract entity cũng được gán names
-
-`ProductsService.create()`:
-- Gọi `authClient.getUserDisplayName(traderId)` → `traderDisplayName`
-- Gọi `farmClient.getFarmName(farmId)` nếu có → `farmName`
-
-`ProposalsService.create()`:
-- Gọi `authClient.getUserDisplayName(traderId)` → `traderDisplayName`
-- Gọi `farmClient.getFarmName(farmId)` nếu có → `farmName`
-
-`BuyingRequestsService.create()`:
-- Gọi `authClient.getUserDisplayName(buyerId)` → `buyerDisplayName`
-
-`TraderReviewsService.create()`:
-- Gọi `authClient.getUserDisplayName(traderId)` → `traderDisplayName`
-- Gọi `authClient.getUserDisplayName(buyerId)` → `buyerDisplayName`
-
-`AlertsService.create()`:
-- Gọi `farmClient.getFarmName(farmId)` → `farmName`
-
-`AlertsService.acknowledge()`:
-- Gọi `authClient.getUserDisplayName(userId)` → `acknowledgedByName`
-
-`IotDevicesService.create()` và `SensorDevicesService.create()`:
-- Gọi `farmClient.getFarmName(farmId)` → `farmName`
-
-`FarmsService.create()`:
-- Gọi `authClient.getUserDisplayName(ownerId)` → `ownerDisplayName`
-
-`CareLogsService.create()`:
-- Gọi `authClient.getUserDisplayName(performedBy)` → `performedByName`
-
-`StandardsService.create()`:
-- Gọi `authClient.getUserDisplayName(ownerTraderId)` → `ownerTraderName`
-
-`ForecastsService.create()` và `NewsArticlesService.create()`:
-- Gọi `authClient.getUserDisplayName(traderId)` → `traderDisplayName`
-
-`ContractAuditLogService` (khi ghi log):
-- Gọi `authClient.getUserDisplayName(actorUserId)` → `actorDisplayName`
-
-`ContractChangeRequestsService.create()` và `.respond()`:
-- Gọi `authClient` cho `requestedBy` / `respondedBy` → `requestedByName` / `respondedByName`
+- [ ] BE unit (`*.spec.ts`):
+  - `products.service.spec.ts`: createProduct với sourceContract hợp lệ / không active / khác trader.
+  - `proposals.service.spec.ts`: createProposal + acceptProposal copy đầy đủ field.
+  - `orders.service.spec.ts`: createContractFromOrder copy field.
+  - `contracts.service.spec.ts`: hook `setCurrentContract` được gọi đúng lúc.
+  - `care-logs.service.spec.ts`: createCareLog auto-set contractId; listCareLogs filter theo contractId.
+- [ ] BE integration (`be/integration-tests/`):
+  - Flow trader đăng product → buyer mua → contract auto-tạo có đủ farm/standard.
+  - Flow buyer post buying-request → trader propose → buyer accept → contract auto-tạo có đủ farm/standard.
+  - Flow farmer ghi care log với farm có contract → care log có contractId.
+- [ ] FE unit: nếu có service helper, viết unit cho `listTraderActiveFarmerContracts`, map DTO.
+- [ ] FE Playwright (`fe/src/tests/e2e/`): chỉ thêm nếu user yêu cầu — mặc định skip.
 
 ---
 
-## Bước 6 — Cập nhật Response builders (toDto)
+## 4. Lưu ý và rủi ro
 
-Tìm các hàm `toDto()`, `mapToDto()`, hoặc object literal return trong mỗi service. Thêm các field mới vào response — chỉ map từ entity, không gọi thêm HTTP:
-
-```typescript
-// Ví dụ ContractsService.toDto(entity)
-return {
-  ...existingFields,
-  partyFarmerName: entity.partyFarmerName ?? null,
-  partyTraderName: entity.partyTraderName ?? null,
-  partyBuyerName: entity.partyBuyerName ?? null,
-  farmName: entity.farmName ?? null,
-};
-```
-
-Làm tương tự cho tất cả service theo danh sách phạm vi.
+1. **Data backfill**: legacy product/proposal/contract `trader_buyer`/care_log không có cột mới — backfill bằng heuristic, log warning những bản ghi không match được. Không xóa.
+2. **Cross-service consistency**: care_log gắn `contractId` nhưng contract sống ở `contract-service`. Khi contract bị xóa cứng (không nên có) → care_log mồ côi. Vẫn đảm bảo soft-delete `deletedAt`.
+3. **1 farm — 1 contract `farmer_trader` active**: hiện đã enforce bởi `assertFarmHasNoOngoingContract`. Tận dụng để `farms.current_contract_id` deterministic.
+4. **Trader tạo product khi contract `farmer_trader` chưa `active` (mới `pending_signature`)**: chặn rõ ràng — yêu cầu `getActiveFarmerTraderContract` throw nếu status khác `active`.
+5. **API Gateway / Auth**: endpoint internal `setCurrentContract` cần header internal hoặc JWT service-to-service như `applyStandardToFarm` đang dùng (tham khảo commit `2e3b3ef`).
+6. **Không tạo endpoint mới ngoài spec**: nếu spec gốc (`/specs/backend-api-specification/design.md`) chưa có `currentContractId` trên farm hoặc query `contractId` trên care-log → **dừng, hỏi user trước khi implement**.
+7. **Đừng đụng** `react-router-dom` cho navigation chính (theo `.claude/rules/00-context-loading.md`).
+8. **Design tokens**: mọi component mới phải dùng tokens trong `fe/src/design-system/tokens/`.
+9. **Trace mã FR/US**: trong commit message và comment 1-dòng (`// FR-G01 truy xuất care log theo contract`).
+10. **Soft delete**: cột `deletedAt` đã có ở các bảng — không cần thêm.
 
 ---
 
-## Bước 7 — Cập nhật Frontend
+## 5. Thứ tự khuyến nghị thực thi (PR nhỏ, độc lập)
 
-### 7.1 Cập nhật DTO interfaces trong service files
-
-**`fe/src/services/contractService.ts`** — `ContractDto`:
-```typescript
-partyFarmerName?: string | null;
-partyTraderName?: string | null;
-partyBuyerName?: string | null;
-farmName?: string | null;
-```
-
-**`fe/src/services/connectionService.ts`** — `ConnectionDto`:
-```typescript
-fromUserName?: string | null;
-toUserName?: string | null;
-farmName?: string | null;
-```
-
-Làm tương tự cho `OrderDto`, `ProductDto`, `ProposalDto`, `BuyingRequestDto`, `TraderReviewDto`, và các DTO monitoring/farm tương ứng trong frontend service files.
-
-### 7.2 Cập nhật hiển thị trong components
-
-Pattern chung: **luôn fallback về label ID** nếu field mới là null. Không xóa các hàm helper hiện tại (`partyFarmerLabel`, `partyBuyerLabel`, ...).
-
-Grep các pattern sau trong `fe/src/` để tìm chỗ cần sửa:
-
-| Tìm pattern | Thay bằng |
-|-------------|-----------|
-| `partyFarmerLabel(contract.partyFarmerId)` | `contract.partyFarmerName ?? partyFarmerLabel(contract.partyFarmerId)` |
-| `partyBuyerLabel(contract.partyBuyerId)` | `contract.partyBuyerName ?? partyBuyerLabel(contract.partyBuyerId)` |
-| `Nông dân #${...slice(0,8)}` | `conn.fromUserName ?? conn.toUserName ?? \`Nông dân #${...slice(0,8)}\`` |
-| `farmId.slice(0,8)` trong label | `farmName ?? \`Vườn #${farmId.slice(0,8)}\`` |
-| `performedBy.slice(0,8)` | `performedByName ?? \`...\`` |
-
-**Màn hình chính cần kiểm tra:**
-- `fe/src/screens/trader/transactions/flows/FarmerFlowPanel.tsx` — `ContractInfoCard`
-- `fe/src/screens/trader/transactions/components/ContractDetailModal.tsx`
-- `fe/src/screens/trader/transactions/components/SelectConnectionModal.tsx`
-- `fe/src/screens/trader/transactions/flows/BuyerFlowPanel.tsx`
-- `fe/src/screens/farmer/` — các màn hiển thị contract và care log
-- `fe/src/screens/buyer/` — các màn order và contract
+1. **PR-1**: Shared DTO + migration `source_contract_id` (products, proposals, contracts) — chưa đổi logic, chỉ schema + DTO optional.
+2. **PR-2**: BE logic — `ProductsService` / `ProposalsService` / `OrdersService` / `ContractsService` (auto-copy field, `getActiveFarmerTraderContract`).
+3. **PR-3**: Migration + entity + DTO cho `care_logs.contract_id` + `farms.current_contract_id` + endpoint internal `setCurrentContract`, hook trong `contracts.service.sign()`.
+4. **PR-4**: BE care-log service auto-gán contractId + filter list.
+5. **PR-5**: FE Trader — chọn contract khi tạo product/proposal.
+6. **PR-6**: FE Buyer — live monitor + product detail truy xuất care log theo contract.
+7. **PR-7**: Tests & polish (snackbar, empty state, swagger).
 
 ---
 
-## Lưu ý quan trọng
+## 6. Tiêu chí hoàn thành
 
-1. **Không cần migration, không cần install package mới** — chỉ sửa entity class rồi restart.
-2. **`Promise.allSettled`** thay vì `Promise.all` trong create methods — nếu 1 call lỗi, entity vẫn tạo thành công với field null.
-3. **Không gọi HTTP trong list endpoints** — denorm đã lưu trong DB, chỉ SELECT là đủ. Tuyệt đối không gọi N HTTP calls để enrich list.
-4. **Rebuild shared lib** mỗi khi sửa `be/libs/shared/src/dto/`:
-   ```
-   npm run build -w @trustagri/shared
-   ```
-5. **Farm endpoint** phải được thêm `@Public()` trước khi chạy (Bước 1) — nếu quên, `FarmClientService` sẽ nhận 401 và trả về null cho tất cả farm names.
+- [ ] Trader chỉ tạo được product/proposal khi đã có contract `farmer_trader` `active`.
+- [ ] Mọi contract `trader_buyer` mới đều có `sourceContractId`, `farmId`, `standardId` đầy đủ.
+- [ ] Care log mới có `contractId` (khi vườn đang trong contract active).
+- [ ] Buyer mở contract `trader_buyer` → thấy được standard steps + timeline care log + evidence của contract đó, không lẫn vụ khác.
+- [ ] Unit test + integration test xanh; `npm run lint` clean ở cả `be/` và `fe/`.
+- [ ] Spec/docs cập nhật nếu thêm trường (đề xuất cập nhật `.claude/docs/business-logic.md` mục traceability).

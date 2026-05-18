@@ -62,6 +62,7 @@ export interface FarmDto {
   plantingDate?: string;
   createdAt: string;
   updatedAt: string;
+  currentContractId?: string | null;
 }
 
 export class CreateFarmDto {
@@ -161,6 +162,7 @@ export interface CareLogDto {
   deviation?: boolean;
   syncStatus: 'synced' | 'pending' | 'conflict';
   clientRecordId?: string;
+  contractId?: string | null;
 }
 
 export class CreateCareLogDto {

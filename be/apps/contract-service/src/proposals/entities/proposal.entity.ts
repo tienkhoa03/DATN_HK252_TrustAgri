@@ -50,6 +50,17 @@ export class ProposalEntity {
   @Column({ name: 'farm_name', type: 'varchar', nullable: true })
   farmName: string | null;
 
+  /** Cross-service FK → contracts.id (source farmer_trader contract). */
+  @Index('idx_proposals_source_contract_id')
+  @Column({ name: 'source_contract_id', nullable: true, type: 'uuid' })
+  sourceContractId: string | null;
+
+  @Column({ name: 'standard_id', nullable: true, type: 'uuid' })
+  standardId: string | null;
+
+  @Column({ name: 'standard_name', type: 'varchar', nullable: true })
+  standardName: string | null;
+
   @Column({ type: 'numeric', precision: 15, scale: 2 })
   price: number;
 

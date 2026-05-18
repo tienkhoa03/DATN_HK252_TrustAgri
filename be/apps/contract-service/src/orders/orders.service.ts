@@ -308,6 +308,24 @@ export class OrdersService {
       phone: order.buyerPhone,
     };
 
+    // Load product to get sourceContractId and farm/standard info
+    let sourceContractId: string | null = null;
+    let farmId: string | null = null;
+    let farmName: string | null = null;
+    let standardId: string | null = null;
+    let standardName: string | null = null;
+
+    if (order.productId) {
+      const product = await this.productRepo.findOne({ where: { id: order.productId } });
+      if (product) {
+        sourceContractId = product.sourceContractId ?? null;
+        farmId = product.farmId ?? null;
+        farmName = product.farmName ?? null;
+        standardId = product.standardId ?? null;
+        standardName = product.standardName ?? null;
+      }
+    }
+
     const contract = this.contractRepo.create({
       contractType: 'trader_buyer',
       partyTraderId: order.traderId,
@@ -318,9 +336,11 @@ export class OrdersService {
       partyBuyerName: buyerSnap.displayName ?? null,
       partyBuyerPhone: buyerSnap.phone ?? null,
       productId: order.productId,
-      standardId: null,
-      farmId: null,
-      farmName: null,
+      sourceContractId,
+      standardId,
+      standardName,
+      farmId,
+      farmName,
       quantity: order.quantity,
       unit: order.unit,
       totalPrice: order.totalPrice,
@@ -335,7 +355,7 @@ export class OrdersService {
 
     const saved = await this.contractRepo.save(contract);
     await this.contractAudit.logStatusChange(saved.id, null, saved.status, order.traderId);
-    this.logger.log(`Contract auto-created from order: orderId=${order.id}`);
+    this.logger.log(`Contract auto-created from order: orderId=${order.id} sourceContractId=${sourceContractId}`);
   }
 
   private toDto(entity: OrderEntity): OrderDto {

@@ -100,23 +100,25 @@ export class ProductsService {
 
   /**
    * POST /api/v1/products (trader)
-   * Tạo sản phẩm mới.
+   * Tạo sản phẩm mới — nguồn gốc gắn với hợp đồng farmer_trader active.
    */
   async createProduct(
     dto: CreateProductDto,
     traderId: string,
   ): Promise<ProductDto> {
-    const farmId = dto.farmId?.trim();
-    if (!farmId) {
-      throw new BadRequestException(
-        'Vui lòng chọn vườn từ hợp đồng nông dân–thương lái đã ký (đang hiệu lực).',
-      );
-    }
-    await this.contractsService.assertTraderFarmLinked(traderId, farmId);
+    // Validate sourceContractId and get the active farmer_trader contract
+    const sourceContract = await this.contractsService.getActiveFarmerTraderContract(
+      dto.sourceContractId,
+      traderId,
+    );
 
-    const [traderSnapRes, farmNameRes] = await Promise.allSettled([
+    const farmId = sourceContract.farmId;
+    if (!farmId) {
+      throw new BadRequestException('Hợp đồng farmer_trader không liên kết vườn.');
+    }
+
+    const [traderSnapRes] = await Promise.allSettled([
       this.authClient.getUserSnapshot(traderId),
-      this.farmClient.getFarmName(farmId),
     ]);
 
     const traderSnap = settledValue(traderSnapRes);
@@ -124,23 +126,26 @@ export class ProductsService {
     const entity = this.productRepo.create({
       traderId,
       farmId,
+      sourceContractId: sourceContract.id,
+      standardId: sourceContract.standardId ?? null,
+      standardName: sourceContract.standardName ?? null,
       traderDisplayName: traderSnap?.displayName ?? null,
       traderPhone: traderSnap?.phone ?? null,
-      farmName: settledValue(farmNameRes),
+      farmName: sourceContract.farmName ?? null,
       name: dto.name,
       cropType: dto.cropType,
       unit: dto.unit,
       price: dto.price,
       currency: 'VND',
       images: dto.images,
-      standardCode: dto.standardCode ?? null,
+      standardCode: sourceContract.standardName ?? dto.standardCode ?? null,
       stockQuantity: dto.stockQuantity ?? null,
       description: dto.description ?? null,
       status: 'active',
     });
 
     const saved = await this.productRepo.save(entity);
-    this.logger.log(`Product created: id=${saved.id} traderId=${traderId}`);
+    this.logger.log(`Product created: id=${saved.id} traderId=${traderId} sourceContractId=${sourceContract.id}`);
     return this.toDto(saved);
   }
 
@@ -156,15 +161,19 @@ export class ProductsService {
     const product = await this.requireProduct(id);
     this.ensureOwner(product, traderId);
 
-    if (dto.farmId !== undefined) {
-      const nextFarm = dto.farmId?.trim();
-      if (!nextFarm) {
-        throw new BadRequestException(
-          'Sản phẩm phải gắn vườn từ hợp đồng đã ký (đang hiệu lực).',
-        );
+    if (dto.sourceContractId !== undefined) {
+      const sourceContract = await this.contractsService.getActiveFarmerTraderContract(
+        dto.sourceContractId,
+        traderId,
+      );
+      if (!sourceContract.farmId) {
+        throw new BadRequestException('Hợp đồng farmer_trader không liên kết vườn.');
       }
-      await this.contractsService.assertTraderFarmLinked(traderId, nextFarm);
-      product.farmId = nextFarm;
+      product.sourceContractId = sourceContract.id;
+      product.farmId = sourceContract.farmId;
+      product.farmName = sourceContract.farmName ?? null;
+      product.standardId = sourceContract.standardId ?? null;
+      product.standardName = sourceContract.standardName ?? null;
     }
     if (dto.name !== undefined) product.name = dto.name;
     if (dto.cropType !== undefined) product.cropType = dto.cropType;
@@ -233,6 +242,9 @@ export class ProductsService {
       description: entity.description ?? undefined,
       status: entity.status,
       createdAt: entity.createdAt.toISOString(),
+      sourceContractId: entity.sourceContractId ?? undefined,
+      standardId: entity.standardId ?? undefined,
+      standardName: entity.standardName ?? null,
     };
   }
 }

@@ -144,6 +144,15 @@ export class FarmsService {
   }
 
   /**
+   * Gắn currentContractId cho vườn khi hợp đồng farmer_trader được ký kết.
+   * Gọi nội bộ từ contract-service — không kiểm tra ownership.
+   */
+  async setCurrentContract(farmId: string, contractId: string | null): Promise<void> {
+    await this.farmRepo.update(farmId, { currentContractId: contractId });
+    this.logger.log(`Farm ${farmId} currentContractId set to ${contractId}`);
+  }
+
+  /**
    * Cập nhật ngày bắt đầu quy trình cho vườn khi hợp đồng farmer_trader được ký kết.
    * Gọi nội bộ từ contract-service — không kiểm tra ownership.
    */
@@ -223,6 +232,7 @@ export class FarmsService {
       plantingDate: farm.plantingDate ?? undefined,
       createdAt: farm.createdAt.toISOString(),
       updatedAt: farm.updatedAt.toISOString(),
+      currentContractId: farm.currentContractId ?? null,
     };
   }
 }

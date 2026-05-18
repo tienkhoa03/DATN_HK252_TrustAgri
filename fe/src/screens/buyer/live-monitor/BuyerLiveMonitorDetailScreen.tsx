@@ -127,10 +127,14 @@ export const BuyerLiveMonitorDetailScreen: React.FC = () => {
 
   const PAGE_SIZE = 10;
 
-  const loadCareLogs = useCallback(async (farmId: string, page: number) => {
+  const loadCareLogs = useCallback(async (farmId: string, page: number, sourceContractId?: string) => {
     setLogLoading(true);
     try {
-      const res = await listCareLogs(farmId, { page, limit: PAGE_SIZE });
+      const res = await listCareLogs(farmId, {
+        page,
+        limit: PAGE_SIZE,
+        ...(sourceContractId ? { contractId: sourceContractId } : {}),
+      });
       const entries = res.items.map(careLogToTimelineEntry);
       setCareLogEntries((prev) => page === 1 ? entries : [...prev, ...entries]);
       setHasMoreLogs(res.total > page * PAGE_SIZE);
@@ -172,7 +176,7 @@ export const BuyerLiveMonitorDetailScreen: React.FC = () => {
               .catch(() => { if (mounted) setSensors(buildSensorSnapshot([])); }),
           );
           promises.push(
-            loadCareLogs(c.farmId, 1).catch(() => {}),
+            loadCareLogs(c.farmId, 1, c.sourceContractId).catch(() => {}),
           );
         } else {
           setSensors(buildSensorSnapshot([]));
@@ -197,7 +201,7 @@ export const BuyerLiveMonitorDetailScreen: React.FC = () => {
     if (farm && !logLoading) {
       const nextPage = logPage + 1;
       setLogPage(nextPage);
-      loadCareLogs(farm.id, nextPage);
+      loadCareLogs(farm.id, nextPage, contract?.sourceContractId);
     }
   };
 

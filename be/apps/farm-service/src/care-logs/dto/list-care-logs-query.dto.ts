@@ -21,4 +21,9 @@ export class ListCareLogsQueryDto {
   @IsOptional()
   @IsUUID('4')
   standardStepId?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by contract ID (trader_buyer contract)', format: 'uuid' })
+  @IsOptional()
+  @IsUUID('4')
+  contractId?: string;
 }

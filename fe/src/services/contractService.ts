@@ -36,6 +36,7 @@ export interface ContractDto {
   partyBuyerPhone?: string | null;
   contractType: 'farmer_trader' | 'trader_buyer';
   productId?: string;
+  sourceContractId?: string;
   standardId?: string;
   standardName?: string | null;
   farmId?: string;
@@ -340,6 +341,15 @@ export function hasUserSigned(contract: ContractDto, userId: string, role: 'farm
   if (role === 'trader') return contract.traderSignedAt != null;
   if (role === 'buyer') return contract.buyerSignedAt != null;
   return false;
+}
+
+/**
+ * GET /api/v1/contracts?role=trader&status=active — lọc farmer_trader đang active.
+ * Dùng để chọn nguồn gốc khi tạo sản phẩm / đề xuất.
+ */
+export async function listTraderActiveFarmerContracts(): Promise<ContractDto[]> {
+  const res = await listContracts({ role: 'trader', status: 'active', limit: 100 });
+  return res.items.filter((c) => c.contractType === 'farmer_trader');
 }
 
 /** Kiểm tra user có phải là bên trong hợp đồng và được phép ký không. */

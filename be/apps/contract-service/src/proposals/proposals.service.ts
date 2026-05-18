@@ -85,7 +85,7 @@ export class ProposalsService {
 
   /**
    * POST /api/v1/proposals (trader)
-   * Thương lái phản hồi một buying request.
+   * Thương lái phản hồi một buying request — nguồn gốc gắn với hợp đồng farmer_trader active.
    */
   async createProposal(dto: CreateProposalDto, traderId: string): Promise<ProposalDto> {
     const buyingRequest = await this.buyingRequestRepo.findOne({
@@ -95,16 +95,22 @@ export class ProposalsService {
       throw new NotFoundException('Nhu cầu mua hàng không tồn tại');
     }
     if (buyingRequest.status !== 'open') {
-      throw new BadRequestException(
-        'Chỉ có thể gửi đề xuất cho nhu cầu mua đang mở',
-      );
+      throw new BadRequestException('Chỉ có thể gửi đề xuất cho nhu cầu mua đang mở');
     }
 
-    await this.contractsService.assertTraderFarmLinked(traderId, dto.farmId);
+    // Validate sourceContractId and get active farmer_trader contract
+    const sourceContract = await this.contractsService.getActiveFarmerTraderContract(
+      dto.sourceContractId,
+      traderId,
+    );
 
-    const [traderSnapRes, farmNameRes] = await Promise.allSettled([
+    const farmId = sourceContract.farmId;
+    if (!farmId) {
+      throw new BadRequestException('Hợp đồng farmer_trader không liên kết vườn.');
+    }
+
+    const [traderSnapRes] = await Promise.allSettled([
       this.authClient.getUserSnapshot(traderId),
-      this.farmClient.getFarmName(dto.farmId),
     ]);
 
     const traderSnap = settledValue(traderSnapRes);
@@ -112,19 +118,22 @@ export class ProposalsService {
     const entity = this.proposalRepo.create({
       buyingRequestId: dto.buyingRequestId,
       traderId,
-      farmId: dto.farmId,
+      farmId,
+      sourceContractId: sourceContract.id,
+      standardId: sourceContract.standardId ?? null,
+      standardName: sourceContract.standardName ?? null,
       traderDisplayName: traderSnap?.displayName ?? null,
       traderPhone: traderSnap?.phone ?? null,
-      farmName: settledValue(farmNameRes),
+      farmName: sourceContract.farmName ?? null,
       price: dto.price,
       quantity: dto.quantity,
-      standardCode: dto.standardCode ?? null,
+      standardCode: sourceContract.standardName ?? dto.standardCode ?? null,
       note: dto.note ?? null,
       status: 'pending',
     });
 
     const saved = await this.proposalRepo.save(entity);
-    this.logger.log(`Proposal created: id=${saved.id} traderId=${traderId}`);
+    this.logger.log(`Proposal created: id=${saved.id} traderId=${traderId} sourceContractId=${sourceContract.id}`);
     return this.toDto(saved);
   }
 
@@ -230,7 +239,9 @@ export class ProposalsService {
       partyBuyerName: buyingRequest.buyerDisplayName ?? null,
       partyBuyerPhone: buyingRequest.buyerPhone ?? null,
       productId: null,
-      standardId: null,
+      standardId: proposal.standardId ?? null,
+      standardName: proposal.standardName ?? null,
+      sourceContractId: proposal.sourceContractId ?? null,
       farmId: proposal.farmId,
       farmName: settledValue(farmNameRes),
       quantity: proposal.quantity,
@@ -265,6 +276,9 @@ export class ProposalsService {
       note: entity.note ?? undefined,
       status: entity.status,
       createdAt: entity.createdAt.toISOString(),
+      sourceContractId: entity.sourceContractId ?? undefined,
+      standardId: entity.standardId ?? undefined,
+      standardName: entity.standardName ?? null,
     };
   }
 }

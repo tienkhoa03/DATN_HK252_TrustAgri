@@ -4,16 +4,17 @@ import {
   IsNumber,
   IsArray,
   IsIn,
+  IsUUID,
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateProductDto {
-  @ApiPropertyOptional({ description: 'Farm ID sourcing this product', example: 'a1b2c3d4-...' })
+  @ApiPropertyOptional({ description: 'Active farmer_trader contract ID to change source', example: 'a1b2c3d4-...' })
   @IsOptional()
-  @IsString()
-  farmId?: string;
+  @IsUUID('4')
+  sourceContractId?: string;
 
   @ApiPropertyOptional({ description: 'Product name', example: 'Gao ST25 An Giang Premium' })
   @IsOptional()

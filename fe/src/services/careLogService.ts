@@ -60,6 +60,7 @@ export interface ListCareLogsParams {
   page?: number;
   limit?: number;
   standardStepId?: string;
+  contractId?: string;
 }
 
 export type CreateCareLogDto = {

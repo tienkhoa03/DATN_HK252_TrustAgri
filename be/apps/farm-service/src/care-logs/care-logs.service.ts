@@ -54,6 +54,7 @@ export class CareLogsService {
 
     const where: FindOptionsWhere<CareLogEntity> = { farmId };
     if (query.standardStepId) where.standardStepId = query.standardStepId;
+    if (query.contractId) where.contractId = query.contractId;
 
     const [rows, total] = await this.careLogRepo.findAndCount({
       where,
@@ -88,6 +89,7 @@ export class CareLogsService {
     const entity = this.careLogRepo.create({
       farmId,
       standardStepId: dto.standardStepId ?? null,
+      contractId: farm.currentContractId ?? null,
       action: dto.action,
       notes: dto.notes ?? null,
       performedAt: new Date(dto.performedAt),
@@ -162,6 +164,7 @@ export class CareLogsService {
         const entity = this.careLogRepo.create({
           farmId,
           standardStepId: item.standardStepId ?? null,
+          contractId: farm.currentContractId ?? null,
           action: item.action,
           notes: item.notes ?? null,
           performedAt,
@@ -280,6 +283,7 @@ export class CareLogsService {
       deviation: entity.deviation ?? undefined,
       syncStatus: entity.syncStatus,
       clientRecordId: entity.clientRecordId ?? undefined,
+      contractId: entity.contractId ?? null,
     };
   }
 

@@ -60,6 +60,26 @@ export class FarmClientService {
     }
   }
 
+  async setCurrentContract(farmId: string, contractId: string | null): Promise<void> {
+    const base = this.farmBase();
+    const url = `${base}/api/v1/farms/${farmId}/current-contract`;
+    try {
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contractId }),
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) {
+        this.logger.warn(`farm PATCH /farms/${farmId}/current-contract → ${res.status}`);
+      }
+    } catch (err) {
+      this.logger.warn(
+        `farm setCurrentContract ${farmId} thất bại: ${(err as Error).message}`,
+      );
+    }
+  }
+
   async getFarmName(
     farmId: string,
     authorization?: string,

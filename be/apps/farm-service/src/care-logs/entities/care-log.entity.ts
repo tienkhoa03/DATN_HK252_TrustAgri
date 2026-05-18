@@ -68,6 +68,11 @@ export class CareLogEntity {
   @Column({ name: 'performed_by_phone', type: 'varchar', nullable: true })
   performedByPhone: string | null;
 
+  /** Cross-service FK → contracts.id (contract-service) — hợp đồng vụ này */
+  @Index('idx_care_logs_contract_id')
+  @Column({ name: 'contract_id', nullable: true, type: 'uuid' })
+  contractId: string | null;
+
   @OneToMany(() => EvidenceEntity, (e) => e.careLog, { cascade: true, eager: false })
   evidences: EvidenceEntity[];
 
