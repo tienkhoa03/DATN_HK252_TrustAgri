@@ -18,14 +18,14 @@ export function notificationLinkToAppPath(
   const path = pathOnly.startsWith('/') ? pathOnly : `/${pathOnly}`;
 
   if (path.includes('/farms/') && path.includes('/monitoring')) {
-    if (role === 'buyer') return '/buyer/monitor';
+    if (role === 'buyer') return '/buyer/live';
     return '/farmer/alerts';
   }
 
   if (path.startsWith('/contracts/')) {
     if (role === 'buyer') return '/buyer/orders';
-    if (role === 'farmer') return '/farmer/contracts';
-    if (role === 'trader') return '/trader/trading';
+    if (role === 'farmer') return '/farmer/trade?tab=contracts';
+    if (role === 'trader') return '/trader/transactions';
     return '/buyer/orders';
   }
 

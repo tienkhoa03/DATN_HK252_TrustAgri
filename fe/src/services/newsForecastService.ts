@@ -256,11 +256,6 @@ export async function listForecasts(
   return mapListResponse(data, mapForecastDto);
 }
 
-export async function getForecast(id: string): Promise<ForecastDto> {
-  const { data } = await apiClient.get<unknown>(`/forecasts/${id}`);
-  return mapForecastDto(data);
-}
-
 export async function createForecast(body: ForecastCreateDto): Promise<ForecastDto> {
   const { data } = await apiClient.post<unknown>('/forecasts', body);
   return mapForecastDto(data);

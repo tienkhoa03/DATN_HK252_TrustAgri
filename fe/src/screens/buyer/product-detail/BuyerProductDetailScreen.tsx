@@ -6,8 +6,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Page, Text } from 'zmp-ui';
-import { Icon } from '../../../design-system/components/Icon';
+import { Page, Text, useNavigate } from 'zmp-ui';
+import { useParams } from 'react-router-dom';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
@@ -27,8 +27,6 @@ export interface BuyerProductDetailScreenProps {
   onOrder?: (productId: string) => void;
 }
 
-const IMAGE_EMOJIS = ['🌳', '🌿', '🎥', '🍃'];
-
 const SkeletonBlock: React.FC<{ height?: number | string }> = ({ height = 16 }) => (
   <div
     style={{
@@ -46,17 +44,21 @@ const SkeletonBlock: React.FC<{ height?: number | string }> = ({ height = 16 }) 
  * Requirements: FR-U01, FR-G01, NFR-U03
  */
 export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> = ({
-  productId = 'prod-001',
+  productId: productIdProp,
   onBack,
   onOrder,
 }) => {
   const openSnackbar = useStableOpenSnackbar();
+  const navigate = useNavigate();
+  const routeParams = useParams<{ productId?: string }>();
+  const productId = productIdProp ?? routeParams.productId ?? '';
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [product, setProduct] = useState<ProductDto | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(!!productId);
+  const [error, setError] = useState<string | null>(productId ? null : 'Sản phẩm không tồn tại.');
 
   useEffect(() => {
+    if (!productId) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -163,12 +165,7 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
   // ── Render helpers ───────────────────────────────────────────────────────────
 
   const renderStickyFooter = (p: ProductDto) => {
-    const supportsDeposit = (p as any).supportsDeposit ?? false;
-    const harvestStatus = (p as any).harvestStatus as string | undefined;
-
-    const showBuyNow = harvestStatus === 'available' || !harvestStatus;
-    const showDeposit = supportsDeposit === true || harvestStatus === 'upcoming';
-    const bothVisible = showBuyNow && showDeposit;
+    const inStock = (p.stockQuantity ?? 0) > 0 || p.status === 'active';
 
     return (
       <div style={stickyFooterStyles}>
@@ -189,42 +186,32 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
         </div>
 
         <div style={{ display: 'flex', gap: spacing.sm }}>
-          {showBuyNow && (
-            <button
-              type="button"
-              style={{ ...primaryBtnStyles, flex: bothVisible ? 1 : undefined, width: bothVisible ? undefined : '100%' }}
-              onClick={() => {
-                onOrder?.(p.id);
-                openSnackbar({ text: 'Chức năng đang phát triển', type: 'info' });
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = colors.primary.agriGreenDark; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = colors.primary.agriGreen; }}
-            >
-              Mua ngay
-            </button>
-          )}
-          {showDeposit && (
-            <button
-              type="button"
-              style={{ ...secondaryBtnStyles, flex: bothVisible ? 1 : undefined, width: bothVisible ? undefined : '100%' }}
-              onClick={() => {
-                openSnackbar({ text: 'Chức năng đang phát triển', type: 'info' });
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = colors.primary.zaloBlueDark; e.currentTarget.style.color = colors.primary.zaloBlueDark; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = colors.primary.zaloBlue; e.currentTarget.style.color = colors.primary.zaloBlue; }}
-            >
-              Thỏa thuận đặt cọc
-            </button>
-          )}
-          {!showBuyNow && !showDeposit && (
-            <button
-              type="button"
-              style={{ ...primaryBtnStyles, width: '100%', opacity: 0.5, cursor: 'not-allowed' }}
-              disabled
-            >
-              Liên hệ thương lái
-            </button>
-          )}
+          <button
+            type="button"
+            style={{ ...primaryBtnStyles, flex: 1 }}
+            disabled={!inStock}
+            onClick={() => {
+              if (onOrder) {
+                onOrder(p.id);
+                return;
+              }
+              // Tạo yêu cầu mua từ sản phẩm này
+              navigate(`/buyer/sourcing?action=create&productId=${encodeURIComponent(p.id)}`);
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = colors.primary.agriGreenDark; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = colors.primary.agriGreen; }}
+          >
+            Gửi yêu cầu mua
+          </button>
+          <button
+            type="button"
+            style={{ ...secondaryBtnStyles, flex: 1 }}
+            onClick={() => {
+              navigate(`/buyer?traderId=${encodeURIComponent(p.traderId)}`);
+            }}
+          >
+            Xem thương lái
+          </button>
         </div>
       </div>
     );
@@ -255,47 +242,39 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
       );
     }
 
-    const emoji = (product.images[0] as string | undefined) ?? cropEmoji(product.cropType);
+    const fallbackEmoji = cropEmoji(product.cropType);
+    const galleryImages = product.images && product.images.length > 0 ? product.images : [];
+    const activeImage = galleryImages[currentImageIndex] ?? null;
 
     return (
       <>
         <div style={contentStyles}>
           {/* Image Slider */}
           <div style={imageSliderStyles}>
-            <div style={imageStyles}>
-              {IMAGE_EMOJIS[currentImageIndex] ?? emoji}
-            </div>
-
-            {currentImageIndex === 2 && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: spacing.md,
-                  right: spacing.md,
-                  padding: `${spacing.xs} ${spacing.sm}`,
-                  backgroundColor: 'rgba(0,0,0,0.6)',
-                  color: colors.text.inverse,
-                  borderRadius: '4px',
-                  fontSize: fontSize.small,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: spacing.xs,
+            {activeImage && activeImage.startsWith('http') ? (
+              <img
+                src={activeImage}
+                alt={product.name}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = 'none';
                 }}
-              >
-                <Icon name="play" size="sm" color={colors.text.inverse} />
-                <span>Video vườn trồng</span>
-              </div>
+              />
+            ) : (
+              <div style={imageStyles}>{activeImage ?? fallbackEmoji}</div>
             )}
 
-            <div style={imageDotsStyles}>
-              {IMAGE_EMOJIS.map((_, index) => (
-                <div
-                  key={index}
-                  style={dotStyles(index === currentImageIndex)}
-                  onClick={() => setCurrentImageIndex(index)}
-                />
-              ))}
-            </div>
+            {galleryImages.length > 1 && (
+              <div style={imageDotsStyles}>
+                {galleryImages.map((_, index) => (
+                  <div
+                    key={index}
+                    style={dotStyles(index === currentImageIndex)}
+                    onClick={() => setCurrentImageIndex(index)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Product name + price summary above tabs */}

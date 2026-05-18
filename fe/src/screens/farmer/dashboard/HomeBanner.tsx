@@ -57,7 +57,10 @@ export const HomeBanner: React.FC<HomeBannerProps> = ({
           bg: `${colors.primary.agriGreen}12`,
           border: colors.primary.agriGreen,
           emoji: '✅',
-          text: `Mọi thứ ổn định – tuân thủ ${complianceScore}%`,
+          text:
+            complianceScore > 0
+              ? `Mọi thứ ổn định – tuân thủ ${complianceScore}%`
+              : 'Mọi thứ ổn định',
           ctaLabel: 'Xem chi tiết',
         };
     }

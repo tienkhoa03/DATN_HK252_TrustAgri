@@ -15,15 +15,11 @@ import { useFarms } from '@/hooks/useFarms';
 import type { FarmDto, CreateFarmDto, UpdateFarmDto } from '@/hooks/useFarms';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
+import { CROP_LABELS } from '@/services/marketplaceService';
 
-const CROP_OPTIONS = [
-  { value: 'dragon_fruit', label: 'Thanh long' },
-  { value: 'rice', label: 'Lúa' },
-  { value: 'vegetable', label: 'Rau củ' },
-  { value: 'fruit', label: 'Trái cây' },
-  { value: 'herb', label: 'Dược liệu' },
-  { value: 'other', label: 'Khác' },
-];
+const CROP_OPTIONS: { value: string; label: string }[] = Object.entries(CROP_LABELS).map(
+  ([value, label]) => ({ value, label }),
+);
 
 interface FarmCardProps {
   farm: FarmDto;

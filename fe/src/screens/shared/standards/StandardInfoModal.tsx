@@ -123,10 +123,14 @@ export const StandardInfoModal: React.FC<Props> = ({ standardId, standardName, o
               }}
             >
               <InfoRow label="Mã tiêu chuẩn" value={standard.code} />
-              {standard.cropType && <InfoRow label="Loại cây trồng" value={standard.cropType} />}
-              <InfoRow label="Phiên bản" value={`v${standard.version}`} />
-              {standard.ownerTraderName && (
-                <InfoRow label="Đơn vị ban hành" value={standard.ownerTraderName} />
+              {standard.ownerTraderId && (
+                <InfoRow label="Đơn vị ban hành" value={standard.ownerTraderId} />
+              )}
+              {standard.createdAt && (
+                <InfoRow
+                  label="Ngày ban hành"
+                  value={new Date(standard.createdAt).toLocaleDateString('vi-VN')}
+                />
               )}
             </div>
 

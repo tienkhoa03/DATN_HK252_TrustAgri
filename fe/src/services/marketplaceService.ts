@@ -96,6 +96,11 @@ export const CROP_LABELS: Record<string, string> = {
   lychee: 'Vải',
   banana: 'Chuối',
   rambutan: 'Chôm chôm',
+  rice: 'Lúa',
+  vegetable: 'Rau củ',
+  fruit: 'Trái cây',
+  herb: 'Dược liệu',
+  other: 'Khác',
 };
 
 export const STANDARD_LABELS: Record<string, string> = {

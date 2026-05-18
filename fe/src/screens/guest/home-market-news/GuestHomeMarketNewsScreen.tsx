@@ -13,7 +13,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Page, Text } from 'zmp-ui';
+import { Page, Text, useNavigate } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { Chart } from '../../../design-system/components/Chart';
 import { colors } from '../../../design-system/tokens/colors';
@@ -49,7 +49,6 @@ interface FeaturedProductUi {
   name: string;
   image: string;
   price: string;
-  deposits: number;
 }
 
 interface PriceData {
@@ -79,68 +78,29 @@ function formatNewsDate(iso: string): string {
   }
 }
 
-const FALLBACK_PRICE_DATA: Record<string, PriceData> = {
-  pomelo: {
-    product: 'Bưởi Da Xanh',
-    trend: 'up',
-    change: 15,
-    data: [
-      { day: 'T2', price: 38 },
-      { day: 'T3', price: 40 },
-      { day: 'T4', price: 42 },
-      { day: 'T5', price: 41 },
-      { day: 'T6', price: 43 },
-      { day: 'T7', price: 45 },
-      { day: 'CN', price: 47 },
-    ],
-  },
-  mango: {
-    product: 'Xoài Cát Chu',
-    trend: 'stable',
-    change: 2,
-    data: [
-      { day: 'T2', price: 34 },
-      { day: 'T3', price: 35 },
-      { day: 'T4', price: 34 },
-      { day: 'T5', price: 35 },
-      { day: 'T6', price: 35 },
-      { day: 'T7', price: 36 },
-      { day: 'CN', price: 35 },
-    ],
-  },
-  durian: {
-    product: 'Sầu riêng Monthong',
-    trend: 'down',
-    change: -8,
-    data: [
-      { day: 'T2', price: 130 },
-      { day: 'T3', price: 128 },
-      { day: 'T4', price: 125 },
-      { day: 'T5', price: 122 },
-      { day: 'T6', price: 120 },
-      { day: 'T7', price: 118 },
-      { day: 'CN', price: 120 },
-    ],
-  },
+const CROP_DEFAULT_LABELS: Record<string, string> = {
+  pomelo: 'Bưởi',
+  mango: 'Xoài',
+  durian: 'Sầu riêng',
 };
 
 function parseForecastToPriceData(
   cropKey: string,
-  fallback: PriceData,
   forecastData: unknown,
-): PriceData {
-  if (!forecastData || typeof forecastData !== 'object') return fallback;
+): PriceData | null {
+  if (!forecastData || typeof forecastData !== 'object') return null;
   const fd = forecastData as Record<string, unknown>;
   const trendRaw = fd.trend;
   const trend: 'up' | 'down' | 'stable' =
-    trendRaw === 'up' || trendRaw === 'down' || trendRaw === 'stable' ? trendRaw : fallback.trend;
+    trendRaw === 'up' || trendRaw === 'down' || trendRaw === 'stable' ? trendRaw : 'stable';
   const changePercent =
-    typeof fd.changePercent === 'number' ? fd.changePercent : fallback.change;
+    typeof fd.changePercent === 'number' ? fd.changePercent : 0;
   const series = fd.series;
-  const productLabel = typeof fd.productLabel === 'string' ? fd.productLabel : fallback.product;
-  let data = fallback.data;
+  const productLabel =
+    typeof fd.productLabel === 'string' ? fd.productLabel : CROP_DEFAULT_LABELS[cropKey] ?? cropKey;
+  let data: { day: string; price: number }[] = [];
   if (Array.isArray(series)) {
-    const mapped = series
+    data = series
       .map((row) => {
         if (!row || typeof row !== 'object') return null;
         const r = row as Record<string, unknown>;
@@ -150,8 +110,8 @@ function parseForecastToPriceData(
         return { day, price };
       })
       .filter((x): x is { day: string; price: number } => x !== null);
-    if (mapped.length > 0) data = mapped;
   }
+  if (data.length === 0) return null;
   return {
     product: productLabel,
     trend,
@@ -169,6 +129,15 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
   onProductPress,
 }) => {
   const openSnackbar = useStableOpenSnackbar();
+  const navigate = useNavigate();
+  const goLogin = () => {
+    if (onLogin) onLogin();
+    else navigate('/login');
+  };
+  const goProduct = (productId: string) => {
+    if (onProductPress) onProductPress(productId);
+    else navigate(`/guest/products/${productId}`);
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
   const [selectedProduct, setSelectedProduct] = useState<string>('pomelo');
@@ -176,7 +145,7 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
   const [productsLoading, setProductsLoading] = useState(true);
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
   const [newsAndForecastLoading, setNewsAndForecastLoading] = useState(true);
-  const [priceData, setPriceData] = useState<Record<string, PriceData>>(FALLBACK_PRICE_DATA);
+  const [priceData, setPriceData] = useState<Record<string, PriceData>>({});
 
   // Load featured products (public — không cần auth) on mount
   useEffect(() => {
@@ -185,12 +154,11 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
     listProducts({ status: 'active', page: 1, limit: 4 })
       .then((res) => {
         if (!cancelled) {
-          const uiItems: FeaturedProductUi[] = res.items.map((p, i) => ({
+          const uiItems: FeaturedProductUi[] = res.items.map((p) => ({
             id: p.id,
             name: p.name,
             image: p.images[0] ?? cropEmoji(p.cropType),
             price: `${p.price.toLocaleString('vi-VN')} VNĐ/${p.unit}`,
-            deposits: [24, 18, 15, 12][i] ?? 10,
           }));
           setFeaturedProducts(uiItems);
           setProductsLoading(false);
@@ -230,12 +198,11 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
         }));
         setNewsItems(slider);
 
-        const nextPrice: Record<string, PriceData> = { ...FALLBACK_PRICE_DATA };
+        const nextPrice: Record<string, PriceData> = {};
         for (const f of fcRes.items) {
           const key = f.cropType;
-          if (key === 'pomelo' || key === 'mango' || key === 'durian') {
-            nextPrice[key] = parseForecastToPriceData(key, FALLBACK_PRICE_DATA[key], f.forecastData);
-          }
+          const parsed = parseForecastToPriceData(key, f.forecastData);
+          if (parsed) nextPrice[key] = parsed;
         }
         setPriceData(nextPrice);
       })
@@ -248,7 +215,7 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
             icon: true,
           });
           setNewsItems([]);
-          setPriceData(FALLBACK_PRICE_DATA);
+          setPriceData({});
         }
       })
       .finally(() => {
@@ -457,18 +424,6 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
     padding: spacing.sm,
   };
 
-  const depositBadgeStyles: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: spacing.xs,
-    padding: `${spacing.xs} ${spacing.sm}`,
-    backgroundColor: colors.functional.warningYellow,
-    color: colors.text.primary,
-    borderRadius: '4px',
-    fontSize: fontSize.small,
-    fontWeight: fontWeight.medium,
-    marginTop: spacing.xs,
-  };
 
   const priceStyles: React.CSSProperties = {
     fontSize: fontSize.body,
@@ -489,7 +444,7 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
     paddingBottom: spacing.xl,
   };
 
-  const currentPriceData = priceData[selectedProduct] ?? FALLBACK_PRICE_DATA[selectedProduct];
+  const currentPriceData = priceData[selectedProduct] ?? null;
   const sliderNews =
     newsItems.length > 0 ? newsItems[Math.min(currentNewsIndex, newsItems.length - 1)] : null;
 
@@ -504,7 +459,7 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
           </div>
           <button
             style={loginButtonStyles}
-            onClick={onLogin}
+            onClick={goLogin}
             onMouseEnter={(e) => {
               e.currentTarget.style.backgroundColor = '#0052CC';
             }}
@@ -554,7 +509,6 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
             <div style={newsSliderStyles}>
               <div
                 style={newsCardStyles(sliderNews.type)}
-                onClick={() => console.log('View news:', sliderNews.id)}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = 'scale(1.02)';
                 }}
@@ -635,49 +589,54 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
             </button>
           </div>
 
-          {/* Trend Badge */}
-          <div style={trendBadgeStyles(currentPriceData.trend)}>
-            {currentPriceData.trend === 'up' && '📈 Tăng'}
-            {currentPriceData.trend === 'down' && '📉 Giảm'}
-            {currentPriceData.trend === 'stable' && '➡️ Ổn định'}
-            <span style={{ fontWeight: fontWeight.bold }}>
-              {currentPriceData.change > 0 ? '+' : ''}
-              {currentPriceData.change}%
-            </span>
-          </div>
+          {/* Trend / Chart / Empty state */}
+          {currentPriceData ? (
+            <>
+              <div style={trendBadgeStyles(currentPriceData.trend)}>
+                {currentPriceData.trend === 'up' && '📈 Tăng'}
+                {currentPriceData.trend === 'down' && '📉 Giảm'}
+                {currentPriceData.trend === 'stable' && '➡️ Ổn định'}
+                <span style={{ fontWeight: fontWeight.bold }}>
+                  {currentPriceData.change > 0 ? '+' : ''}
+                  {currentPriceData.change}%
+                </span>
+              </div>
 
-          {/* Chart */}
-          <div style={chartContainerStyles}>
-            <Chart
-              type="line"
-              data={currentPriceData.data.map((d) => ({
-                label: d.day,
-                value: d.price,
-              }))}
-              xAxis={{ label: 'Ngày' }}
-              yAxis={{ label: 'Giá (nghìn VNĐ)' }}
-              colors={[
-                currentPriceData.trend === 'up'
-                  ? colors.primary.agriGreen
-                  : currentPriceData.trend === 'down'
-                  ? colors.functional.alertRed
-                  : colors.text.secondary,
-              ]}
-              showGrid={true}
-            />
-          </div>
-
-          <Text
-            size="xSmall"
-            style={{
-              color: colors.text.secondary,
-              marginTop: spacing.sm,
-              textAlign: 'center',
-              display: 'block',
-            }}
-          >
-            Bấm vào biểu đồ để xem chi tiết
-          </Text>
+              <div style={chartContainerStyles}>
+                <Chart
+                  type="line"
+                  data={currentPriceData.data.map((d) => ({
+                    label: d.day,
+                    value: d.price,
+                  }))}
+                  xAxis={{ label: 'Ngày' }}
+                  yAxis={{ label: 'Giá (nghìn VNĐ)' }}
+                  colors={[
+                    currentPriceData.trend === 'up'
+                      ? colors.primary.agriGreen
+                      : currentPriceData.trend === 'down'
+                      ? colors.functional.alertRed
+                      : colors.text.secondary,
+                  ]}
+                  showGrid={true}
+                />
+              </div>
+            </>
+          ) : (
+            !newsAndForecastLoading && (
+              <div
+                style={{
+                  ...chartContainerStyles,
+                  textAlign: 'center',
+                  color: colors.text.secondary,
+                }}
+              >
+                <Text size="small" style={{ color: colors.text.secondary }}>
+                  Chưa có dự báo giá cho loại nông sản này.
+                </Text>
+              </div>
+            )
+          )}
         </div>
 
         {/* Featured Products - Nông sản nổi bật */}
@@ -687,7 +646,7 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
             size="small"
             style={{ color: colors.text.secondary, marginBottom: spacing.md }}
           >
-            Sản phẩm đang được đặt cọc nhiều nhất
+            Sản phẩm đang có trên thị trường
           </Text>
 
           {productsLoading ? (
@@ -732,7 +691,7 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
                 <div
                   key={product.id}
                   style={productCardStyles}
-                  onClick={() => onProductPress?.(product.id)}
+                  onClick={() => goProduct(product.id)}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.transform = 'translateY(-4px)';
                     e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.15)';
@@ -748,11 +707,6 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
                     <Text.Title size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
                       {product.name}
                     </Text.Title>
-
-                    <div style={depositBadgeStyles}>
-                      <span>🔥</span>
-                      <span>{product.deposits} đặt cọc</span>
-                    </div>
 
                     <div style={priceStyles}>{product.price}</div>
                   </div>

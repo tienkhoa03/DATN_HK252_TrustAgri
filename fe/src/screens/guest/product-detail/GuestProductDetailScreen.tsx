@@ -14,7 +14,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Page, Text } from 'zmp-ui';
+import { Page, Text, useNavigate } from 'zmp-ui';
+import { useParams } from 'react-router-dom';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
@@ -33,16 +34,6 @@ export interface GuestProductDetailScreenProps {
   onBack?: () => void;
   onLogin?: () => void;
 }
-
-interface Review {
-  id: string;
-  userName: string;
-  rating: number;
-  comment: string;
-  date: string;
-}
-
-const IMAGE_EMOJIS = ['🌳', '🌿', '🍃'];
 
 // Reviews removed — sẽ load từ API khi BE thêm endpoint /products/:id/reviews.
 
@@ -66,17 +57,30 @@ const SkeletonBlock: React.FC<{ height?: number | string; width?: string }> = ({
  * Requirements: FR-G03
  */
 export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> = ({
-  productId = 'prod-001',
+  productId: productIdProp,
   onBack,
   onLogin,
 }) => {
   const openSnackbar = useStableOpenSnackbar();
+  const navigate = useNavigate();
+  const routeParams = useParams<{ productId?: string }>();
+  const productId = productIdProp ?? routeParams.productId ?? '';
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [product, setProduct] = useState<ProductDto | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(!!productId);
+  const [error, setError] = useState<string | null>(productId ? null : 'Sản phẩm không tồn tại.');
+
+  const goLogin = () => {
+    if (onLogin) onLogin();
+    else navigate('/login');
+  };
+  const goBack = () => {
+    if (onBack) onBack();
+    else navigate('/guest');
+  };
 
   useEffect(() => {
+    if (!productId) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -336,7 +340,7 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
         </div>
         <button
           style={unlockButtonStyles}
-          onClick={onLogin}
+          onClick={goLogin}
           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#0052CC'; }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = colors.primary.zaloBlue;
@@ -375,7 +379,9 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
       );
     }
 
-    const emoji = product.images[0] ?? cropEmoji(product.cropType);
+    const fallbackEmoji = cropEmoji(product.cropType);
+    const galleryImages = product.images && product.images.length > 0 ? product.images : [];
+    const activeImage = galleryImages[currentImageIndex] ?? null;
     const std = standardLabel(product.standardCode);
 
     return (
@@ -383,40 +389,34 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
         <div style={contentStyles}>
           {/* Image Slider */}
           <div style={imageSliderStyles}>
-            <div style={imageStyles}>
-              {IMAGE_EMOJIS[currentImageIndex] ?? emoji}
-            </div>
-            <div style={imageDotsStyles}>
-              {IMAGE_EMOJIS.map((_, index) => (
-                <div
-                  key={index}
-                  style={dotStyles(index === currentImageIndex)}
-                  onClick={() => setCurrentImageIndex(index)}
-                />
-              ))}
-            </div>
+            {activeImage && activeImage.startsWith('http') ? (
+              <img
+                src={activeImage}
+                alt={product.name}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            ) : (
+              <div style={imageStyles}>{activeImage ?? fallbackEmoji}</div>
+            )}
+            {galleryImages.length > 1 && (
+              <div style={imageDotsStyles}>
+                {galleryImages.map((_, index) => (
+                  <div
+                    key={index}
+                    style={dotStyles(index === currentImageIndex)}
+                    onClick={() => setCurrentImageIndex(index)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Product Info */}
           <div style={sectionStyles}>
             <h1 style={titleStyles}>{product.name}</h1>
-
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: spacing.xs,
-                marginBottom: spacing.sm,
-              }}
-            >
-              <Icon name="star-filled" size="sm" color={colors.functional.warningYellow} />
-              <Text size="small" style={{ margin: 0, fontWeight: fontWeight.medium }}>
-                4.8
-              </Text>
-              <Text size="small" style={{ margin: 0, color: colors.text.secondary }}>
-                (127 đánh giá)
-              </Text>
-            </div>
 
             {std && <div style={standardBadgeStyles}>{std}</div>}
 
@@ -440,25 +440,25 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
           </div>
 
           {/* Farm Location */}
-          <div style={sectionStyles}>
-            <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.sm }}>
-              Địa chỉ vườn trồng
-            </Text.Title>
+          {(product.farmName || product.farmId) && (
+            <div style={sectionStyles}>
+              <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.sm }}>
+                Địa chỉ vườn trồng
+              </Text.Title>
 
-            <div style={infoRowStyles}>
-              <Icon name="map-pin" size="md" color={colors.text.secondary} />
-              <div>
-                <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>
-                  Vườn nguồn
-                </Text>
-                <Text size="small" style={{ margin: 0, fontWeight: fontWeight.medium }}>
-                  {product.farmId ?? 'Chưa có thông tin'}
-                </Text>
+              <div style={infoRowStyles}>
+                <Icon name="map-pin" size="md" color={colors.text.secondary} />
+                <div>
+                  <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>
+                    Vườn nguồn
+                  </Text>
+                  <Text size="small" style={{ margin: 0, fontWeight: fontWeight.medium }}>
+                    {product.farmName ?? product.farmId}
+                  </Text>
+                </div>
               </div>
             </div>
-
-            <div style={mapPlaceholderStyles}>🗺️</div>
-          </div>
+          )}
 
           {/* Blurred Sections */}
           {renderLockSection('📹', 'Camera giám sát thời gian thực')}
@@ -475,7 +475,7 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
 
           <button
             style={loginButtonStyles}
-            onClick={onLogin}
+            onClick={goLogin}
             onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#0052CC'; }}
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = colors.primary.zaloBlue;
@@ -492,21 +492,19 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
     <Page className="guest-product-detail-screen">
       {/* Header */}
       <div style={headerStyles}>
-        {onBack && (
-          <button
-            style={backButtonStyles}
-            onClick={onBack}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = colors.background.secondary;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = colors.background.primary;
-            }}
-            aria-label="Quay lại"
-          >
-            <Icon name="chevron-left" size="md" color={colors.text.primary} />
-          </button>
-        )}
+        <button
+          style={backButtonStyles}
+          onClick={goBack}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = colors.background.secondary;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = colors.background.primary;
+          }}
+          aria-label="Quay lại"
+        >
+          <Icon name="chevron-left" size="md" color={colors.text.primary} />
+        </button>
         {product && (
           <Text
             size="small"

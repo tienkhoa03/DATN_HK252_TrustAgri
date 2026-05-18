@@ -143,7 +143,7 @@ export const BuyerDashboardScreen: React.FC = () => {
           </Text>
           <button
             type="button"
-            onClick={() => navigate('/buyer/request')}
+            onClick={() => navigate('/buyer/sourcing?action=create')}
             style={{
               padding: `${spacing.sm} ${spacing.lg}`,
               backgroundColor: colors.primary.zaloBlue,

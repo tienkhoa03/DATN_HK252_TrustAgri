@@ -28,7 +28,8 @@ import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { useStandards } from '@/hooks/useStandards';
-import type { StandardDto, StandardStepDto, CreateStandardDto, UpdateStandardDto } from '@/hooks/useStandards';
+import type { StandardDto, CreateStandardDto, UpdateStandardDto } from '@/hooks/useStandards';
+import type { StandardStepDto } from '@/services/standardService';
 
 // ── View states ───────────────────────────────────────────────────────────────
 

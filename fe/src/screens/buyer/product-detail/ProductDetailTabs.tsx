@@ -29,19 +29,6 @@ const TABS: Tab[] = [
   { id: 'journal', label: 'Nhật ký Vườn' },
 ];
 
-// Static quality specs (UI-only)
-const QUALITY_SPECS = [
-  { label: 'Độ ngọt',    value: '≥ 28 Brix',        icon: '🍯' },
-  { label: 'Kích thước', value: '2.5 – 3.5 kg/trái', icon: '📏' },
-  { label: 'Thuốc BVTV', value: 'Không dư lượng',    icon: '✅' },
-  { label: 'Thu hoạch',  value: '15–20 ngày',         icon: '📅' },
-];
-
-const FARM_HISTORY = [
-  { season: 'Vụ 2024', yield: '5.2 tấn', quality: 'Đạt chuẩn GlobalGAP' },
-  { season: 'Vụ 2023', yield: '4.8 tấn', quality: 'Đạt chuẩn VietGAP' },
-];
-
 export interface ProductDetailTabsProps {
   product: ProductDto;
 }
@@ -76,27 +63,6 @@ export const ProductDetailTabs: React.FC<ProductDetailTabsProps> = ({ product })
   const sectionStyles: React.CSSProperties = {
     padding: spacing.md,
     backgroundColor: colors.background.primary,
-    marginBottom: spacing.sm,
-  };
-
-  const specGridStyles: React.CSSProperties = {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  };
-
-  const specCardStyles: React.CSSProperties = {
-    padding: spacing.sm,
-    backgroundColor: colors.background.secondary,
-    borderRadius: '8px',
-    textAlign: 'center',
-  };
-
-  const historyCardStyles: React.CSSProperties = {
-    padding: spacing.md,
-    backgroundColor: colors.background.secondary,
-    borderRadius: '8px',
     marginBottom: spacing.sm,
   };
 
@@ -144,29 +110,18 @@ export const ProductDetailTabs: React.FC<ProductDetailTabsProps> = ({ product })
         )}
       </div>
 
-      <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.sm }}>
-        Thông số cam kết
-      </Text.Title>
-      <div style={specGridStyles}>
-        {QUALITY_SPECS.map((spec, i) => (
-          <div key={i} style={specCardStyles}>
-            <div style={{ fontSize: '28px', marginBottom: spacing.xs }}>{spec.icon}</div>
-            <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>{spec.label}</Text>
-            <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>{spec.value}</Text>
-          </div>
-        ))}
-      </div>
-
-      <Text.Title size="small" style={{ margin: `${spacing.md} 0 ${spacing.sm}` }}>
-        Hồ sơ năng lực vườn
-      </Text.Title>
-      {FARM_HISTORY.map((h, i) => (
-        <div key={i} style={historyCardStyles}>
-          <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>{h.season}</Text>
-          <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>Sản lượng: {h.yield}</Text>
-          <Text size="xSmall" style={{ margin: 0, color: colors.primary.agriGreen }}>✓ {h.quality}</Text>
+      {product.stockQuantity !== undefined && (
+        <div style={{
+          padding: spacing.sm,
+          backgroundColor: colors.background.secondary,
+          borderRadius: '8px',
+        }}>
+          <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Tồn kho</Text>
+          <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
+            {product.stockQuantity} {product.unit}
+          </Text>
         </div>
-      ))}
+      )}
     </div>
   );
 
@@ -203,8 +158,13 @@ export const ProductDetailTabs: React.FC<ProductDetailTabsProps> = ({ product })
           </div>
           <div style={{ flex: 1 }}>
             <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-              {product.traderId}
+              {product.traderDisplayName ?? product.traderId}
             </Text>
+            {product.traderPhone && (
+              <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                ☎ {product.traderPhone}
+              </Text>
+            )}
             {trustScoreLoading ? (
               <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Đang tải đánh giá...</Text>
             ) : score && score.count > 0 && score.average !== null ? (
@@ -223,23 +183,25 @@ export const ProductDetailTabs: React.FC<ProductDetailTabsProps> = ({ product })
           </div>
         </div>
 
-        <div style={{
-          padding: spacing.sm,
-          backgroundColor: colors.background.secondary,
-          borderRadius: '8px',
-          marginBottom: spacing.md,
-        }}>
-          <div style={{ display: 'flex', gap: spacing.sm, alignItems: 'center' }}>
-            <Icon name="map-pin" size="sm" color={colors.text.secondary} />
-            <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-              {(product as any).region ?? 'Khu vực chưa cập nhật'}
-            </Text>
+        {product.farmName && (
+          <div style={{
+            padding: spacing.sm,
+            backgroundColor: colors.background.secondary,
+            borderRadius: '8px',
+            marginBottom: spacing.md,
+          }}>
+            <div style={{ display: 'flex', gap: spacing.sm, alignItems: 'center' }}>
+              <Icon name="map-pin" size="sm" color={colors.text.secondary} />
+              <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                {product.farmName}
+              </Text>
+            </div>
           </div>
-        </div>
+        )}
 
         <button
           type="button"
-          onClick={() => navigate(`/buyer?traderId=${product.traderId}`)}
+          onClick={() => navigate(`/buyer?traderId=${encodeURIComponent(product.traderId)}`)}
           style={{
             width: '100%',
             minHeight: '44px',
@@ -264,22 +226,24 @@ export const ProductDetailTabs: React.FC<ProductDetailTabsProps> = ({ product })
         Nhật ký Vườn trồng
       </Text.Title>
 
-      <div style={{
-        padding: spacing.md,
-        backgroundColor: colors.background.secondary,
-        borderRadius: '8px',
-        marginBottom: spacing.md,
-      }}>
-        <div style={{ display: 'flex', gap: spacing.sm }}>
-          <Icon name="map-pin" size="sm" color={colors.text.secondary} />
-          <div>
-            <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Mã vườn</Text>
-            <Text size="small" style={{ fontWeight: fontWeight.medium, margin: 0 }}>
-              {product.farmId ?? 'Chưa gán vườn'}
-            </Text>
+      {(product.farmName || product.farmId) && (
+        <div style={{
+          padding: spacing.md,
+          backgroundColor: colors.background.secondary,
+          borderRadius: '8px',
+          marginBottom: spacing.md,
+        }}>
+          <div style={{ display: 'flex', gap: spacing.sm }}>
+            <Icon name="map-pin" size="sm" color={colors.text.secondary} />
+            <div>
+              <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Vườn</Text>
+              <Text size="small" style={{ fontWeight: fontWeight.medium, margin: 0 }}>
+                {product.farmName ?? product.farmId}
+              </Text>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Locked state — nhật ký chỉ mở khóa sau khi đặt cọc */}
       <div style={{

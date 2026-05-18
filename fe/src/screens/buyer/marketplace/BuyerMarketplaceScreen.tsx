@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Page, Text } from 'zmp-ui';
+import { Page, Text, useNavigate } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
@@ -28,8 +28,8 @@ import { productTraderDisplay } from '@/utils/displayLabels';
 const NEWS_LIMIT = 5;
 const PRODUCTS_PER_PAGE = 12;
 
-type FilterOption = 'Tất cả' | 'Có IoT' | 'VietGAP' | 'Hỗ trợ đặt cọc' | 'Sẵn hàng';
-const FILTER_OPTIONS: FilterOption[] = ['Tất cả', 'Có IoT', 'VietGAP', 'Hỗ trợ đặt cọc', 'Sẵn hàng'];
+type FilterOption = 'Tất cả' | 'VietGAP' | 'GlobalGAP' | 'Hữu cơ' | 'Sẵn hàng';
+const FILTER_OPTIONS: FilterOption[] = ['Tất cả', 'VietGAP', 'GlobalGAP', 'Hữu cơ', 'Sẵn hàng'];
 
 export interface BuyerMarketplaceScreenProps {
   buyerName?: string;
@@ -81,6 +81,11 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
   onProductPress,
 }) => {
   const openSnackbar = useStableOpenSnackbar();
+  const navigate = useNavigate();
+  const goProduct = (productId: string) => {
+    if (onProductPress) onProductPress(productId);
+    else navigate(`/buyer/products/${productId}`);
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const [currentNewsIndex, setCurrentNewsIndex] = useState(0);
   const [newsItems, setNewsItems] = useState<NewsArticleDto[]>([]);
@@ -145,19 +150,14 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
     }
 
     switch (activeFilter) {
-      case 'Có IoT':
-        return list.filter((p) => (p as any).hasIotData ?? false);
       case 'VietGAP':
-        return list.filter((p) =>
-          ((p as any).certifications as string[] | undefined)?.includes('VietGAP') ?? false,
-        );
-      case 'Hỗ trợ đặt cọc':
-        return list.filter((p) => (p as any).supportsDeposit ?? false);
+        return list.filter((p) => p.standardCode === 'VIETGAP_2024');
+      case 'GlobalGAP':
+        return list.filter((p) => p.standardCode === 'GLOBALGAP_2024');
+      case 'Hữu cơ':
+        return list.filter((p) => p.standardCode === 'ORGANIC_2024');
       case 'Sẵn hàng':
-        return list.filter(
-          (p) =>
-            (p as any).harvestStatus === 'available' || !(p as any).harvestStatus,
-        );
+        return list.filter((p) => p.status === 'active' && (p.stockQuantity ?? 0) > 0);
       default:
         return list;
     }
@@ -354,14 +354,13 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
     return (
       <div style={productGridStyles}>
         {filteredProducts.map((product) => {
-          const emoji = (product.images[0] as string | undefined) ?? cropEmoji(product.cropType);
+          const firstImage = product.images && product.images.length > 0 ? product.images[0] : undefined;
           const std = standardLabel(product.standardCode);
-          const p = product as any;
           return (
             <div
               key={product.id}
               style={productCardStyles}
-              onClick={() => onProductPress?.(product.id)}
+              onClick={() => goProduct(product.id)}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'translateY(-4px)';
                 e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.15)';
@@ -372,15 +371,28 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
               }}
             >
               <div style={productImageContainerStyles}>
-                <div style={productImageStyles}>{emoji}</div>
-                <div style={badgeOverlayStyles}>
-                  <TrustBadgeGroup
-                    certifications={p.certifications ?? (std ? [std] : [])}
-                    hasIot={p.hasIotData ?? false}
-                    supportsDeposit={p.supportsDeposit ?? false}
-                    maxVisible={2}
+                {firstImage && firstImage.startsWith('http') ? (
+                  <img
+                    src={firstImage}
+                    alt={product.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                    }}
                   />
-                </div>
+                ) : (
+                  <div style={productImageStyles}>{firstImage ?? cropEmoji(product.cropType)}</div>
+                )}
+                {std && (
+                  <div style={badgeOverlayStyles}>
+                    <TrustBadgeGroup
+                      certifications={[std]}
+                      hasIot={false}
+                      supportsDeposit={false}
+                      maxVisible={2}
+                    />
+                  </div>
+                )}
               </div>
 
               <div style={productInfoStyles}>
@@ -406,7 +418,7 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
                   style={viewDetailButtonStyles}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onProductPress?.(product.id);
+                    goProduct(product.id);
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = colors.primary.agriGreenDark;

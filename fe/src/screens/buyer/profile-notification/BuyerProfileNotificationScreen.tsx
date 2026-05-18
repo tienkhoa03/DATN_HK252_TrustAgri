@@ -84,10 +84,10 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
   // ── Tải hồ sơ từ mockProfileService (Phase 2.1) ──────────────────────────
   const { profile, isLoading: profileLoading } = useProfile();
 
-  // Resolve display values: prefer live profile, fallback to props / defaults
+  // Resolve display values: prefer live profile, fallback to props
   const buyerName   = profile?.displayName   ?? buyerNameProp   ?? 'Người mua';
   const buyerAvatar = profile?.avatarUrl      ?? buyerAvatarProp ?? undefined;
-  const buyerId     = profile?.userId         ?? buyerIdProp     ?? 'BU001';
+  const buyerId     = profile?.userId         ?? buyerIdProp     ?? '';
 
   const [notifications, setNotifications] = useState<NotificationDto[]>([]);
   const [notifLoading, setNotifLoading] = useState(false);
@@ -500,7 +500,7 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
         {/* Menu Items */}
         <div
           style={menuItemStyles}
-          onClick={() => console.log('Edit profile')}
+          onClick={() => openSnackbar({ type: 'info', text: 'Chức năng đang phát triển', duration: 2000 })}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = colors.background.secondary;
           }}
@@ -517,7 +517,7 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
 
         <div
           style={menuItemStyles}
-          onClick={() => navigate('/buyer/history')}
+          onClick={() => navigate('/buyer/orders?status=completed')}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = colors.background.secondary;
           }}
@@ -534,7 +534,7 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
 
         <div
           style={menuItemStyles}
-          onClick={() => console.log('Payment methods')}
+          onClick={() => openSnackbar({ type: 'info', text: 'Chức năng đang phát triển', duration: 2000 })}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = colors.background.secondary;
           }}
@@ -551,7 +551,7 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
 
         <div
           style={menuItemStyles}
-          onClick={() => console.log('Settings')}
+          onClick={() => openSnackbar({ type: 'info', text: 'Chức năng đang phát triển', duration: 2000 })}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = colors.background.secondary;
           }}
@@ -749,7 +749,11 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
             </div>
           </div>
 
-          <div style={qrIdStyles}>{buyerId}</div>
+          {buyerId ? (
+            <div style={qrIdStyles}>{buyerId}</div>
+          ) : (
+            <div style={qrIdStyles}>Đang tải mã định danh…</div>
+          )}
 
           <Text size="xSmall" style={{ color: colors.text.secondary }}>
             Mã này dùng để xác nhận danh tính khi nhận hàng
@@ -784,7 +788,7 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
             cursor: 'pointer',
             transition: 'all 0.2s',
           }}
-          onClick={() => console.log('Confirm delivery')}
+          onClick={() => openSnackbar({ type: 'info', text: 'Vui lòng vào danh sách đơn hàng để xác nhận giao nhận', duration: 3000 })}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = colors.primary.agriGreenDark;
           }}
