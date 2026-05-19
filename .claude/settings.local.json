@@ -34,7 +34,8 @@
       "Bash(npx vite *)",
       "Bash(cd c:/Users/ntkhoa/Code/TrustAgri/fe && npx tsc --noEmit 2>&1 > /tmp/tsc-out.log; grep -B1 \"error TS\" /tmp/tsc-out.log | grep -E \"^src/\" | sort -u | head -100)",
       "Read(//tmp/**)",
-      "Bash(xargs ls -la)"
+      "Bash(xargs ls -la)",
+      "Bash(grep -E \"\\\\.tsx?$|\\\\.jsx?$\")"
     ]
   }
 }

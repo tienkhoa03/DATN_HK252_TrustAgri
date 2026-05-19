@@ -130,7 +130,7 @@ export interface CreateConnectionDto {
 /**
  * Map ApiError code → thông báo tiếng Việt thân thiện cho màn kết nối.
  */
-export function toConnectionViMessage(err: unknown, context?: 'search' | 'list' | 'create' | 'respond' | 'cancel'): string {
+export function toConnectionViMessage(err: unknown, context?: 'search' | 'list' | 'create' | 'respond' | 'cancel' | 'disconnect'): string {
   if (err instanceof ApiError) {
     switch (err.code) {
       case 'UNAUTHORIZED':
@@ -142,9 +142,9 @@ export function toConnectionViMessage(err: unknown, context?: 'search' | 'list' 
           ? 'Yêu cầu kết nối không tồn tại hoặc đã được xử lý.'
           : 'Không tìm thấy dữ liệu.';
       case 'CONFLICT':
-        return context === 'create'
-          ? 'Đã tồn tại yêu cầu kết nối với đối tác này.'
-          : 'Xung đột trạng thái. Vui lòng tải lại trang.';
+        if (context === 'create') return 'Đã tồn tại yêu cầu kết nối với đối tác này.';
+        if (context === 'disconnect') return 'Không thể hủy kết nối khi đang có hợp đồng chưa hoàn thành giữa hai bên.';
+        return 'Xung đột trạng thái. Vui lòng tải lại trang.';
       case 'INVALID_INPUT':
         return 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại thông tin.';
       case 'NETWORK_ERROR':
@@ -168,6 +168,8 @@ export function toConnectionViMessage(err: unknown, context?: 'search' | 'list' 
       return 'Không thể xử lý yêu cầu. Vui lòng thử lại.';
     case 'cancel':
       return 'Không thể hủy yêu cầu kết nối. Vui lòng thử lại.';
+    case 'disconnect':
+      return 'Không thể hủy kết nối. Vui lòng thử lại.';
     default:
       return 'Đã xảy ra lỗi. Vui lòng thử lại.';
   }
@@ -281,6 +283,16 @@ export async function rejectConnection(connectionId: string): Promise<Connection
  * Chỉ hoạt động khi status = 'pending'; 403 nếu không phải người gửi.
  */
 export async function cancelConnection(connectionId: string): Promise<{ success: boolean }> {
+  const { data } = await apiClient.delete<{ success: boolean }>(`/connections/${connectionId}`);
+  return data;
+}
+
+/**
+ * DELETE /api/v1/connections/:id
+ * Hủy kết nối đã accepted — cả hai bên đều có thể hủy.
+ * Backend kiểm tra không có hợp đồng đang ở trạng thái pending_signature/active/pending_change/in_settlement.
+ */
+export async function disconnectConnection(connectionId: string): Promise<{ success: boolean }> {
   const { data } = await apiClient.delete<{ success: boolean }>(`/connections/${connectionId}`);
   return data;
 }

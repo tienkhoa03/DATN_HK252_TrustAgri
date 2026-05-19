@@ -48,6 +48,8 @@ export interface ListStandardsParams {
   page?: number;
   limit?: number;
   ownerTraderId?: string;
+  /** Trả về tiêu chuẩn hệ thống + tiêu chuẩn của trader này. */
+  includedTraderId?: string;
 }
 
 export type CreateStandardDto = Pick<StandardDto, 'code' | 'name' | 'description' | 'steps'>;

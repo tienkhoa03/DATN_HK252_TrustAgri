@@ -24,3 +24,8 @@ export const currentRoleAtom = atom<UserRole>(
 export const accessTokenAtom = atom<string>(
   (get) => get(authSessionAtom)?.accessToken ?? '',
 );
+
+/** Derived: current user ID or null when unauthenticated. */
+export const currentUserIdAtom = atom<string | null>(
+  (get) => get(authSessionAtom)?.userId ?? null,
+);

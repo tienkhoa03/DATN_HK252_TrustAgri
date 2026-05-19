@@ -16,6 +16,8 @@ import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import type { ConnectionDto } from '@/services/connectionService';
+import { disconnectConnection, toConnectionViMessage } from '@/services/connectionService';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { connectionTraderDisplay, farmDisplayLabel } from '@/utils/displayLabels';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -128,8 +130,24 @@ export const FarmerConnectionDetailScreen: React.FC = () => {
   const navigate = useNavigate();
   const params = useParams<{ id?: string }>();
   const location = useLocation();
+  const openSnackbar = useStableOpenSnackbar();
   const stateConnection = (location.state as { connection?: ConnectionDto } | null)?.connection;
-  const [connection] = useState<ConnectionDto | null>(stateConnection ?? null);
+  const [connection, setConnection] = useState<ConnectionDto | null>(stateConnection ?? null);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+
+  const handleDisconnect = async () => {
+    if (!connection) return;
+    setIsDisconnecting(true);
+    try {
+      await disconnectConnection(connection.id);
+      setConnection((prev) => prev ? { ...prev, status: 'cancelled' } : null);
+      openSnackbar({ type: 'success', text: 'Đã hủy kết nối thành công.', duration: 3000, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'disconnect'), duration: 3500, icon: true });
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
 
   const statusColor: Record<ConnectionStatus, string> = {
     pending: colors.functional.warningYellow,
@@ -421,7 +439,7 @@ export const FarmerConnectionDetailScreen: React.FC = () => {
         )}
       </div>
 
-      {/* Sticky action: navigate to contracts tab when accepted */}
+      {/* Sticky action bar khi accepted */}
       {connection.status === 'accepted' && (
         <div
           style={{
@@ -433,13 +451,15 @@ export const FarmerConnectionDetailScreen: React.FC = () => {
             backgroundColor: colors.background.primary,
             borderTop: `1px solid ${colors.background.secondary}`,
             boxShadow: '0 -4px 12px rgba(0,0,0,0.08)',
+            display: 'flex',
+            gap: spacing.sm,
           }}
         >
           <button
             onClick={() => navigate('/farmer/trade?tab=contracts')}
             style={{
-              width: '100%',
-              padding: `${spacing.md} ${spacing.lg}`,
+              flex: 1,
+              padding: `${spacing.md} ${spacing.sm}`,
               backgroundColor: colors.primary.zaloBlue,
               color: '#fff',
               border: 'none',
@@ -451,6 +471,24 @@ export const FarmerConnectionDetailScreen: React.FC = () => {
             }}
           >
             📄 Xem hợp đồng
+          </button>
+          <button
+            onClick={handleDisconnect}
+            disabled={isDisconnecting}
+            style={{
+              flex: 1,
+              padding: `${spacing.md} ${spacing.sm}`,
+              backgroundColor: 'transparent',
+              color: isDisconnecting ? colors.text.disabled : colors.functional.alertRed,
+              border: `1.5px solid ${isDisconnecting ? colors.text.disabled : colors.functional.alertRed}`,
+              borderRadius: 12,
+              fontSize: fontSize.body,
+              fontWeight: fontWeight.semibold,
+              cursor: isDisconnecting ? 'not-allowed' : 'pointer',
+              minHeight: 44,
+            }}
+          >
+            {isDisconnecting ? 'Đang hủy...' : '✕ Hủy kết nối'}
           </button>
         </div>
       )}

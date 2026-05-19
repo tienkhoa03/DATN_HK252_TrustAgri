@@ -486,6 +486,7 @@ export class ConnectionsService implements OnModuleInit {
   /**
    * DELETE /api/v1/connections/:id
    * Hủy kết nối (pending hoặc accepted) — cả hai phía đều được phép.
+   * Khi hủy accepted: kiểm tra không có hợp đồng đang hoạt động giữa hai bên.
    */
   async deleteConnection(
     connectionId: string,
@@ -500,6 +501,25 @@ export class ConnectionsService implements OnModuleInit {
         `Không thể hủy kết nối ở trạng thái "${connection.status}"`,
       );
     }
+
+    if (connection.status === 'accepted') {
+      const farmerId = connection.fromRole === 'farmer' ? connection.fromUserId : connection.toUserId;
+      const traderId = connection.fromRole === 'trader' ? connection.fromUserId : connection.toUserId;
+      const blockingStatuses = ['pending_signature', 'active', 'pending_change', 'in_settlement'];
+      const [countRow] = await this.dataSource.query<[{ count: string }]>(
+        `SELECT COUNT(*) AS count FROM contracts
+         WHERE party_farmer_id = $1 AND party_trader_id = $2
+           AND status = ANY($3::varchar[])
+           AND deleted_at IS NULL`,
+        [farmerId, traderId, blockingStatuses],
+      );
+      if (parseInt(countRow.count, 10) > 0) {
+        throw new ConflictException(
+          'Không thể hủy kết nối khi đang có hợp đồng chưa hoàn thành giữa hai bên',
+        );
+      }
+    }
+
     connection.status = 'cancelled';
     const saved = await this.connectionRepo.save(connection);
     const dto = this.toDto(saved);

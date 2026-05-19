@@ -17,6 +17,8 @@ import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
 import type { ConnectionDto } from '@/services/connectionService';
+import { disconnectConnection, toConnectionViMessage } from '@/services/connectionService';
+import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { CreateFarmerContractModal } from '../transactions/components/CreateFarmerContractModal';
 import { listContracts, type ContractDto } from '@/services/contractService';
 import { connectionFarmerDisplay, farmDisplayLabel } from '@/utils/displayLabels';
@@ -139,28 +141,49 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
   const navigate = useNavigate();
   const params = useParams<{ id?: string }>();
   const location = useLocation();
+  const openSnackbar = useStableOpenSnackbar();
   // Ưu tiên prop, rồi đến navigation state (khi navigate từ ConnectionRequestsScreen)
   const stateConnection = (location.state as { connection?: ConnectionDto } | null)?.connection;
   const [connection, setConnection] = useState<ConnectionDto | null>(connectionProp ?? stateConnection ?? null);
   const [showCreateContract, setShowCreateContract] = useState(false);
   const [farmHasOngoingContract, setFarmHasOngoingContract] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   useEffect(() => {
     const farmId = connection?.farmId;
     if (!farmId) return;
+    // Kiểm tra cả 4 trạng thái block disconnect
     Promise.all([
       listContracts({ role: 'trader', status: 'active', limit: 100 }),
       listContracts({ role: 'trader', status: 'pending_signature', limit: 100 }),
+      listContracts({ role: 'trader', status: 'pending_change', limit: 100 }),
+      listContracts({ role: 'trader', status: 'in_settlement', limit: 100 }),
     ])
-      .then(([activeRes, pendingRes]) => {
+      .then(([activeRes, pendingRes, changeRes, settlementRes]) => {
         const busy = [
           ...activeRes.items.map((c) => c.farmId),
           ...pendingRes.items.map((c) => c.farmId),
+          ...changeRes.items.map((c) => c.farmId),
+          ...settlementRes.items.map((c) => c.farmId),
         ].filter(Boolean);
         setFarmHasOngoingContract(busy.includes(farmId));
       })
       .catch(() => {});
   }, [connection?.farmId]);
+
+  const handleDisconnect = async () => {
+    if (!connection) return;
+    setIsDisconnecting(true);
+    try {
+      await disconnectConnection(connection.id);
+      setConnection((prev) => prev ? { ...prev, status: 'cancelled' } : null);
+      openSnackbar({ type: 'success', text: 'Đã hủy kết nối thành công.', duration: 3000, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'disconnect'), duration: 3500, icon: true });
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
 
   const farmerUserId = connection
     ? (connection.fromRole === 'farmer' ? connection.fromUserId : connection.toUserId)
@@ -415,7 +438,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
         )}
       </div>
 
-      {/* Sticky action bar — tạo hợp đồng khi accepted */}
+      {/* Sticky action bar — tạo hợp đồng / hủy kết nối khi accepted */}
       {connection.status === 'accepted' && (
         <div
           style={{
@@ -439,29 +462,49 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
                 marginBottom: spacing.sm,
               }}
             >
-              Vườn này đã có hợp đồng đang thực hiện
+              Vườn này đã có hợp đồng đang thực hiện — không thể hủy kết nối
             </Text>
           )}
-          <button
-            onClick={() => !farmHasOngoingContract && setShowCreateContract(true)}
-            disabled={farmHasOngoingContract}
-            style={{
-              width: '100%',
-              padding: `${spacing.md} ${spacing.lg}`,
-              backgroundColor: farmHasOngoingContract
-                ? colors.background.secondary
-                : colors.primary.agriGreen,
-              color: farmHasOngoingContract ? colors.text.secondary : '#fff',
-              border: 'none',
-              borderRadius: 12,
-              fontSize: fontSize.body,
-              fontWeight: fontWeight.semibold,
-              cursor: farmHasOngoingContract ? 'not-allowed' : 'pointer',
-              minHeight: 44,
-            }}
-          >
-            📄 Tạo hợp đồng bao tiêu
-          </button>
+          <div style={{ display: 'flex', gap: spacing.sm }}>
+            <button
+              onClick={() => !farmHasOngoingContract && setShowCreateContract(true)}
+              disabled={farmHasOngoingContract}
+              style={{
+                flex: 1,
+                padding: `${spacing.md} ${spacing.sm}`,
+                backgroundColor: farmHasOngoingContract
+                  ? colors.background.secondary
+                  : colors.primary.agriGreen,
+                color: farmHasOngoingContract ? colors.text.secondary : '#fff',
+                border: 'none',
+                borderRadius: 12,
+                fontSize: fontSize.body,
+                fontWeight: fontWeight.semibold,
+                cursor: farmHasOngoingContract ? 'not-allowed' : 'pointer',
+                minHeight: 44,
+              }}
+            >
+              📄 Tạo hợp đồng
+            </button>
+            <button
+              onClick={handleDisconnect}
+              disabled={isDisconnecting || farmHasOngoingContract}
+              style={{
+                flex: 1,
+                padding: `${spacing.md} ${spacing.sm}`,
+                backgroundColor: 'transparent',
+                color: (isDisconnecting || farmHasOngoingContract) ? colors.text.disabled : colors.functional.alertRed,
+                border: `1.5px solid ${(isDisconnecting || farmHasOngoingContract) ? colors.text.disabled : colors.functional.alertRed}`,
+                borderRadius: 12,
+                fontSize: fontSize.body,
+                fontWeight: fontWeight.semibold,
+                cursor: (isDisconnecting || farmHasOngoingContract) ? 'not-allowed' : 'pointer',
+                minHeight: 44,
+              }}
+            >
+              {isDisconnecting ? 'Đang hủy...' : '✕ Hủy kết nối'}
+            </button>
+          </div>
         </div>
       )}
 

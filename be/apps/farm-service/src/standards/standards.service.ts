@@ -45,7 +45,13 @@ export class StandardsService {
       .skip(skip)
       .take(limit);
 
-    if (query.ownerTraderId !== undefined) {
+    if (query.includedTraderId) {
+      // Hệ thống (ownerTraderId IS NULL) + tiêu chuẩn của trader này
+      qb.andWhere(
+        '(std.owner_trader_id IS NULL OR std.owner_trader_id = :includedId)',
+        { includedId: query.includedTraderId },
+      );
+    } else if (query.ownerTraderId !== undefined) {
       if (query.ownerTraderId === 'null' || query.ownerTraderId === '') {
         qb.andWhere('std.owner_trader_id IS NULL');
       } else {

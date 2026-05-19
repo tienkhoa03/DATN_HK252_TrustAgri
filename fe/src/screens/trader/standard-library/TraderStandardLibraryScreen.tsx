@@ -21,7 +21,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Page, Text } from 'zmp-ui';
 import { useAtomValue } from 'jotai';
-import { currentRoleAtom } from '@/state/authAtoms';
+import { currentRoleAtom, currentUserIdAtom } from '@/state/authAtoms';
 import { Icon } from '../../../design-system/components/Icon';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
@@ -100,7 +100,14 @@ function formToStepDto(s: StepFormItem): StandardStepDto {
 
 export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inTab }) => {
   const role = useAtomValue(currentRoleAtom);
+  const currentUserId = useAtomValue(currentUserIdAtom);
   const isTrader = role === 'trader';
+
+  const isOwner = useCallback(
+    (std: { ownerTraderId?: string }) =>
+      !!std.ownerTraderId && std.ownerTraderId === currentUserId,
+    [currentUserId],
+  );
 
   const {
     standards,
@@ -147,8 +154,13 @@ export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inT
   useEffect(() => {
     if (loadedRef.current) return;
     loadedRef.current = true;
-    loadStandards({ page: 1, limit: 20 });
-  }, [loadStandards]);
+    // Trader: chỉ load hệ thống + của mình; role khác load tất cả
+    if (isTrader && currentUserId) {
+      loadStandards({ page: 1, limit: 50, includedTraderId: currentUserId });
+    } else {
+      loadStandards({ page: 1, limit: 20 });
+    }
+  }, [loadStandards, isTrader, currentUserId]);
 
   // ── Detail ──────────────────────────────────────────────────────────────────
 
@@ -179,7 +191,10 @@ export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inT
   };
 
   const openEdit = (s: StandardDto) => {
-    if (!isTrader) return;
+    if (!isTrader || !isOwner(s)) {
+      openSnackbar({ text: 'Bạn không có quyền chỉnh sửa quy trình này.', type: 'error', duration: 3000 });
+      return;
+    }
     setEditingId(s.id);
     setFormCode(s.code);
     setFormName(s.name);
@@ -427,11 +442,15 @@ export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inT
 
                 <div style={{ marginBottom: spacing.sm }}>
                   <span style={s.badge(colors.primary.agriGreen)}>{std.code}</span>
-                  {std.ownerTraderId && (
-                    <span style={{ ...s.badge(colors.primary.zaloBlue), marginLeft: spacing.xs }}>
-                      Riêng
+                  {!std.ownerTraderId ? (
+                    <span style={{ ...s.badge(colors.text.secondary), marginLeft: spacing.xs }}>
+                      Hệ thống
                     </span>
-                  )}
+                  ) : isOwner(std) ? (
+                    <span style={{ ...s.badge(colors.primary.zaloBlue), marginLeft: spacing.xs }}>
+                      Của bạn
+                    </span>
+                  ) : null}
                 </div>
 
                 <Text size="small" style={{ color: colors.text.secondary, marginBottom: spacing.sm }}>
@@ -457,7 +476,7 @@ export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inT
         <Text.Title size="normal" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
           Chi tiết Quy trình
         </Text.Title>
-        {isTrader && detail && (
+        {isTrader && detail && isOwner(detail) && (
           <div style={{ display: 'flex', gap: spacing.sm }}>
             <button
               style={s.primaryBtn(isMutating)}
@@ -506,9 +525,11 @@ export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inT
               </Text.Title>
               <div style={{ marginBottom: spacing.sm }}>
                 <span style={s.badge(colors.primary.agriGreen)}>{detail.code}</span>
-                {detail.ownerTraderId && (
+                {!detail.ownerTraderId ? (
+                  <span style={{ ...s.badge(colors.text.secondary), marginLeft: spacing.xs }}>Hệ thống</span>
+                ) : isOwner(detail) ? (
                   <span style={{ ...s.badge(colors.primary.zaloBlue), marginLeft: spacing.xs }}>Của bạn</span>
-                )}
+                ) : null}
               </div>
               <Text size="small" style={{ color: colors.text.secondary }}>
                 {detail.description}

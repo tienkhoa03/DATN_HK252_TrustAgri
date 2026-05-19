@@ -196,8 +196,11 @@ export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> =
     }
   };
 
-  // ── Derived counts ────────────────────────────────────────────────────────
-  const incomingPendingCount = incoming.filter((c) => c.status === 'pending').length;
+  // ── Derived / filtered lists ──────────────────────────────────────────────
+  // Rejected connections are treated as "no connection" — hidden from both tabs
+  const incomingDisplay = incoming.filter((c) => c.status !== 'rejected');
+  const outgoingDisplay = outgoing.filter((c) => c.status !== 'rejected');
+  const incomingPendingCount = incomingDisplay.filter((c) => c.status === 'pending').length;
 
   // ── Styles ────────────────────────────────────────────────────────────────
   const tabBtn = (active: boolean): React.CSSProperties => ({
@@ -274,10 +277,10 @@ export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> =
           <>
             {isIncomingLoading ? (
               <><ConnectionCardSkeleton /><ConnectionCardSkeleton /><ConnectionCardSkeleton /></>
-            ) : incoming.length === 0 ? (
+            ) : incomingDisplay.length === 0 ? (
               <EmptyState message={`Chưa có ${roleLabel.toLowerCase()} nào gửi yêu cầu kết nối đến bạn`} />
             ) : (
-              incoming.map((conn) => {
+              incomingDisplay.map((conn) => {
                 const isPending = !!pendingActions[conn.id];
                 const isActionable = conn.status === 'pending';
                 const name = counterpartLabel(conn, role, 'incoming');
@@ -351,10 +354,10 @@ export const ConnectionRequestsScreen: React.FC<ConnectionRequestsScreenProps> =
           <>
             {isOutgoingLoading ? (
               <><ConnectionCardSkeleton /><ConnectionCardSkeleton /></>
-            ) : outgoing.length === 0 ? (
+            ) : outgoingDisplay.length === 0 ? (
               <EmptyState message={`Bạn chưa gửi yêu cầu kết nối nào tới ${roleLabel.toLowerCase()}`} />
             ) : (
-              outgoing.map((conn) => {
+              outgoingDisplay.map((conn) => {
                 const name = counterpartLabel(conn, role, 'outgoing');
                 const isClickable = conn.status === 'accepted';
                 const detailPath = role === 'trader'
