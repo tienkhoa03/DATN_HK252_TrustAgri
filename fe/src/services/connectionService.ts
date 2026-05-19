@@ -61,6 +61,8 @@ export interface TraderSearchResultDto {
     region: string;
     capacity: string;
     trustScore: number;
+    /** Danh sách mã loại nông sản trader thu mua (vd: ['dragon_fruit']). */
+    purchasedCropTypes?: string[];
   };
   connectionStatus: 'none' | 'pending_sent' | 'pending_received' | 'accepted';
   connectionId?: string;

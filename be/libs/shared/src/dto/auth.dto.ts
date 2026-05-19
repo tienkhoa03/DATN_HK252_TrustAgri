@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsString,
   IsOptional,
   IsEmail,
@@ -48,6 +49,8 @@ export interface UserProfileDto {
     region: string;
     capacity: string;
     trustScore: number;
+    /** Danh sách mã loại nông sản trader thu mua. */
+    purchasedCropTypes?: string[];
   };
   farmerProfile?: {
     region: string;
@@ -139,6 +142,16 @@ export class TraderProfileUpdateDto {
   @IsNumber()
   @Min(0)
   trustScore: number;
+
+  @ApiPropertyOptional({
+    description: 'Danh sách mã loại nông sản trader thu mua',
+    example: ['dragon_fruit', 'pomelo'],
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  purchasedCropTypes?: string[];
 }
 
 /** Nested DTO cho farmerProfile */

@@ -259,6 +259,39 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
           }}
         />
 
+        {/* Block 2.5: Tin tức & dự báo giá (FR-F12) */}
+        <div style={{ padding: `${spacing.sm} ${spacing.md} 0` }}>
+          <button
+            type="button"
+            onClick={() => navigate('/farmer/news')}
+            style={{
+              width: '100%',
+              padding: spacing.md,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: colors.background.primary,
+              border: `1px solid ${colors.background.secondary}`,
+              borderRadius: 10,
+              cursor: 'pointer',
+              minHeight: 56,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+              <span style={{ fontSize: '24px' }}>📰</span>
+              <div style={{ textAlign: 'left' }}>
+                <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
+                  Tin tức & Dự báo giá
+                </Text>
+                <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                  Cập nhật từ các thương lái
+                </Text>
+              </div>
+            </div>
+            <span style={{ fontSize: '18px', color: colors.text.secondary }}>›</span>
+          </button>
+        </div>
+
         {/* Block 3: KPI chips */}
         <div style={{ padding: `${spacing.sm} ${spacing.md} 0` }}>
           <Text.Title size="small" style={{ margin: `0 0 ${spacing.sm}` }}>

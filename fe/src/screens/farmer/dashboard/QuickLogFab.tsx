@@ -148,7 +148,10 @@ export const QuickLogFab: React.FC<QuickLogFabProps> = ({ farmId, onSuccess }) =
       {open && (
         <div
           style={{
-            position: 'fixed', inset: 0, zIndex: 1100,
+            position: 'fixed',
+            top: 0, left: 0, right: 0,
+            bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+            zIndex: 1100,
             backgroundColor: 'rgba(0,0,0,0.45)',
             display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
           }}
@@ -158,7 +161,7 @@ export const QuickLogFab: React.FC<QuickLogFabProps> = ({ farmId, onSuccess }) =
             backgroundColor: colors.background.primary,
             borderRadius: '16px 16px 0 0',
             padding: `${spacing.md} ${spacing.md} ${spacing.xl}`,
-            maxHeight: '80vh',
+            maxHeight: '75vh',
             overflowY: 'auto',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>

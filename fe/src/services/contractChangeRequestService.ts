@@ -13,20 +13,26 @@
 import apiClient from '@/api/client';
 import { ApiError } from '@/api/errors';
 
+export type ContractChangeAction = 'modify' | 'cancel' | 'complete';
+
 export interface ContractChangeRequestDto {
   id: string;
   contractId: string;
+  action: ContractChangeAction;
   requestedBy: string;
+  requestedByName?: string | null;
   changes: Record<string, { oldValue: unknown; newValue: unknown }>;
   reason?: string;
   status: 'pending' | 'accepted' | 'rejected';
   respondedBy?: string;
+  respondedByName?: string | null;
   createdAt: string;
   respondedAt?: string;
 }
 
 export interface CreateContractChangeRequestDto {
-  changes: Record<string, { oldValue: unknown; newValue: unknown }>;
+  action?: ContractChangeAction;
+  changes?: Record<string, { oldValue: unknown; newValue: unknown }>;
   reason?: string;
 }
 
@@ -58,6 +64,9 @@ export function normalizeContractChangeRequestDto(raw: unknown): ContractChangeR
   const contractId = String(r.contractId ?? r.contract_id ?? '');
   const requestedBy = String(r.requestedBy ?? r.requested_by ?? '');
   const status = (r.status ?? 'pending') as ContractChangeRequestDto['status'];
+  const actionRaw = r.action;
+  const action: ContractChangeAction =
+    actionRaw === 'cancel' || actionRaw === 'complete' ? actionRaw : 'modify';
   const createdAt =
     typeof r.createdAt === 'string'
       ? r.createdAt
@@ -76,17 +85,32 @@ export function normalizeContractChangeRequestDto(raw: unknown): ContractChangeR
       : typeof r.responded_by === 'string'
         ? r.responded_by
         : undefined;
+  const requestedByName =
+    typeof r.requestedByName === 'string'
+      ? r.requestedByName
+      : typeof r.requested_by_name === 'string'
+        ? r.requested_by_name
+        : null;
+  const respondedByName =
+    typeof r.respondedByName === 'string'
+      ? r.respondedByName
+      : typeof r.responded_by_name === 'string'
+        ? r.responded_by_name
+        : null;
   const reason =
     r.reason === undefined || r.reason === null ? undefined : String(r.reason);
 
   return {
     id,
     contractId,
+    action,
     requestedBy,
+    requestedByName,
     changes: normalizeChanges(r.changes),
     reason,
     status,
     respondedBy,
+    respondedByName,
     createdAt,
     respondedAt,
   };
@@ -162,4 +186,38 @@ export async function rejectContractChangeRequest(
     `/contracts/${contractId}/change-requests/${changeId}/reject`,
   );
   return normalizeContractChangeRequestDto(data);
+}
+
+/**
+ * Yêu cầu hủy hợp đồng (cần đối tác chấp nhận).
+ * Sau khi tạo, hợp đồng chuyển sang `pending_change` cho đến khi đối tác accept → cancelled, hoặc reject → active.
+ */
+export async function requestCancelContract(
+  contractId: string,
+  reason?: string,
+): Promise<ContractChangeRequestDto> {
+  return createContractChangeRequest(contractId, { action: 'cancel', reason });
+}
+
+/**
+ * Yêu cầu hoàn thành hợp đồng (cần đối tác chấp nhận).
+ * Sau khi tạo, hợp đồng chuyển sang `pending_change` → accept → completed.
+ */
+export async function requestCompleteContract(
+  contractId: string,
+  reason?: string,
+): Promise<ContractChangeRequestDto> {
+  return createContractChangeRequest(contractId, { action: 'complete', reason });
+}
+
+/**
+ * Yêu cầu điều chỉnh hợp đồng (cần đối tác chấp nhận).
+ * changes: map field → { oldValue, newValue } khớp giá trị hiện tại.
+ */
+export async function requestModifyContract(
+  contractId: string,
+  changes: Record<string, { oldValue: unknown; newValue: unknown }>,
+  reason?: string,
+): Promise<ContractChangeRequestDto> {
+  return createContractChangeRequest(contractId, { action: 'modify', changes, reason });
 }

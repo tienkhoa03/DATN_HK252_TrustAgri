@@ -84,12 +84,15 @@ export class SensorsService {
   }
 
   /**
-   * Ghi một reading mới vào Redis, push WebSocket sensor_update,
+   * Ghi một reading mới vào InfluxDB + Redis, push WebSocket sensor_update,
    * và kiểm tra ngưỡng để tạo alert nếu cần.
-   * Dùng khi có data ingestion pipeline (MQTT, HTTP ingestion, v.v.)
+   * Dùng cho data ingestion pipeline (MQTT, HTTP ingestion, seed demo).
    */
   async ingestReading(reading: SensorReadingDto): Promise<void> {
-    await this.redis.setReading(reading);
+    await Promise.all([
+      this.redis.setReading(reading),
+      this.influx.writeReading(reading),
+    ]);
     this.gateway.pushSensorUpdate(reading.farmId, reading);
     await this.alertsService.checkAndCreateAlert(reading);
   }

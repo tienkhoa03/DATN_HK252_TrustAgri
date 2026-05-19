@@ -10,8 +10,11 @@ import {
 } from 'typeorm';
 import { ContractEntity } from '../../contracts/entities/contract.entity';
 
+export type ContractChangeAction = 'modify' | 'cancel' | 'complete';
+
 @Entity('contract_change_requests')
 @Check(`"status" IN ('pending', 'accepted', 'rejected')`)
+@Check(`"action" IN ('modify', 'cancel', 'complete')`)
 export class ContractChangeRequestEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -23,6 +26,12 @@ export class ContractChangeRequestEntity {
   @ManyToOne(() => ContractEntity, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'contract_id' })
   contract: ContractEntity;
+
+  /**
+   * Loại yêu cầu: modify (điều chỉnh field), cancel (hủy), complete (hoàn thành).
+   */
+  @Column({ type: 'varchar', length: 20, default: 'modify' })
+  action: ContractChangeAction;
 
   /**
    * Cross-service FK → users.user_id (auth-service).

@@ -15,6 +15,7 @@ import * as authService from '@/services/authService';
 import * as marketplaceService from '@/services/marketplaceService';
 import type { UserProfileDto, UserProfileUpdateDto } from '@/services/authService';
 import type { ProductDto } from '@/services/marketplaceService';
+import { CROP_LABELS } from '@/services/marketplaceService';
 import { primaryColors, functionalColors, textColors, backgroundColors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
@@ -49,7 +50,9 @@ export function TraderProfileLayout({ profile, updateProfile, isSaving }: Trader
   const [region, setRegion]                   = useState(profile.traderProfile?.region ?? '');
   const [phone, setPhone]                     = useState(profile.phone ?? '');
   const [capacity, setCapacity]               = useState(profile.traderProfile?.capacity ?? '');
-  const [preferredCrops, setPreferredCrops]   = useState('');
+  const [purchasedCropTypes, setPurchasedCropTypes] = useState<string[]>(
+    profile.traderProfile?.purchasedCropTypes ?? [],
+  );
 
   const closeModal = () => setActiveModal(null);
 
@@ -62,6 +65,7 @@ export function TraderProfileLayout({ profile, updateProfile, isSaving }: Trader
         region,
         capacity: profile.traderProfile?.capacity ?? '',
         trustScore: profile.traderProfile?.trustScore ?? 0,
+        purchasedCropTypes: profile.traderProfile?.purchasedCropTypes ?? [],
       },
     };
     const ok = await updateProfile(patch);
@@ -80,21 +84,13 @@ export function TraderProfileLayout({ profile, updateProfile, isSaving }: Trader
   };
 
   const saveCapacity = async () => {
-    const cropsArray = preferredCrops
-      .split(',')
-      .map((c) => c.trim())
-      .filter(Boolean);
-
-    // preferredCrops not in current DTO — stored via description field workaround
-    // capacity update via traderProfile.capacity
     const patch: UserProfileUpdateDto = {
       traderProfile: {
         companyName:  profile.traderProfile?.companyName ?? '',
         region:       profile.traderProfile?.region ?? '',
         capacity,
         trustScore:   profile.traderProfile?.trustScore ?? 0,
-        // If backend adds preferredCrops later it will pass through
-        ...(cropsArray.length > 0 ? {} : {}),
+        purchasedCropTypes,
       },
     };
     const ok = await updateProfile(patch);
@@ -280,7 +276,7 @@ export function TraderProfileLayout({ profile, updateProfile, isSaving }: Trader
           label="Năng lực thu mua"
           onTap={() => {
             setCapacity(profile.traderProfile?.capacity ?? '');
-            setPreferredCrops('');
+            setPurchasedCropTypes(profile.traderProfile?.purchasedCropTypes ?? []);
             setActiveModal('capacity');
           }}
         />
@@ -337,12 +333,36 @@ export function TraderProfileLayout({ profile, updateProfile, isSaving }: Trader
           isSaving={isSaving}
         >
           <ModalInput label="Năng lực thu mua (VD: 50 tấn/tháng)" value={capacity} onChange={setCapacity} />
-          <ModalInput
-            label="Nông sản ưu tiên (cách nhau bằng dấu phẩy)"
-            value={preferredCrops}
-            onChange={setPreferredCrops}
-            placeholder="Xoài, Nhãn, Bưởi"
-          />
+          <Text size="small" style={{ color: 'rgba(0,0,0,0.6)', marginBottom: spacing.xs, marginTop: spacing.sm, fontWeight: fontWeight.semibold, display: 'block' }}>
+            Loại nông sản thu mua
+          </Text>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm }}>
+            {Object.entries(CROP_LABELS).map(([value, label]) => {
+              const checked = purchasedCropTypes.includes(value);
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setPurchasedCropTypes((prev) =>
+                    prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+                  )}
+                  style={{
+                    padding: `${spacing.xs} ${spacing.sm}`,
+                    backgroundColor: checked ? primaryColors.agriGreen : 'transparent',
+                    color: checked ? '#fff' : primaryColors.agriGreen,
+                    border: `1px solid ${primaryColors.agriGreen}`,
+                    borderRadius: 16,
+                    fontSize: fontSize.caption,
+                    fontWeight: fontWeight.medium,
+                    cursor: 'pointer',
+                    minHeight: 36,
+                  }}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </EditModal>
       )}
 

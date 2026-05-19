@@ -42,6 +42,8 @@ export class UserEntity {
     region: string;
     capacity: string;
     trustScore: number;
+    /** Danh sách mã loại nông sản trader thu mua (vd: ['dragon_fruit', 'pomelo']). */
+    purchasedCropTypes?: string[];
   } | null;
 
   @Column({ type: 'jsonb', nullable: true, name: 'farmer_profile' })

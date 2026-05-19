@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InfluxDB, QueryApi } from '@influxdata/influxdb-client';
+import { InfluxDB, Point, QueryApi, WriteApi } from '@influxdata/influxdb-client';
 import { resolveInfluxUrl, SensorReadingDto } from '@trustagri/shared';
 
 /** Đơn vị mặc định theo loại cảm biến */
@@ -22,6 +22,7 @@ const UNIT_MAP: Record<string, string> = {
 export class InfluxSensorService {
   private readonly logger = new Logger(InfluxSensorService.name);
   private readonly queryApi: QueryApi;
+  private readonly writeApi: WriteApi;
   private readonly bucket: string;
 
   constructor(private readonly config: ConfigService) {
@@ -32,6 +33,28 @@ export class InfluxSensorService {
 
     const influx = new InfluxDB({ url, token });
     this.queryApi = influx.getQueryApi(org);
+    this.writeApi = influx.getWriteApi(org, this.bucket, 'ns');
+  }
+
+  /**
+   * Ghi một sensor reading vào InfluxDB.
+   * Dùng cho data ingestion pipeline (HTTP/MQTT) hoặc seed data demo.
+   */
+  async writeReading(reading: SensorReadingDto): Promise<void> {
+    try {
+      const point = new Point('sensor_reading')
+        .tag('farmId', reading.farmId)
+        .tag('sensorType', reading.sensorType)
+        .tag('isImputed', reading.isImputed ? 'true' : 'false')
+        .floatField('value', reading.value)
+        .timestamp(reading.recordedAt ? new Date(reading.recordedAt) : new Date());
+      this.writeApi.writePoint(point);
+      await this.writeApi.flush();
+    } catch (err) {
+      this.logger.warn(
+        `InfluxDB write failed for farmId=${reading.farmId}: ${(err as Error).message}`,
+      );
+    }
   }
 
   /**

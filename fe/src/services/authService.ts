@@ -29,6 +29,8 @@ export interface UserProfileDto {
     region: string;
     capacity: string;
     trustScore: number;
+    /** Danh sách mã loại nông sản trader thu mua (vd: ['dragon_fruit']). */
+    purchasedCropTypes?: string[];
   };
   farmerProfile?: {
     region: string;

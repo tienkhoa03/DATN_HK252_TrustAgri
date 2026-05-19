@@ -142,6 +142,10 @@ const NotificationsScreen = lazy(() =>
   import('@/screens/shared/notifications').then((m) => ({ default: m.NotificationsScreen })),
 );
 
+const NewsFeedScreen = lazy(() =>
+  import('@/screens/shared/news-feed').then((m) => ({ default: m.NewsFeedScreen })),
+);
+
 const AppInitScreen = lazy(() =>
   import('@/pages/AppInitScreen').then((m) => ({ default: m.AppInitScreen })),
 );
@@ -263,6 +267,7 @@ export function AppRoutes() {
           <Route path="connections" element={<ConnectionRequestsScreen role="farmer" />} />
           <Route path="connections/:id" element={<FarmerConnectionDetailScreen />} />
           <Route path="alerts" element={<FarmerAlertListScreen />} />
+          <Route path="news" element={<NewsFeedScreen title="Tin tức & Dự báo giá" />} />
           {/* Legacy redirects */}
           <Route path="farm" element={<RedirectTo to="/farmer/garden" />} />
           <Route path="process" element={<RedirectTo to="/farmer/garden?section=timeline" />} />
@@ -280,6 +285,7 @@ export function AppRoutes() {
           <Route path="connections" element={<ConnectionRequestsScreen role="trader" />} />
           <Route path="connections/:id" element={<TraderConnectionDetailScreen />} />
           <Route path="me" element={<ProfileScreen />} />
+          <Route path="news-feed" element={<NewsFeedScreen title="Tin tức & Dự báo từ thương lái" />} />
           {/* Legacy redirects — keep for backwards-compat */}
           <Route path="supply" element={<RedirectTo to="/trader/monitor" />} />
           <Route path="trading" element={<RedirectTo to="/trader/transactions" />} />

@@ -40,9 +40,10 @@ export interface ProductDto {
 }
 
 export class CreateProductDto {
-  @ApiProperty({ description: 'Active farmer_trader contract ID that links to the farm', example: 'a1b2c3d4-...' })
+  @ApiPropertyOptional({ description: 'Active farmer_trader contract ID that links to the farm (optional — bỏ trống nếu chưa có hợp đồng)', example: 'a1b2c3d4-...' })
+  @IsOptional()
   @IsUUID('4')
-  sourceContractId: string;
+  sourceContractId?: string;
 
   @ApiProperty({ description: 'Product name', example: 'Gao ST25 An Giang' })
   @IsString()
@@ -60,9 +61,10 @@ export class CreateProductDto {
   @IsNumber()
   price: number;
 
-  @ApiProperty({ description: 'Product image URLs', example: ['https://cdn.example.com/img1.jpg'] })
+  @ApiPropertyOptional({ description: 'Product image URLs (optional — mặc định []) ', example: ['https://cdn.example.com/img1.jpg'] })
+  @IsOptional()
   @IsArray()
-  images: string[];
+  images?: string[];
 
   @ApiPropertyOptional({ description: 'Quality standard code', example: 'VietGAP-Rice-2024' })
   @IsOptional()
@@ -348,10 +350,18 @@ export class CreateContractDto {
 
 /**
  * Yêu cầu thay đổi hợp đồng (design.md §4.4.5 ContractChangeRequestDto)
+ * action:
+ *   - 'modify': sửa các trường (changes phải có).
+ *   - 'cancel': yêu cầu hủy hợp đồng (changes có thể rỗng).
+ *   - 'complete': yêu cầu hoàn thành hợp đồng (changes có thể rỗng).
+ * Tất cả đều cần đối tác accept trước khi áp dụng.
  */
+export type ContractChangeAction = 'modify' | 'cancel' | 'complete';
+
 export interface ContractChangeRequestDto {
   id: string;
   contractId: string;
+  action: ContractChangeAction;
   requestedBy: string;
   requestedByName?: string | null;
   requestedByPhone?: string | null;
@@ -366,13 +376,23 @@ export interface ContractChangeRequestDto {
 }
 
 export class CreateContractChangeRequestDto {
+  @ApiPropertyOptional({
+    description: 'Loại yêu cầu',
+    enum: ['modify', 'cancel', 'complete'],
+    example: 'modify',
+  })
+  @IsOptional()
+  @IsIn(['modify', 'cancel', 'complete'])
+  action?: ContractChangeAction;
+
   /** Khóa là tên trường hợp đồng (camelCase); mỗi mục phải khớp giá trị hiện tại ở oldValue. */
-  @ApiProperty({
-    description: 'Fields to change. Key is camelCase contract field name; each entry has oldValue and newValue.',
+  @ApiPropertyOptional({
+    description: 'Fields to change. Key is camelCase contract field name; each entry has oldValue and newValue. Required for action=modify; ignored for cancel/complete.',
     example: { quantity: { oldValue: 5000, newValue: 4500 } },
   })
+  @IsOptional()
   @IsObject()
-  changes: Record<string, { oldValue: unknown; newValue: unknown }>;
+  changes?: Record<string, { oldValue: unknown; newValue: unknown }>;
 
   @ApiPropertyOptional({ description: 'Reason for requesting the change', example: 'Crop yield lower than expected due to flooding' })
   @IsOptional()

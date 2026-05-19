@@ -66,7 +66,10 @@ export interface ListProductsParams {
 }
 
 export interface CreateProductDto {
-  sourceContractId: string;
+  /** Optional — gắn với hợp đồng farmer_trader active để tự động kế thừa standard/farm. */
+  sourceContractId?: string;
+  /** Optional — chỉ dùng ở client để hiển thị, không gửi lên BE. */
+  farmId?: string;
   name: string;
   cropType: string;
   unit: string;
@@ -228,9 +231,18 @@ export async function getProduct(id: string): Promise<ProductDto> {
 /**
  * POST /api/v1/products
  * Trader only — tạo mặt hàng mới (403 nếu không phải trader).
+ * `farmId` client-side only; lọc bỏ trước khi gửi để BE chỉ nhận field cho phép.
  */
 export async function createProduct(body: CreateProductDto): Promise<ProductDto> {
-  const { data } = await apiClient.post<ProductDto>('/products', body);
+  const { farmId: _drop, ...payload } = body;
+  const safePayload = {
+    ...payload,
+    images: Array.isArray(payload.images) ? payload.images : [],
+  };
+  if (!safePayload.sourceContractId) {
+    delete (safePayload as Partial<CreateProductDto>).sourceContractId;
+  }
+  const { data } = await apiClient.post<ProductDto>('/products', safePayload);
   return data;
 }
 

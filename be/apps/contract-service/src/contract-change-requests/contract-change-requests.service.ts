@@ -77,7 +77,7 @@ export class ContractChangeRequestsService {
 
     if (contract.status !== 'active') {
       throw new BadRequestException(
-        'Chỉ có thể tạo yêu cầu thay đổi khi hợp đồng đang active',
+        'Chỉ có thể tạo yêu cầu khi hợp đồng đang active',
       );
     }
 
@@ -86,33 +86,38 @@ export class ContractChangeRequestsService {
     });
     if (pending) {
       throw new BadRequestException(
-        'Đã có yêu cầu thay đổi đang chờ phản hồi',
+        'Đã có yêu cầu đang chờ phản hồi',
       );
     }
 
-    const keys = Object.keys(dto.changes);
-    if (keys.length === 0) {
-      throw new BadRequestException('changes không được rỗng');
-    }
+    const action = dto.action ?? 'modify';
+    const changes = dto.changes ?? {};
 
-    for (const key of keys) {
-      if (!ALLOWED_CONTRACT_KEYS.has(key)) {
-        throw new BadRequestException(`Trường không được phép thay đổi: ${key}`);
+    if (action === 'modify') {
+      const keys = Object.keys(changes);
+      if (keys.length === 0) {
+        throw new BadRequestException('changes không được rỗng cho action=modify');
       }
-      const entry = dto.changes[key];
-      if (
-        !entry ||
-        typeof entry !== 'object' ||
-        !('oldValue' in entry) ||
-        !('newValue' in entry)
-      ) {
-        throw new BadRequestException(
-          `Mỗi mục trong changes phải có dạng { oldValue, newValue } (${key})`,
-        );
-      }
-    }
 
-    this.assertOldValuesMatchContract(contract, dto.changes);
+      for (const key of keys) {
+        if (!ALLOWED_CONTRACT_KEYS.has(key)) {
+          throw new BadRequestException(`Trường không được phép thay đổi: ${key}`);
+        }
+        const entry = changes[key];
+        if (
+          !entry ||
+          typeof entry !== 'object' ||
+          !('oldValue' in entry) ||
+          !('newValue' in entry)
+        ) {
+          throw new BadRequestException(
+            `Mỗi mục trong changes phải có dạng { oldValue, newValue } (${key})`,
+          );
+        }
+      }
+
+      this.assertOldValuesMatchContract(contract, changes);
+    }
 
     const [requestedSnapRes] = await Promise.allSettled([
       this.authClient.getUserSnapshot(user.sub),
@@ -125,10 +130,11 @@ export class ContractChangeRequestsService {
 
       const row = crRepo.create({
         contractId,
+        action,
         requestedBy: user.sub,
         requestedByName: requestedSnap?.displayName ?? null,
         requestedByPhone: requestedSnap?.phone ?? null,
-        changes: dto.changes,
+        changes,
         reason: dto.reason ?? null,
         status: 'pending',
         respondedBy: null,
@@ -192,10 +198,21 @@ export class ContractChangeRequestsService {
       if (!fresh) {
         throw new NotFoundException('Hợp đồng không tồn tại');
       }
-      this.assertOldValuesMatchContract(fresh, row.changes);
 
-      this.applyChanges(fresh, row.changes);
-      fresh.status = 'active';
+      // Tùy action: 'cancel'/'complete' → đổi status terminal; 'modify' → apply diff & về active.
+      const nextStatus: ContractEntity['status'] =
+        row.action === 'cancel'
+          ? 'cancelled'
+          : row.action === 'complete'
+            ? 'completed'
+            : 'active';
+
+      if (row.action === 'modify') {
+        this.assertOldValuesMatchContract(fresh, row.changes);
+        this.applyChanges(fresh, row.changes);
+      }
+
+      fresh.status = nextStatus;
       await cRepo.save(fresh);
 
       row.status = 'accepted';
@@ -208,7 +225,7 @@ export class ContractChangeRequestsService {
       await this.contractAudit.logStatusChange(
         contractId,
         'pending_change',
-        'active',
+        nextStatus,
         user.sub,
         manager,
       );
@@ -474,10 +491,11 @@ export class ContractChangeRequestsService {
     return {
       id: row.id,
       contractId: row.contractId,
+      action: row.action ?? 'modify',
       requestedBy: row.requestedBy,
       requestedByName: row.requestedByName ?? null,
       requestedByPhone: row.requestedByPhone ?? null,
-      changes: row.changes,
+      changes: row.changes ?? {},
       reason: row.reason ?? undefined,
       status: row.status,
       respondedBy: row.respondedBy ?? undefined,

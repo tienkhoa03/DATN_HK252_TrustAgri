@@ -130,7 +130,10 @@ export const StepDetailSheet: React.FC<StepDetailSheetProps> = ({
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 1100,
+        position: 'fixed',
+        top: 0, left: 0, right: 0,
+        bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+        zIndex: 1100,
         backgroundColor: 'rgba(0,0,0,0.45)',
         display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
       }}
@@ -140,7 +143,7 @@ export const StepDetailSheet: React.FC<StepDetailSheetProps> = ({
         backgroundColor: colors.background.primary,
         borderRadius: '16px 16px 0 0',
         padding: `${spacing.md} ${spacing.md} ${spacing.xl}`,
-        maxHeight: '85vh',
+        maxHeight: '80vh',
         overflowY: 'auto',
       }}>
         {/* Header */}

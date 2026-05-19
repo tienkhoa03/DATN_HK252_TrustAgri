@@ -151,7 +151,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, farms, isEditing, on
     <div
       style={{
         position: 'fixed',
-        inset: 0,
+        top: 0, left: 0, right: 0,
+        bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
         backgroundColor: 'rgba(0,0,0,0.4)',
         zIndex: 2000,
         display: 'flex',
@@ -164,7 +165,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, farms, isEditing, on
           backgroundColor: colors.background.primary,
           borderRadius: '16px 16px 0 0',
           padding: spacing.md,
-          maxHeight: '90vh',
+          maxHeight: '85vh',
           overflowY: 'auto',
         }}
       >
@@ -241,14 +242,19 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, farms, isEditing, on
             onClick={() => {
               if (!name.trim() || !price) return;
               if (!isEditing && (!farmId || farms.length === 0)) return;
+              const selectedFarm = farms.find((f) => f.id === farmId);
               onSave({
                 name: name.trim(),
                 cropType,
                 unit: unit.trim() || 'kg',
                 price: parseFloat(price),
+                images: [],
                 stockQuantity: stock ? parseInt(stock, 10) : undefined,
                 description: description.trim() || undefined,
                 farmId: isEditing ? (initial?.farmId ?? undefined) : farmId,
+                sourceContractId: isEditing
+                  ? (initial?.sourceContractId ?? undefined)
+                  : (selectedFarm?.currentContractId ?? undefined),
               });
             }}
           >
@@ -277,11 +283,11 @@ const BuyingRequestDetailModal: React.FC<DetailModalProps> = ({ req, buyerName, 
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2100, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))', backgroundColor: 'rgba(0,0,0,0.5)', zIndex: 2100, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}
       onClick={onClose}
     >
       <div
-        style={{ backgroundColor: colors.background.primary, borderRadius: '16px 16px 0 0', padding: spacing.md, maxHeight: '85vh', overflowY: 'auto' }}
+        style={{ backgroundColor: colors.background.primary, borderRadius: '16px 16px 0 0', padding: spacing.md, maxHeight: '80vh', overflowY: 'auto' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
@@ -590,9 +596,15 @@ export const MarketplaceFeedPanel: React.FC = () => {
     }
     setProposalSaving(true);
     try {
+      const selectedFarm = availableFarms.find((f) => f.id === proposalFarmId);
+      if (!selectedFarm?.currentContractId) {
+        openSnackbar({ type: 'error', text: 'Vườn được chọn chưa có hợp đồng nông dân–thương lái active.', duration: 4000, icon: true });
+        setProposalSaving(false);
+        return;
+      }
       await createProposal({
         buyingRequestId: proposingFor.id,
-        farmId: proposalFarmId,
+        sourceContractId: selectedFarm.currentContractId,
         price: parseFloat(proposalPrice),
         quantity: proposingFor.quantity,
         standardCode: proposingFor.qualityStandardCode,
@@ -953,8 +965,8 @@ export const MarketplaceFeedPanel: React.FC = () => {
 
       {/* Proposal form modal */}
       {proposingFor && (
-        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} onClick={() => setProposingFor(null)}>
-          <div style={{ backgroundColor: colors.background.primary, borderRadius: '16px 16px 0 0', padding: spacing.md, maxHeight: '80vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))', backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} onClick={() => setProposingFor(null)}>
+          <div style={{ backgroundColor: colors.background.primary, borderRadius: '16px 16px 0 0', padding: spacing.md, maxHeight: '75vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
               <Text.Title size="small" style={{ margin: 0 }}>Gửi đề xuất giá</Text.Title>
               <button style={{ background: 'none', border: 'none', cursor: 'pointer', minWidth: 44, minHeight: 44 }} onClick={() => setProposingFor(null)} aria-label="Đóng">

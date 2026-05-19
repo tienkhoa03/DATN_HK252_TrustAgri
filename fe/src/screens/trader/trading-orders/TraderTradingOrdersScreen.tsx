@@ -168,7 +168,8 @@ const ProductForm: React.FC<ProductFormProps> = ({
     <div
       style={{
         position: 'fixed',
-        inset: 0,
+        top: 0, left: 0, right: 0,
+        bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
         backgroundColor: 'rgba(0,0,0,0.4)',
         zIndex: 2000,
         display: 'flex',
@@ -181,7 +182,7 @@ const ProductForm: React.FC<ProductFormProps> = ({
           backgroundColor: colors.background.primary,
           borderRadius: '16px 16px 0 0',
           padding: spacing.md,
-          maxHeight: '85vh',
+          maxHeight: '80vh',
           overflowY: 'auto',
         }}
       >
@@ -1269,7 +1270,8 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
       <div
         style={{
           position: 'fixed',
-          inset: 0,
+          top: 0, left: 0, right: 0,
+          bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
           backgroundColor: 'rgba(0,0,0,0.4)',
           zIndex: 2000,
           display: 'flex',
@@ -1534,7 +1536,8 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
         <div
           style={{
             position: 'fixed',
-            inset: 0,
+            top: 0, left: 0, right: 0,
+            bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
             backgroundColor: 'rgba(0,0,0,0.4)',
             zIndex: 2000,
             display: 'flex',

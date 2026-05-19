@@ -20,6 +20,7 @@ import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import { listFarms } from '@/services/farmService';
 import type { FarmDto } from '@/services/farmService';
+import { listStandards, type StandardDto } from '@/services/standardService';
 import { ApiError } from '@/api/errors';
 import {
   createConnection,
@@ -211,6 +212,9 @@ export const MarketplaceSupplyPanel: React.FC = () => {
   const [cancellingFarmId, setCancellingFarmId] = useState<string | null>(null);
   const [acceptingFarmId, setAcceptingFarmId] = useState<string | null>(null);
 
+  // Standard lookup: id → StandardDto (cho hiển thị tên thay vì UUID)
+  const [standardsById, setStandardsById] = useState<Record<string, StandardDto>>({});
+
   const inFlightRef = useRef(false);
   const loadedKeyRef = useRef<string | null>(null);
   const warnedRef = useRef(false);
@@ -317,6 +321,18 @@ export const MarketplaceSupplyPanel: React.FC = () => {
 
   useEffect(() => { void loadFarmerNames(); }, [loadFarmerNames]);
   useEffect(() => { void loadExistingConnections(); }, [loadExistingConnections]);
+  useEffect(() => {
+    let cancelled = false;
+    void listStandards({ page: 1, limit: 200 })
+      .then((res) => {
+        if (cancelled) return;
+        const map: Record<string, StandardDto> = {};
+        res.items.forEach((s) => { map[s.id] = s; });
+        setStandardsById(map);
+      })
+      .catch(() => { /* không block UI */ });
+    return () => { cancelled = true; };
+  }, []);
 
   // Suggestions debounce
   useEffect(() => {
@@ -577,7 +593,7 @@ export const MarketplaceSupplyPanel: React.FC = () => {
                     </span>
                     {farm.standardId && (
                       <span style={{ padding: `2px ${spacing.sm}`, backgroundColor: `${colors.primary.zaloBlue}14`, borderRadius: 99, fontSize: fontSize.small, color: colors.primary.zaloBlue }}>
-                        Có tiêu chuẩn
+                        {standardsById[farm.standardId]?.name ?? 'Có tiêu chuẩn'}
                       </span>
                     )}
                   </div>
@@ -613,7 +629,9 @@ export const MarketplaceSupplyPanel: React.FC = () => {
                       {farm.standardId && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
                           <Icon name="check" size="sm" color={colors.primary.agriGreen} />
-                          <Text size="xSmall" style={{ color: colors.primary.agriGreen }}>Tiêu chuẩn: {farm.standardId}</Text>
+                          <Text size="xSmall" style={{ color: colors.primary.agriGreen }}>
+                            Tiêu chuẩn: {standardsById[farm.standardId]?.name ?? 'Đã gán tiêu chuẩn'}
+                          </Text>
                         </div>
                       )}
                     </div>

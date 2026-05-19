@@ -47,7 +47,8 @@ export const StandardInfoModal: React.FC<Props> = ({ standardId, standardName, o
       aria-label={title}
       style={{
         position: 'fixed',
-        inset: 0,
+        top: 0, left: 0, right: 0,
+        bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
         zIndex: 2100,
         backgroundColor: colors.background.primary,
         display: 'flex',

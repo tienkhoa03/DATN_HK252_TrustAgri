@@ -96,6 +96,7 @@ export class ContractsService {
 
   /**
    * Danh sách vườn từ farm-service — chỉ các farmId có hợp đồng active với trader.
+   * Mỗi vườn trả về kèm `currentContractId` = ID hợp đồng farmer_trader active mới nhất giữa trader & farm.
    */
   async listTraderLinkedFarms(
     traderId: string,
@@ -103,20 +104,24 @@ export class ContractsService {
   ): Promise<FarmDto[]> {
     const rows = await this.contractRepo
       .createQueryBuilder('c')
-      .select('c.farmId', 'farmId')
-      .distinct(true)
+      .select(['c.id AS "contractId"', 'c.farmId AS "farmId"', 'c.updatedAt AS "updatedAt"'])
       .where('c.partyTraderId = :tid', { tid: traderId })
       .andWhere('c.contractType = :ctype', { ctype: 'farmer_trader' })
       .andWhere('c.status = :st', { st: 'active' })
       .andWhere('c.farmId IS NOT NULL')
       .andWhere('c.deletedAt IS NULL')
-      .getRawMany();
+      .orderBy('c.updatedAt', 'DESC')
+      .getRawMany<{ contractId: string; farmId: string; updatedAt: Date }>();
 
-    const farmIds = rows
-      .map((r: { farmId?: string }) => r.farmId)
-      .filter((id): id is string => Boolean(id));
+    // Group: farmId → latest contractId
+    const farmToContract = new Map<string, string>();
+    for (const r of rows) {
+      if (!farmToContract.has(r.farmId)) {
+        farmToContract.set(r.farmId, r.contractId);
+      }
+    }
 
-    if (farmIds.length === 0) {
+    if (farmToContract.size === 0) {
       return [];
     }
 
@@ -132,9 +137,11 @@ export class ContractsService {
     }
 
     const results = await Promise.all(
-      farmIds.map((id) => this.fetchFarmJson(farmBase, id, headers)),
+      Array.from(farmToContract.keys()).map((id) => this.fetchFarmJson(farmBase, id, headers)),
     );
-    return results.filter((f): f is FarmDto => f !== null);
+    return results
+      .filter((f): f is FarmDto => f !== null)
+      .map((f) => ({ ...f, currentContractId: farmToContract.get(f.id) ?? null }));
   }
 
   private async fetchFarmJson(

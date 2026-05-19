@@ -20,6 +20,7 @@ const BUYER_TABS: RoleNavItem[] = [
   { id: 'sourcing',  label: 'Nguồn hàng', path: '/buyer/sourcing', icon: 'plus-circle' },
   { id: 'orders',    label: 'Đơn hàng',   path: '/buyer/orders',   icon: 'package' },
   { id: 'live',      label: 'Trực tiếp',  path: '/buyer/live',     icon: 'eye' },
+  { id: 'profile',   label: 'Hồ sơ',      path: '/buyer/me',       icon: 'user' },
 ];
 
 const TRADER_TABS: RoleNavItem[] = [
@@ -70,6 +71,7 @@ export function resolveActiveNavId(pathname: string, role: UserRole): string {
   }
 
   if (role === 'buyer') {
+    if (pathname === '/buyer/me' || pathname.startsWith('/buyer/me/')) return 'profile';
     if (pathname.startsWith('/buyer/sourcing') || pathname.startsWith('/buyer/request')) return 'sourcing';
     if (
       pathname.startsWith('/buyer/orders') ||
@@ -79,7 +81,6 @@ export function resolveActiveNavId(pathname: string, role: UserRole): string {
     }
     if (pathname.startsWith('/buyer/live') || pathname.startsWith('/buyer/monitor')) return 'live';
     if (pathname === '/buyer' || pathname.startsWith('/buyer/products')) return 'discover';
-    // /buyer/me → no tab highlight (accessed via header avatar)
     return 'discover';
   }
 

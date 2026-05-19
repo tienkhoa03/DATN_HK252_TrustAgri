@@ -392,6 +392,39 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
               </div>
             </div>
 
+            {/* Tin tức & dự báo giá từ thương lái khác */}
+            <div style={{ padding: `0 ${spacing.md} ${spacing.md}` }}>
+              <button
+                type="button"
+                onClick={() => navigate('/trader/news-feed')}
+                style={{
+                  width: '100%',
+                  padding: spacing.md,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  backgroundColor: colors.background.primary,
+                  border: `1px solid ${colors.background.secondary}`,
+                  borderRadius: 10,
+                  cursor: 'pointer',
+                  minHeight: 56,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+                  <span style={{ fontSize: '24px' }}>📰</span>
+                  <div style={{ textAlign: 'left' }}>
+                    <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
+                      Tin tức & Dự báo từ thương lái
+                    </Text>
+                    <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                      Tham khảo thông tin thị trường công khai
+                    </Text>
+                  </div>
+                </div>
+                <span style={{ fontSize: '18px', color: colors.text.secondary }}>›</span>
+              </button>
+            </div>
+
             <div style={{ padding: `0 ${spacing.md} ${spacing.md}` }}>
               <Text.Title size="small" style={{ margin: `0 0 ${spacing.sm}` }}>
                 Đơn hàng theo trạng thái

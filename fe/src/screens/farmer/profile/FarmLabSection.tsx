@@ -1,11 +1,11 @@
 /**
- * FarmLabSection — CRUD farms with inline edit, QR code, MapPicker (FR-F01, FR-G01)
+ * FarmLabSection — CRUD farms with inline edit + QR code (FR-F01, FR-G01).
+ * GPS picker đã được loại bỏ — vị trí vườn chỉ dùng tỉnh/thành + huyện text.
  */
 
 import React, { useState, useEffect } from 'react';
 import { Text, useNavigate } from 'zmp-ui';
 import { QRCode } from '@/design-system/components/QRCode';
-import { MapPicker } from '@/design-system/components/MapPicker';
 import { EmptyState } from '@/design-system/components/EmptyState';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
@@ -16,6 +16,7 @@ import type { FarmDto, CreateFarmDto, UpdateFarmDto } from '@/hooks/useFarms';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
 import { CROP_LABELS } from '@/services/marketplaceService';
+import { listStandards, type StandardDto } from '@/services/standardService';
 
 const CROP_OPTIONS: { value: string; label: string }[] = Object.entries(CROP_LABELS).map(
   ([value, label]) => ({ value, label }),
@@ -24,11 +25,12 @@ const CROP_OPTIONS: { value: string; label: string }[] = Object.entries(CROP_LAB
 interface FarmCardProps {
   farm: FarmDto;
   isLocked?: boolean;
+  standardOptions: StandardDto[];
   onUpdate: (id: string, body: UpdateFarmDto) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }
 
-const FarmCard: React.FC<FarmCardProps> = ({ farm, isLocked, onUpdate, onDelete }) => {
+const FarmCard: React.FC<FarmCardProps> = ({ farm, isLocked, standardOptions, onUpdate, onDelete }) => {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<UpdateFarmDto>({
@@ -96,9 +98,11 @@ const FarmCard: React.FC<FarmCardProps> = ({ farm, isLocked, onUpdate, onDelete 
 
           {!editing && (
             <div style={{ marginBottom: spacing.md }}>
-              <div style={{ fontSize: fontSize.caption, color: colors.text.secondary, marginBottom: spacing.xs }}>Tiêu chuẩn: {farm.standardId ?? '—'}</div>
+              <div style={{ fontSize: fontSize.caption, color: colors.text.secondary, marginBottom: spacing.xs }}>
+                Tiêu chuẩn: {standardOptions.find((s) => s.id === farm.standardId)?.name ?? 'Chưa gán'}
+              </div>
               <div style={{ fontSize: fontSize.caption, color: colors.text.secondary }}>
-                Vị trí: {farm.location.province}, {farm.location.district}
+                Vị trí: {farm.location.province}{farm.location.district ? `, ${farm.location.district}` : ''}
               </div>
             </div>
           )}
@@ -129,20 +133,30 @@ const FarmCard: React.FC<FarmCardProps> = ({ farm, isLocked, onUpdate, onDelete 
                 style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, boxSizing: 'border-box' }}
               />
 
-              <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>ID Tiêu chuẩn</label>
-              <input
+              <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Tiêu chuẩn</label>
+              <select
                 value={form.standardId ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, standardId: e.target.value || undefined }))}
-                placeholder="Để trống nếu chưa có"
+                style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, minHeight: 44 }}
+              >
+                <option value="">— Chưa gán —</option>
+                {standardOptions.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+
+              <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Tỉnh/Thành</label>
+              <input
+                value={form.location?.province ?? ''}
+                onChange={(e) => setForm((p) => ({ ...p, location: { ...(p.location ?? farm.location), province: e.target.value } }))}
                 style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, boxSizing: 'border-box' }}
               />
 
-              <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Vị trí GPS</label>
-              <MapPicker
-                lat={form.location?.lat}
-                lng={form.location?.lng}
-                onChange={(lat, lng) => setForm((p) => ({ ...p, location: { ...(p.location ?? farm.location), lat, lng } }))}
-                height={200}
+              <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Huyện/Quận</label>
+              <input
+                value={form.location?.district ?? ''}
+                onChange={(e) => setForm((p) => ({ ...p, location: { ...(p.location ?? farm.location), district: e.target.value } }))}
+                style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, boxSizing: 'border-box' }}
               />
             </div>
           )}
@@ -210,11 +224,12 @@ const FarmCard: React.FC<FarmCardProps> = ({ farm, isLocked, onUpdate, onDelete 
 };
 
 interface CreateFarmFormProps {
+  standardOptions: StandardDto[];
   onCancel: () => void;
   onSubmit: (body: CreateFarmDto) => Promise<void>;
 }
 
-const CreateFarmForm: React.FC<CreateFarmFormProps> = ({ onCancel, onSubmit }) => {
+const CreateFarmForm: React.FC<CreateFarmFormProps> = ({ standardOptions, onCancel, onSubmit }) => {
   const [form, setForm] = useState<CreateFarmDto>({
     name: '',
     cropType: 'vegetable',
@@ -246,14 +261,17 @@ const CreateFarmForm: React.FC<CreateFarmFormProps> = ({ onCancel, onSubmit }) =
       <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Diện tích (m²) *</label>
       <input type="number" value={form.area || ''} onChange={(e) => setForm((p) => ({ ...p, area: Number(e.target.value) }))} style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, boxSizing: 'border-box' }} />
 
+      <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Tiêu chuẩn (tùy chọn)</label>
+      <select value={form.standardId ?? ''} onChange={(e) => setForm((p) => ({ ...p, standardId: e.target.value || undefined }))} style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, minHeight: 44 }}>
+        <option value="">— Chưa gán —</option>
+        {standardOptions.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+
       <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Tỉnh/Thành</label>
       <input value={form.location.province} onChange={(e) => setForm((p) => ({ ...p, location: { ...p.location, province: e.target.value } }))} style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, boxSizing: 'border-box' }} />
 
-      <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Vị trí GPS (tùy chọn)</label>
-      <MapPicker
-        onChange={(lat, lng) => setForm((p) => ({ ...p, location: { ...p.location, lat, lng } }))}
-        height={180}
-      />
+      <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Huyện/Quận</label>
+      <input value={form.location.district} onChange={(e) => setForm((p) => ({ ...p, location: { ...p.location, district: e.target.value } }))} style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, boxSizing: 'border-box' }} />
 
       <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.sm }}>
         <button type="button" onClick={onCancel} style={{ flex: 1, padding: spacing.sm, backgroundColor: colors.background.secondary, color: colors.text.primary, border: 'none', borderRadius: 8, fontSize: fontSize.caption, cursor: 'pointer', minHeight: 44 }}>Hủy</button>
@@ -278,10 +296,19 @@ export const FarmLabSection: React.FC<FarmLabSectionProps> = ({ ownerId, lockedF
   const openSnackbar = useStableOpenSnackbar();
   const { farms, isLoading, isMutating, error, clearError, loadFarms, createFarm, updateFarm, deleteFarm } = useFarms();
   const [showCreate, setShowCreate] = useState(false);
+  const [standardOptions, setStandardOptions] = useState<StandardDto[]>([]);
 
   useEffect(() => {
     if (ownerId) loadFarms({ ownerId });
   }, [ownerId, loadFarms]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void listStandards({ page: 1, limit: 200 })
+      .then((res) => { if (!cancelled) setStandardOptions(res.items); })
+      .catch(() => { /* fallback: dropdown chỉ còn "— Chưa gán —" */ });
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (error) { openSnackbar({ type: 'error', text: error, duration: 3500, icon: true }); clearError(); }
@@ -316,7 +343,11 @@ export const FarmLabSection: React.FC<FarmLabSectionProps> = ({ ownerId, lockedF
       )}
 
       {!isLoading && showCreate && (
-        <CreateFarmForm onCancel={() => setShowCreate(false)} onSubmit={handleCreate} />
+        <CreateFarmForm
+          standardOptions={standardOptions}
+          onCancel={() => setShowCreate(false)}
+          onSubmit={handleCreate}
+        />
       )}
 
       {!isLoading && farms.length === 0 && !showCreate && (
@@ -333,6 +364,7 @@ export const FarmLabSection: React.FC<FarmLabSectionProps> = ({ ownerId, lockedF
           key={farm.id}
           farm={farm}
           isLocked={lockedFarmIds?.has(farm.id)}
+          standardOptions={standardOptions}
           onUpdate={handleUpdate}
           onDelete={handleDelete}
         />

@@ -41,6 +41,8 @@ export interface FarmDto {
   plantingDate?: string;    // FR-F09: ngày trồng (ISO date 'YYYY-MM-DD'), input cho care-plan
   createdAt: string;        // ISO-8601
   updatedAt: string;        // ISO-8601
+  /** Hợp đồng farmer_trader active hiện tại — chỉ có ở endpoint `linked-farms` (trader). */
+  currentContractId?: string | null;
 }
 
 export interface ListResponse<T> {

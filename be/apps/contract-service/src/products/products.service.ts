@@ -9,6 +9,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProductDto, CreateProductDto, ListResponse } from '@trustagri/shared';
 import { ProductEntity } from './entities/product.entity';
+import { ContractEntity } from '../contracts/entities/contract.entity';
 import { ProductQueryDto } from './dto/product-query.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ContractsService } from '../contracts/contracts.service';
@@ -100,21 +101,23 @@ export class ProductsService {
 
   /**
    * POST /api/v1/products (trader)
-   * Tạo sản phẩm mới — nguồn gốc gắn với hợp đồng farmer_trader active.
+   * Tạo sản phẩm mới. Nếu có sourceContractId thì nguồn gốc gắn với hợp đồng farmer_trader active;
+   * nếu không, trader có thể đăng tin bán mà chưa có hợp đồng (vd: bán hàng tự có).
    */
   async createProduct(
     dto: CreateProductDto,
     traderId: string,
   ): Promise<ProductDto> {
-    // Validate sourceContractId and get the active farmer_trader contract
-    const sourceContract = await this.contractsService.getActiveFarmerTraderContract(
-      dto.sourceContractId,
-      traderId,
-    );
-
-    const farmId = sourceContract.farmId;
-    if (!farmId) {
-      throw new BadRequestException('Hợp đồng farmer_trader không liên kết vườn.');
+    // Resolve nguồn gốc qua sourceContractId (nếu có), nếu không thì chỉ lấy snapshot trader.
+    let sourceContract: ContractEntity | null = null;
+    if (dto.sourceContractId) {
+      sourceContract = await this.contractsService.getActiveFarmerTraderContract(
+        dto.sourceContractId,
+        traderId,
+      );
+      if (!sourceContract.farmId) {
+        throw new BadRequestException('Hợp đồng farmer_trader không liên kết vườn.');
+      }
     }
 
     const [traderSnapRes] = await Promise.allSettled([
@@ -125,27 +128,29 @@ export class ProductsService {
 
     const entity = this.productRepo.create({
       traderId,
-      farmId,
-      sourceContractId: sourceContract.id,
-      standardId: sourceContract.standardId ?? null,
-      standardName: sourceContract.standardName ?? null,
+      farmId: sourceContract?.farmId ?? null,
+      sourceContractId: sourceContract?.id ?? null,
+      standardId: sourceContract?.standardId ?? null,
+      standardName: sourceContract?.standardName ?? null,
       traderDisplayName: traderSnap?.displayName ?? null,
       traderPhone: traderSnap?.phone ?? null,
-      farmName: sourceContract.farmName ?? null,
+      farmName: sourceContract?.farmName ?? null,
       name: dto.name,
       cropType: dto.cropType,
       unit: dto.unit,
       price: dto.price,
       currency: 'VND',
-      images: dto.images,
-      standardCode: sourceContract.standardName ?? dto.standardCode ?? null,
+      images: Array.isArray(dto.images) ? dto.images : [],
+      standardCode: sourceContract?.standardName ?? dto.standardCode ?? null,
       stockQuantity: dto.stockQuantity ?? null,
       description: dto.description ?? null,
       status: 'active',
     });
 
     const saved = await this.productRepo.save(entity);
-    this.logger.log(`Product created: id=${saved.id} traderId=${traderId} sourceContractId=${sourceContract.id}`);
+    this.logger.log(
+      `Product created: id=${saved.id} traderId=${traderId} sourceContractId=${sourceContract?.id ?? 'none'}`,
+    );
     return this.toDto(saved);
   }
 

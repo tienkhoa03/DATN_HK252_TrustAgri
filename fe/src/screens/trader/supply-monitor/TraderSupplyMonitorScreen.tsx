@@ -499,6 +499,20 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
   const [isManagedFarmsLoading, setIsManagedFarmsLoading] = useState(false);
   const managedLoadedRef = useRef(false);
   const standardStepTitleMapRef = useRef<Map<string, string>>(new Map());
+  const [standardsById, setStandardsById] = useState<Record<string, StandardDto>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    void listStandards({ page: 1, limit: 200 })
+      .then((res) => {
+        if (cancelled) return;
+        const map: Record<string, StandardDto> = {};
+        res.items.forEach((s) => { map[s.id] = s; });
+        setStandardsById(map);
+      })
+      .catch(() => { /* không block UI */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const loadStandardStepTitleMap = useCallback(async (): Promise<Map<string, string>> => {
     if (standardStepTitleMapRef.current.size > 0) return standardStepTitleMapRef.current;
@@ -1198,7 +1212,7 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
                         color: colors.primary.zaloBlue,
                       }}
                     >
-                      Có tiêu chuẩn
+                      {standardsById[farm.standardId]?.name ?? 'Có tiêu chuẩn'}
                     </span>
                   )}
                 </div>
@@ -1261,7 +1275,7 @@ export const TraderSupplyMonitorScreen: React.FC<TraderSupplyMonitorScreenProps>
                       <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
                         <Icon name="check" size="sm" color={colors.primary.agriGreen} />
                         <Text size="xSmall" style={{ color: colors.primary.agriGreen }}>
-                          Tiêu chuẩn: {farm.standardId}
+                          Tiêu chuẩn: {standardsById[farm.standardId]?.name ?? 'Đã gán tiêu chuẩn'}
                         </Text>
                       </div>
                     )}

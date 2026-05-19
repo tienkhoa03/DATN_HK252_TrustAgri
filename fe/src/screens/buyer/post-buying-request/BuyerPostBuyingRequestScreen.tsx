@@ -828,15 +828,15 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
       </div>
 
       {/* Step content */}
-      <div style={{ padding: spacing.md, paddingBottom: '90px' }}>
+      <div style={{ padding: spacing.md, paddingBottom: '160px' }}>
         {renderStep()}
       </div>
 
-      {/* Navigation buttons */}
+      {/* Navigation buttons (above bottom nav bar) */}
       <div
         style={{
           position: 'fixed',
-          bottom: 0,
+          bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
           left: 0,
           right: 0,
           padding: spacing.md,
@@ -844,6 +844,7 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
           borderTop: `1px solid ${colors.background.secondary}`,
           display: 'flex',
           gap: spacing.sm,
+          zIndex: 950,
         }}
       >
         {currentStep > 1 && (

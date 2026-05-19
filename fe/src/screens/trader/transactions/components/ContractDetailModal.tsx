@@ -1,8 +1,9 @@
 /**
  * ContractDetailModal — full-screen contract detail + vertical timeline
  * (FR-T04, FR-T05, US-T03)
+ * Cũng hỗ trợ flow Hủy/Hoàn thành/Điều chỉnh hợp đồng với approval pattern.
  */
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Modal, Text } from 'zmp-ui';
 import { StandardInfoModal } from '@/screens/shared/standards/StandardInfoModal';
 import { useQueryClient } from '@tanstack/react-query';
@@ -17,7 +18,18 @@ import {
   canUserSign,
   hasUserSigned,
   toContractViMessage,
+  getContract,
 } from '@/services/contractService';
+import {
+  listContractChangeRequests,
+  requestCancelContract,
+  requestCompleteContract,
+  requestModifyContract,
+  acceptContractChangeRequest,
+  rejectContractChangeRequest,
+  toContractChangeRequestViMessage,
+  type ContractChangeRequestDto,
+} from '@/services/contractChangeRequestService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { contractFarmDisplay, partyBuyerDisplay, partyFarmerDisplay } from '@/utils/displayLabels';
 import { colors } from '@/design-system/tokens/colors';
@@ -82,6 +94,8 @@ function formatDate(iso: string): string {
   }
 }
 
+type ActionDialog = 'cancel' | 'complete' | 'modify' | null;
+
 export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
   contract: initialContract,
   visible,
@@ -95,11 +109,30 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
   const [contract, setContract] = useState<ContractDto>(initialContract);
   const [signing, setSigning] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+
+  // Change request flow (cancel / complete / modify)
+  const [changeRequests, setChangeRequests] = useState<ContractChangeRequestDto[]>([]);
+  const [actionDialog, setActionDialog] = useState<ActionDialog>(null);
+  const [actionReason, setActionReason] = useState('');
+  const [actionSubmitting, setActionSubmitting] = useState(false);
+
+  // Modify form
+  const [modifyQuantity, setModifyQuantity] = useState<string>(String(initialContract.quantity));
+  const [modifyTotalPrice, setModifyTotalPrice] = useState<string>(String(initialContract.totalPrice));
+  const [modifyEndDate, setModifyEndDate] = useState<string>(initialContract.endDate?.slice(0, 10) ?? '');
+  const [modifyTerms, setModifyTerms] = useState<string>(initialContract.terms ?? '');
+
+  // Re-sync state when contract prop changes
+  useEffect(() => {
+    setContract(initialContract);
+    setModifyQuantity(String(initialContract.quantity));
+    setModifyTotalPrice(String(initialContract.totalPrice));
+    setModifyEndDate(initialContract.endDate?.slice(0, 10) ?? '');
+    setModifyTerms(initialContract.terms ?? '');
+  }, [initialContract]);
   const [rejectReason, setRejectReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
   const [showStandardInfo, setShowStandardInfo] = useState(false);
-
-  if (!visible) return null;
 
   const userId = session?.userId ?? '';
   const sessionRole = session?.role;
@@ -107,6 +140,23 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
     sessionRole === 'farmer' || sessionRole === 'trader' || sessionRole === 'buyer'
       ? sessionRole
       : undefined;
+
+  // Reload change requests + contract khi modal mở
+  const refreshChangeRequests = useCallback(async () => {
+    if (!visible) return;
+    try {
+      const list = await listContractChangeRequests(initialContract.id);
+      setChangeRequests(list);
+    } catch {
+      setChangeRequests([]);
+    }
+  }, [initialContract.id, visible]);
+
+  useEffect(() => {
+    void refreshChangeRequests();
+  }, [refreshChangeRequests]);
+
+  if (!visible) return null;
 
   const showSignButton =
     userRole != null && canUserSign(contract, userId, userRole);
@@ -116,6 +166,97 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
     contract.status === 'pending_signature' &&
     !showSignButton &&
     hasUserSigned(contract, userId, userRole);
+
+  const pendingChange = changeRequests.find((c) => c.status === 'pending');
+  const myIsRequester = pendingChange?.requestedBy === userId;
+  const canShowActionButtons =
+    contract.status === 'active' && userRole != null && !pendingChange;
+
+  const handleCreateAction = async (action: 'cancel' | 'complete' | 'modify') => {
+    setActionSubmitting(true);
+    try {
+      let resultMsg = '';
+      if (action === 'cancel') {
+        await requestCancelContract(contract.id, actionReason.trim() || undefined);
+        resultMsg = 'Đã gửi yêu cầu hủy hợp đồng. Đợi đối tác chấp nhận.';
+      } else if (action === 'complete') {
+        await requestCompleteContract(contract.id, actionReason.trim() || undefined);
+        resultMsg = 'Đã gửi yêu cầu hoàn thành. Đợi đối tác chấp nhận.';
+      } else {
+        const changes: Record<string, { oldValue: unknown; newValue: unknown }> = {};
+        if (Number(modifyQuantity) !== Number(contract.quantity)) {
+          changes.quantity = { oldValue: Number(contract.quantity), newValue: Number(modifyQuantity) };
+        }
+        if (Number(modifyTotalPrice) !== Number(contract.totalPrice)) {
+          changes.totalPrice = { oldValue: Number(contract.totalPrice), newValue: Number(modifyTotalPrice) };
+        }
+        const newEnd = modifyEndDate;
+        const oldEnd = contract.endDate?.slice(0, 10) ?? '';
+        if (newEnd && newEnd !== oldEnd) {
+          changes.endDate = { oldValue: contract.endDate, newValue: new Date(newEnd).toISOString() };
+        }
+        if (modifyTerms !== contract.terms) {
+          changes.terms = { oldValue: contract.terms, newValue: modifyTerms };
+        }
+        if (Object.keys(changes).length === 0) {
+          openSnackbar({ type: 'warning', text: 'Bạn chưa thay đổi trường nào.', duration: 3000, icon: true });
+          setActionSubmitting(false);
+          return;
+        }
+        await requestModifyContract(contract.id, changes, actionReason.trim() || undefined);
+        resultMsg = 'Đã gửi yêu cầu điều chỉnh. Đợi đối tác chấp nhận.';
+      }
+
+      const fresh = await getContract(contract.id);
+      setContract(fresh);
+      await refreshChangeRequests();
+      void queryClient.invalidateQueries({ queryKey: ['trader-contracts'] });
+      setActionDialog(null);
+      setActionReason('');
+      openSnackbar({ type: 'success', text: resultMsg, duration: 3000, icon: true });
+    } catch (err) {
+      openSnackbar({
+        type: 'error',
+        text: toContractChangeRequestViMessage(err, 'create'),
+        duration: 3500,
+        icon: true,
+      });
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
+  const handleAcceptChangeRequest = async (changeId: string) => {
+    setActionSubmitting(true);
+    try {
+      await acceptContractChangeRequest(contract.id, changeId);
+      const fresh = await getContract(contract.id);
+      setContract(fresh);
+      await refreshChangeRequests();
+      void queryClient.invalidateQueries({ queryKey: ['trader-contracts'] });
+      openSnackbar({ type: 'success', text: 'Đã chấp nhận yêu cầu.', duration: 3000, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toContractChangeRequestViMessage(err, 'accept'), duration: 3500, icon: true });
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
+
+  const handleRejectChangeRequest = async (changeId: string) => {
+    setActionSubmitting(true);
+    try {
+      await rejectContractChangeRequest(contract.id, changeId);
+      const fresh = await getContract(contract.id);
+      setContract(fresh);
+      await refreshChangeRequests();
+      void queryClient.invalidateQueries({ queryKey: ['trader-contracts'] });
+      openSnackbar({ type: 'success', text: 'Đã từ chối yêu cầu.', duration: 3000, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toContractChangeRequestViMessage(err, 'reject'), duration: 3500, icon: true });
+    } finally {
+      setActionSubmitting(false);
+    }
+  };
 
   const handleSign = async () => {
     setSigning(true);
@@ -183,7 +324,8 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
       aria-modal="true"
       style={{
         position: 'fixed',
-        inset: 0,
+        top: 0, left: 0, right: 0,
+        bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
         backgroundColor: colors.background.primary,
         zIndex: 200,
         overflowY: 'auto',
@@ -358,6 +500,248 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
             </button>
           </div>
         )}
+
+        {/* Pending change request banner — show diff + accept/reject for counterparty */}
+        {pendingChange && (
+          <div
+            style={{
+              backgroundColor: `${colors.functional.warningYellow}10`,
+              border: `1px solid ${colors.functional.warningYellow}66`,
+              borderRadius: 10,
+              padding: spacing.md,
+              marginBottom: spacing.md,
+            }}
+          >
+            <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0, marginBottom: spacing.xs }}>
+              {pendingChange.action === 'cancel'
+                ? '⛔️ Yêu cầu hủy hợp đồng'
+                : pendingChange.action === 'complete'
+                  ? '✅ Yêu cầu hoàn thành hợp đồng'
+                  : '✏️ Yêu cầu điều chỉnh hợp đồng'}
+            </Text>
+            <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0, marginBottom: spacing.sm }}>
+              Người gửi: {pendingChange.requestedByName ?? pendingChange.requestedBy.slice(0, 8) + '…'}
+            </Text>
+            {pendingChange.reason && (
+              <Text size="xSmall" style={{ margin: 0, marginBottom: spacing.sm, fontStyle: 'italic' }}>
+                Lý do: {pendingChange.reason}
+              </Text>
+            )}
+            {pendingChange.action === 'modify' && Object.keys(pendingChange.changes ?? {}).length > 0 && (
+              <div style={{ backgroundColor: colors.background.primary, padding: spacing.sm, borderRadius: 6, marginBottom: spacing.sm }}>
+                {Object.entries(pendingChange.changes ?? {}).map(([key, val]) => (
+                  <div key={key} style={{ fontSize: fontSize.caption, marginBottom: spacing.xs }}>
+                    <strong>{key}:</strong>{' '}
+                    <span style={{ color: colors.functional.alertRed, textDecoration: 'line-through' }}>
+                      {String(val.oldValue)}
+                    </span>{' '}
+                    →{' '}
+                    <span style={{ color: colors.primary.agriGreen, fontWeight: fontWeight.semibold }}>
+                      {String(val.newValue)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {myIsRequester ? (
+              <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                ⏳ Đang chờ đối tác phản hồi…
+              </Text>
+            ) : (
+              <div style={{ display: 'flex', gap: spacing.sm }}>
+                <button
+                  type="button"
+                  disabled={actionSubmitting}
+                  onClick={() => void handleAcceptChangeRequest(pendingChange.id)}
+                  style={{
+                    flex: 1,
+                    padding: spacing.sm,
+                    backgroundColor: colors.primary.agriGreen,
+                    color: colors.text.inverse,
+                    border: 'none',
+                    borderRadius: 8,
+                    fontSize: fontSize.caption,
+                    fontWeight: fontWeight.semibold,
+                    cursor: actionSubmitting ? 'not-allowed' : 'pointer',
+                    minHeight: 44,
+                  }}
+                >
+                  Chấp nhận
+                </button>
+                <button
+                  type="button"
+                  disabled={actionSubmitting}
+                  onClick={() => void handleRejectChangeRequest(pendingChange.id)}
+                  style={{
+                    flex: 1,
+                    padding: spacing.sm,
+                    backgroundColor: colors.background.primary,
+                    color: colors.functional.alertRed,
+                    border: `1px solid ${colors.functional.alertRed}`,
+                    borderRadius: 8,
+                    fontSize: fontSize.caption,
+                    fontWeight: fontWeight.semibold,
+                    cursor: actionSubmitting ? 'not-allowed' : 'pointer',
+                    minHeight: 44,
+                  }}
+                >
+                  Từ chối
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Action buttons: Cancel / Complete / Modify — only for active contract without pending change */}
+        {canShowActionButtons && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm, marginBottom: spacing.md }}>
+            <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+              Thao tác trên hợp đồng (cần đối tác chấp nhận):
+            </Text>
+            <div style={{ display: 'flex', gap: spacing.sm }}>
+              <button
+                type="button"
+                onClick={() => { setActionReason(''); setActionDialog('modify'); }}
+                style={{
+                  flex: 1,
+                  padding: spacing.sm,
+                  backgroundColor: colors.background.primary,
+                  color: colors.primary.zaloBlue,
+                  border: `1px solid ${colors.primary.zaloBlue}`,
+                  borderRadius: 8,
+                  fontSize: fontSize.caption,
+                  fontWeight: fontWeight.semibold,
+                  cursor: 'pointer',
+                  minHeight: 44,
+                }}
+              >
+                ✏️ Điều chỉnh
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActionReason(''); setActionDialog('complete'); }}
+                style={{
+                  flex: 1,
+                  padding: spacing.sm,
+                  backgroundColor: colors.background.primary,
+                  color: colors.primary.agriGreen,
+                  border: `1px solid ${colors.primary.agriGreen}`,
+                  borderRadius: 8,
+                  fontSize: fontSize.caption,
+                  fontWeight: fontWeight.semibold,
+                  cursor: 'pointer',
+                  minHeight: 44,
+                }}
+              >
+                ✅ Hoàn thành
+              </button>
+              <button
+                type="button"
+                onClick={() => { setActionReason(''); setActionDialog('cancel'); }}
+                style={{
+                  flex: 1,
+                  padding: spacing.sm,
+                  backgroundColor: colors.background.primary,
+                  color: colors.functional.alertRed,
+                  border: `1px solid ${colors.functional.alertRed}`,
+                  borderRadius: 8,
+                  fontSize: fontSize.caption,
+                  fontWeight: fontWeight.semibold,
+                  cursor: 'pointer',
+                  minHeight: 44,
+                }}
+              >
+                ⛔️ Hủy
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Action confirmation modal */}
+        <Modal
+          visible={actionDialog !== null}
+          title={
+            actionDialog === 'cancel'
+              ? 'Yêu cầu hủy hợp đồng?'
+              : actionDialog === 'complete'
+                ? 'Yêu cầu hoàn thành hợp đồng?'
+                : 'Yêu cầu điều chỉnh hợp đồng?'
+          }
+          description={
+            actionDialog === 'modify'
+              ? 'Chỉnh giá trị bên dưới, kèm lý do (tùy chọn). Hợp đồng sẽ chuyển sang chờ phản hồi cho đến khi đối tác phản hồi.'
+              : 'Yêu cầu sẽ chờ đối tác chấp nhận trước khi áp dụng. Bạn có thể nhập lý do (tùy chọn).'
+          }
+          zIndex={2100}
+          onClose={() => {
+            if (actionSubmitting) return;
+            setActionDialog(null);
+            setActionReason('');
+          }}
+          verticalActions
+          actions={[
+            {
+              text: actionSubmitting ? 'Đang gửi…' : 'Gửi yêu cầu',
+              onClick: () => {
+                if (actionDialog) void handleCreateAction(actionDialog);
+              },
+            },
+            { text: 'Huỷ', close: true },
+          ]}
+        >
+          {actionDialog === 'modify' && (
+            <div style={{ marginTop: spacing.sm }}>
+              <label style={{ display: 'block', fontSize: fontSize.caption, color: colors.text.secondary, marginBottom: 4 }}>
+                Khối lượng ({contract.unit})
+              </label>
+              <input
+                type="number"
+                value={modifyQuantity}
+                onChange={(e) => setModifyQuantity(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', padding: spacing.sm, marginBottom: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 6 }}
+              />
+              <label style={{ display: 'block', fontSize: fontSize.caption, color: colors.text.secondary, marginBottom: 4 }}>
+                Tổng giá trị (VNĐ)
+              </label>
+              <input
+                type="number"
+                value={modifyTotalPrice}
+                onChange={(e) => setModifyTotalPrice(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', padding: spacing.sm, marginBottom: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 6 }}
+              />
+              <label style={{ display: 'block', fontSize: fontSize.caption, color: colors.text.secondary, marginBottom: 4 }}>
+                Đến ngày
+              </label>
+              <input
+                type="date"
+                value={modifyEndDate}
+                onChange={(e) => setModifyEndDate(e.target.value)}
+                style={{ width: '100%', boxSizing: 'border-box', padding: spacing.sm, marginBottom: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 6 }}
+              />
+              <label style={{ display: 'block', fontSize: fontSize.caption, color: colors.text.secondary, marginBottom: 4 }}>
+                Điều khoản
+              </label>
+              <textarea
+                value={modifyTerms}
+                onChange={(e) => setModifyTerms(e.target.value)}
+                rows={3}
+                style={{ width: '100%', boxSizing: 'border-box', padding: spacing.sm, marginBottom: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 6, resize: 'vertical' }}
+              />
+            </div>
+          )}
+          <label style={{ display: 'block', fontSize: fontSize.caption, color: colors.text.secondary, marginTop: spacing.sm, marginBottom: 4 }}>
+            Lý do (tùy chọn)
+          </label>
+          <textarea
+            value={actionReason}
+            onChange={(e) => setActionReason(e.target.value)}
+            placeholder="Vd: thay đổi do thời tiết, mùa vụ hoàn tất…"
+            maxLength={500}
+            rows={3}
+            disabled={actionSubmitting}
+            style={{ width: '100%', boxSizing: 'border-box', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 6, resize: 'vertical' }}
+          />
+        </Modal>
 
         <Modal
           visible={rejectDialogOpen}

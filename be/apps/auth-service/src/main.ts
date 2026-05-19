@@ -2,13 +2,13 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import { applyTrustagriHttpStack, corsOrigins } from '@trustagri/shared';
+import { applyTrustagriHttpStack, corsOriginsOrAllowAll } from '@trustagri/shared';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
   app.enableCors({
-    origin: corsOrigins(),
+    origin: corsOriginsOrAllowAll(),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [

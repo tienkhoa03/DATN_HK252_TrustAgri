@@ -278,11 +278,14 @@ export const FarmerGardenListScreen: React.FC = () => {
           ))}
       </div>
 
-      {/* Bottom sheet: Quản lý vườn */}
+      {/* Bottom sheet: Quản lý vườn (offset đáy để không bị nav bar che) */}
       {showManage && (
         <div
           style={{
-            position: 'fixed', inset: 0, zIndex: 1000,
+            position: 'fixed',
+            top: 0, left: 0, right: 0,
+            bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+            zIndex: 1100,
             backgroundColor: 'rgba(0,0,0,0.45)',
             display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
           }}
@@ -292,9 +295,9 @@ export const FarmerGardenListScreen: React.FC = () => {
             style={{
               backgroundColor: colors.background.primary,
               borderRadius: '16px 16px 0 0',
-              maxHeight: '85vh',
+              maxHeight: '80vh',
               overflowY: 'auto',
-              paddingBottom: 32,
+              paddingBottom: spacing.md,
             }}
             onClick={(e) => e.stopPropagation()}
           >

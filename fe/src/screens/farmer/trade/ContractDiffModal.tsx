@@ -98,7 +98,10 @@ export const ContractDiffModal: React.FC<ContractDiffModalProps> = ({
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 1300,
+      position: 'fixed',
+      top: 0, left: 0, right: 0,
+      bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+      zIndex: 1300,
       backgroundColor: colors.background.primary,
       display: 'flex', flexDirection: 'column',
     }}>

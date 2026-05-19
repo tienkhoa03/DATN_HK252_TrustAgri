@@ -160,7 +160,8 @@ export const SelectConnectionModal: React.FC<Props> = ({ visible, onClose, onSel
     <div
       style={{
         position: 'fixed',
-        inset: 0,
+        top: 0, left: 0, right: 0,
+        bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
         zIndex: 1001,
         display: 'flex',
         flexDirection: 'column',

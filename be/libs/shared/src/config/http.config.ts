@@ -8,3 +8,15 @@ export function corsOrigins(): string[] {
     .map((s) => s.trim())
     .filter(Boolean);
 }
+
+/**
+ * Trả về giá trị `origin` cho NestJS `enableCors`:
+ * - Nếu FE_ORIGINS có giá trị: trả mảng whitelist.
+ * - Nếu FE_ORIGINS rỗng (vd: dev local quên set): trả `true` để allow mọi origin
+ *   (an toàn ở dev — vẫn yêu cầu CSRF/JWT cho endpoint nhạy cảm).
+ * Pattern này tránh tình trạng `origin: []` → CORS reject mọi request.
+ */
+export function corsOriginsOrAllowAll(): boolean | string[] {
+  const list = corsOrigins();
+  return list.length > 0 ? list : true;
+}

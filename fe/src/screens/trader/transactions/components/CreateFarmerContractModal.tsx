@@ -145,7 +145,8 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
     <div
       style={{
         position: 'fixed',
-        inset: 0,
+        top: 0, left: 0, right: 0,
+        bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
         zIndex: 1000,
         display: 'flex',
         flexDirection: 'column',

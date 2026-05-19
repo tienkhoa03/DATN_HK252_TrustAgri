@@ -24,6 +24,7 @@ import {
   type ConnectionDto,
 } from '@/services/connectionService';
 import { listFarms, type FarmDto } from '@/services/farmService';
+import { CROP_LABELS } from '@/services/marketplaceService';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
 
@@ -770,6 +771,28 @@ const TraderBrowser: React.FC<TraderBrowserProps> = ({ selectedFarm, onBack }) =
                       <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
                         {trader.traderProfile.region} · {trader.traderProfile.capacity}
                       </Text>
+                      {Array.isArray(trader.traderProfile.purchasedCropTypes) && trader.traderProfile.purchasedCropTypes.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.xs }}>
+                          <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                            🛒 Thu mua:
+                          </Text>
+                          {trader.traderProfile.purchasedCropTypes.map((c) => (
+                            <span
+                              key={c}
+                              style={{
+                                padding: `2px ${spacing.sm}`,
+                                backgroundColor: `${colors.primary.agriGreen}15`,
+                                color: colors.primary.agriGreen,
+                                borderRadius: 12,
+                                fontSize: '11px',
+                                fontWeight: fontWeight.medium,
+                              }}
+                            >
+                              {CROP_LABELS[c] ?? c}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Trust score */}

@@ -14,7 +14,7 @@ import { Injectable, Logger, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { WsJwtGuard } from './guards/ws-jwt.guard';
-import { corsOrigins, serviceUrlFromEnv, SERVICE_URL_KEYS } from '@trustagri/shared';
+import { corsOriginsOrAllowAll, serviceUrlFromEnv, SERVICE_URL_KEYS } from '@trustagri/shared';
 import type { JwtPayload } from '@trustagri/shared';
 
 /**
@@ -28,7 +28,9 @@ import type { JwtPayload } from '@trustagri/shared';
 @WebSocketGateway({
   // path (không phải namespace) để nginx prefix /ws/monitoring khớp đúng với socket.io handshake
   path: '/ws/monitoring/socket.io/',
-  cors: { origin: corsOrigins, credentials: true },
+  // Hỗ trợ cả websocket lẫn polling fallback (nginx luôn upgrade khi browser request WS).
+  transports: ['websocket', 'polling'],
+  cors: { origin: corsOriginsOrAllowAll(), credentials: true },
 })
 export class MonitoringGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
