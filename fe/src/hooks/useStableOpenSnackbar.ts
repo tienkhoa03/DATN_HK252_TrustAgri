@@ -1,6 +1,10 @@
 import { useCallback, useRef } from 'react';
 import { useSnackbar } from 'zmp-ui';
-import type { SnackbarOptions } from 'zmp-ui/snackbar-provider';
+
+// Derive options shape from zmp-ui's openSnackbar signature so we stay in sync
+// with the library without depending on its internal export paths.
+type OpenSnackbar = ReturnType<typeof useSnackbar>['openSnackbar'];
+export type SnackbarOptions = Parameters<OpenSnackbar>[0];
 
 /**
  * zmp-ui's useSnackbar() returns openSnackbar as a new function every render.

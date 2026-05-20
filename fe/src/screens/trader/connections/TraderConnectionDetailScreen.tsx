@@ -102,7 +102,7 @@ const StatusProgressBar: React.FC<{ status: ConnectionStatus }> = ({ status }) =
                     fontWeight: isActive ? fontWeight.semibold : fontWeight.regular,
                     textAlign: 'center',
                     whiteSpace: 'nowrap',
-                    fontSize: '10px',
+                    fontSize: fontSize.small,
                   }}
                 >
                   {stage.label}

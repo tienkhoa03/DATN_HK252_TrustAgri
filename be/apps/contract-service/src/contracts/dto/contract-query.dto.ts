@@ -23,12 +23,18 @@ export class ContractQueryDto extends PaginationQueryDto {
 
   @ApiPropertyOptional({
     description: 'Filter by contract status',
-    enum: ['pending_signature', 'active', 'pending_change', 'completed', 'cancelled'],
+    enum: ['pending_signature', 'active', 'pending_change', 'in_settlement', 'completed', 'cancelled'],
     example: 'active',
   })
   @IsOptional()
-  @IsIn(['pending_signature', 'active', 'pending_change', 'completed', 'cancelled'])
-  status?: 'pending_signature' | 'active' | 'pending_change' | 'completed' | 'cancelled';
+  @IsIn(['pending_signature', 'active', 'pending_change', 'in_settlement', 'completed', 'cancelled'])
+  status?: 'pending_signature' | 'active' | 'pending_change' | 'in_settlement' | 'completed' | 'cancelled';
+
+  /** Lọc hợp đồng theo farmId — dùng bởi monitoring-service khi kiểm tra quyền WS. */
+  @ApiPropertyOptional({ description: 'Filter by farm ID (UUID)', example: 'f0e1a2b3-c4d5-6789-abcd-ef0123456789' })
+  @IsOptional()
+  @IsString()
+  farmId?: string;
 
   /** ISO datetime — lọc theo createdAt từ */
   @ApiPropertyOptional({ description: 'Filter from date (ISO 8601)', example: '2024-01-01T00:00:00Z' })

@@ -85,21 +85,23 @@ export async function screenshotComponent(
   padding: number = 20
 ): Promise<void> {
   const element = page.locator(selector);
-  if (await element.count() > 0) {
-    await element.screenshot({
-      path: filename,
-      // Add padding around the element
-      clip: await element.boundingBox().then(box => {
-        if (!box) return undefined;
-        return {
-          x: Math.max(0, box.x - padding),
-          y: Math.max(0, box.y - padding),
-          width: box.width + padding * 2,
-          height: box.height + padding * 2,
-        };
-      }),
-    });
+  if ((await element.count()) === 0) return;
+  // locator.screenshot() crops tightly to the bounding box and has no `clip` option,
+  // so route the padded crop through page.screenshot when padding is requested.
+  const box = await element.boundingBox();
+  if (!box) {
+    await element.screenshot({ path: filename });
+    return;
   }
+  await page.screenshot({
+    path: filename,
+    clip: {
+      x: Math.max(0, box.x - padding),
+      y: Math.max(0, box.y - padding),
+      width: box.width + padding * 2,
+      height: box.height + padding * 2,
+    },
+  });
 }
 
 /**

@@ -324,7 +324,7 @@ function logPageLoadMetrics(): void {
       'TCP Connection': `${(perfData.connectEnd - perfData.connectStart).toFixed(2)}ms`,
       'Request Time': `${(perfData.responseStart - perfData.requestStart).toFixed(2)}ms`,
       'Response Time': `${(perfData.responseEnd - perfData.responseStart).toFixed(2)}ms`,
-      'DOM Processing': `${(perfData.domComplete - perfData.domLoading).toFixed(2)}ms`,
+      'DOM Processing': `${(perfData.domComplete - perfData.responseEnd).toFixed(2)}ms`,
       'Total Load Time': `${(perfData.loadEventEnd - perfData.fetchStart).toFixed(2)}ms`,
     });
   }

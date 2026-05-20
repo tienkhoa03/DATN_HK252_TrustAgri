@@ -10,7 +10,9 @@ import '@testing-library/jest-dom';
 
 // Farmer Screens
 import { FarmerDashboardScreen } from '../../screens/farmer';
-import { FarmerProcessScreen } from '../../screens/farmer';
+// FarmerProcessScreen was removed; alias the replacement (FarmerGardenMonitorScreen)
+// so the user-flow assertions still exercise the "quy trình + nhật ký" surface.
+import { FarmerGardenMonitorScreen as FarmerProcessScreen } from '../../screens/farmer/garden';
 // import { FarmerMarketConnectScreen } from '../../screens/farmer'; // Has TypeScript errors
 // import { FarmerContractsScreen } from '../../screens/farmer'; // Has TypeScript errors
 // import { FarmerFarmProfileScreen } from '../../screens/farmer'; // Has TypeScript errors

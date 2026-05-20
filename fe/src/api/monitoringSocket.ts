@@ -64,16 +64,22 @@ getDefaultStore().sub(accessTokenAtom, () => {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function getOrCreateSocket(): Socket {
+function getOrCreateSocket(): Socket | null {
   if (socket && socket.connected) return socket;
 
   const store = getDefaultStore();
   const token = store.get(accessTokenAtom);
+  if (!token) {
+    // BE refuses unauthenticated WS handshake; skip opening a doomed socket and
+    // let the caller's no-op return reflect that monitoring is unavailable until
+    // the user has a valid session.
+    return null;
+  }
 
   socket = io(WS_ORIGIN, {
     path: WS_MONITORING_PATH,
     transports: ['websocket'],
-    auth: token ? { token: `Bearer ${token}` } : undefined,
+    auth: { token: `Bearer ${token}` },
     autoConnect: true,
     reconnection: true,
     // Exponential backoff: 1s → 2s → 4s → … → 30s max (NFR-A01, NFR-X01)
@@ -154,7 +160,7 @@ export function subscribeToFarm(
   if (!callbacks.has(farmId)) callbacks.set(farmId, new Set());
   callbacks.get(farmId)!.add(onUpdate);
 
-  if (!subscribedFarms.has(farmId)) {
+  if (sock && !subscribedFarms.has(farmId)) {
     subscribedFarms.add(farmId);
     sock.emit('subscribe_farm', { farmId });
   }

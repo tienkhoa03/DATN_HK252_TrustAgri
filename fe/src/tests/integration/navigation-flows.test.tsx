@@ -10,7 +10,10 @@ import '@testing-library/jest-dom';
 
 // Import all screens for navigation testing
 import { FarmerDashboardScreen } from '../../screens/farmer';
-import { FarmerProcessScreen } from '../../screens/farmer';
+// FarmerProcessScreen was removed during refactor; its "quy trình + nhật ký"
+// behavior is now hosted by FarmerGardenMonitorScreen — alias it here to keep
+// the navigation/structural assertions in this test stable.
+import { FarmerGardenMonitorScreen as FarmerProcessScreen } from '../../screens/farmer/garden';
 // import { FarmerMarketConnectScreen } from '../../screens/farmer'; // Has TypeScript errors
 // import { FarmerContractsScreen } from '../../screens/farmer'; // Has TypeScript errors
 // import { FarmerFarmProfileScreen } from '../../screens/farmer'; // Has TypeScript errors

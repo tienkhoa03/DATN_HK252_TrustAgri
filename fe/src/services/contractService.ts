@@ -180,6 +180,8 @@ export function contractStatusLabelVi(status: ContractDto['status']): string {
       return 'Đang thực hiện';
     case 'pending_change':
       return 'Chờ duyệt thay đổi';
+    case 'in_settlement':
+      return 'Đang quyết toán';
     case 'completed':
       return 'Hoàn thành';
     case 'cancelled':

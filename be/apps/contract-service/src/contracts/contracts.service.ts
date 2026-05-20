@@ -209,6 +209,9 @@ export class ContractsService {
     if (query.status) {
       qb.andWhere('c.status = :st', { st: query.status });
     }
+    if (query.farmId) {
+      qb.andWhere('c.farmId = :farmId', { farmId: query.farmId });
+    }
     if (query.from) {
       qb.andWhere('c.createdAt >= :from', { from: query.from });
     }

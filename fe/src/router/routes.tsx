@@ -55,9 +55,8 @@ const BuyerOrdersProposalsScreen = lazy(() =>
 const BuyerPostBuyingRequestScreen = lazy(() =>
   import('@/screens/buyer/post-buying-request').then((m) => ({ default: m.BuyerPostBuyingRequestScreen })),
 );
-const BuyerDigitalTwinMonitorScreen = lazy(() =>
-  import('@/screens/buyer/digital-twin-monitor').then((m) => ({ default: m.BuyerDigitalTwinMonitorScreen })),
-);
+// BuyerDigitalTwinMonitorScreen was replaced by BuyerLiveMonitorScreen below;
+// keep the import out of the route bundle until/unless it is re-wired.
 const BuyerProfileNotificationScreen = lazy(() =>
   import('@/screens/buyer/profile-notification').then((m) => ({ default: m.BuyerProfileNotificationScreen })),
 );

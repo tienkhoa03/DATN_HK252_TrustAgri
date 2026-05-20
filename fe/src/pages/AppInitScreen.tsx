@@ -515,7 +515,7 @@ function StatusBadge({ status }: { status: SmokeStatus }) {
         gap: 4,
       }}
     >
-      {status === 'loading' ? <Spinner size="small" /> : null}
+      {status === 'loading' ? <Spinner /> : null}
       {config.text}
     </Box>
   );

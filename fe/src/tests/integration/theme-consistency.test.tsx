@@ -13,7 +13,9 @@ import { colors, typography, spacing, icons } from '../../design-system/tokens';
 
 // All Screens
 import { FarmerDashboardScreen } from '../../screens/farmer';
-import { FarmerProcessScreen } from '../../screens/farmer';
+// FarmerProcessScreen was removed; alias the replacement so theme assertions
+// still cover the "quy trình + nhật ký" surface.
+import { FarmerGardenMonitorScreen as FarmerProcessScreen } from '../../screens/farmer/garden';
 // import { FarmerMarketConnectScreen } from '../../screens/farmer'; // Has TypeScript errors
 // import { FarmerContractsScreen } from '../../screens/farmer'; // Has TypeScript errors
 // import { FarmerFarmProfileScreen } from '../../screens/farmer'; // Has TypeScript errors
