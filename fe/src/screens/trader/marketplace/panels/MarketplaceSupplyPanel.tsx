@@ -36,7 +36,13 @@ import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { farmOwnerDisplay } from '@/utils/displayLabels';
 
 type ConnectionStatus = ConnectionDto['status'];
-type FarmConnectionFilter = 'all' | 'none' | ConnectionStatus;
+// UI-only derived states layered on top of the connection lifecycle:
+//   negotiating = trader & farmer đang đàm phán hợp đồng
+//   signed      = hợp đồng đã ký kết
+// Không tồn tại trong ConnectionDto backend; suy ra từ API contracts hoặc cập nhật cục bộ.
+type DerivedConnectionStatus = 'negotiating' | 'signed';
+type AnyConnectionStatus = ConnectionStatus | DerivedConnectionStatus;
+type FarmConnectionFilter = 'all' | 'none' | AnyConnectionStatus;
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -84,8 +90,9 @@ const CONNECTION_STATUS_FILTER_OPTIONS: { value: FarmConnectionFilter; label: st
   { value: 'rejected', label: 'Đã từ chối' },
 ];
 
-const STATUS_PRIORITY: Record<ConnectionStatus, number> = {
+const STATUS_PRIORITY: Record<AnyConnectionStatus, number> = {
   rejected: 1,
+  cancelled: 1,
   pending: 2,
   accepted: 3,
   negotiating: 4,
@@ -100,6 +107,7 @@ const STATUS_LABEL: Record<FarmConnectionFilter, string> = {
   negotiating: 'Đang đàm phán',
   signed: 'Đã ký kết',
   rejected: 'Đã từ chối',
+  cancelled: 'Đã hủy',
 };
 
 const STATUS_COLOR: Record<FarmConnectionFilter, string> = {
@@ -110,12 +118,13 @@ const STATUS_COLOR: Record<FarmConnectionFilter, string> = {
   negotiating: colors.primary.zaloBlue,
   signed: '#9B59B6',
   rejected: colors.functional.alertRed,
+  cancelled: colors.text.secondary,
 };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ConnectionInfo {
-  status: ConnectionStatus;
+  status: AnyConnectionStatus;
   connectionId: string;
   /** 'outgoing' = trader gửi đến farmer; 'incoming' = farmer gửi đến trader */
   direction: 'outgoing' | 'incoming';

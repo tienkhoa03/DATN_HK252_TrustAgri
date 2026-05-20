@@ -234,12 +234,11 @@ export const toTailwindConfig = () => {
 };
 
 /**
- * Get nearest valid color from palette
- * Used for error recovery when invalid color is provided
+ * Default color fallback used when an invalid color is encountered.
+ * The richer color-mapping logic lives in `design-system/utils/errorHandling.ts`
+ * (re-exported as `getNearestValidColor` from the package root).
  */
-export const getNearestValidColor = (color: string): string => {
-  // Simple implementation: return first primary color as fallback
-  // In production, this could use color distance algorithms
+export const getDefaultColorFallback = (_color?: string): string => {
   return primaryColors.zaloBlue;
 };
 

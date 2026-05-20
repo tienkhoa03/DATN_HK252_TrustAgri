@@ -48,7 +48,7 @@ export interface ContractDto {
   startDate: string;
   endDate: string;
   plantingDate?: string | null;
-  status: 'pending_signature' | 'active' | 'pending_change' | 'completed' | 'cancelled';
+  status: 'pending_signature' | 'active' | 'pending_change' | 'in_settlement' | 'completed' | 'cancelled';
   terms: string;
   farmerSignedAt?: string;
   traderSignedAt?: string;
@@ -128,7 +128,7 @@ export interface ListContractsParams {
   role?: ContractRoleFilter;
   /** `me` = partyBuyerId = user hiện tại (role buyer) */
   buyerId?: string;
-  status?: ContractDto['status'] | 'all' | 'pending_signature';
+  status?: ContractDto['status'] | 'all';
   from?: string;
   to?: string;
   page?: number;

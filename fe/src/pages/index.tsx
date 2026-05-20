@@ -5,20 +5,9 @@ import { Box, Page, Text, Button, Spinner } from "zmp-ui";
 import { currentRoleAtom, type UserRole } from "@/state/authAtoms";
 
 // Lazy load all screen demos for better performance
-const FarmerDashboardScreenDemo = lazy(() => 
-  import("../screens/farmer").then(m => ({ default: m.FarmerDashboardScreenDemo }))
-);
-const FarmerProcessScreenDemo = lazy(() => 
-  import("../screens/farmer").then(m => ({ default: m.FarmerProcessScreenDemo }))
-);
-const FarmerMarketConnectScreenDemo = lazy(() => 
-  import("../screens/farmer").then(m => ({ default: m.FarmerMarketConnectScreenDemo }))
-);
-const FarmerFarmProfileScreenDemo = lazy(() => 
-  import("../screens/farmer").then(m => ({ default: m.FarmerFarmProfileScreenDemo }))
-);
-const FarmerContractsScreenDemoSimple = lazy(() => 
-  import("../screens/farmer").then(m => ({ default: m.FarmerContractsScreenDemoSimple }))
+// Farmer screens have been integrated; the dev launcher renders the real screens directly.
+const FarmerDashboardScreenDemo = lazy(() =>
+  import("../screens/farmer/dashboard/FarmerDashboardScreen.demo").then(m => ({ default: m.FarmerDashboardScreenDemo }))
 );
 
 const TraderDashboardScreenDemo = lazy(() => 
@@ -89,38 +78,6 @@ function HomePage() {
     return (
       <Suspense fallback={<LoadingScreen />}>
         <FarmerDashboardScreenDemo onBack={() => setActiveDemo(null)} />
-      </Suspense>
-    );
-  }
-
-  if (activeDemo === 'farmer-process') {
-    return (
-      <Suspense fallback={<LoadingScreen />}>
-        <FarmerProcessScreenDemo onBack={() => setActiveDemo(null)} />
-      </Suspense>
-    );
-  }
-
-  if (activeDemo === 'farmer-market-connect') {
-    return (
-      <Suspense fallback={<LoadingScreen />}>
-        <FarmerMarketConnectScreenDemo onBack={() => setActiveDemo(null)} />
-      </Suspense>
-    );
-  }
-
-  if (activeDemo === 'farmer-contracts') {
-    return (
-      <Suspense fallback={<LoadingScreen />}>
-        <FarmerContractsScreenDemoSimple onBack={() => setActiveDemo(null)} />
-      </Suspense>
-    );
-  }
-
-  if (activeDemo === 'farmer-farm-profile') {
-    return (
-      <Suspense fallback={<LoadingScreen />}>
-        <FarmerFarmProfileScreenDemo onBack={() => setActiveDemo(null)} />
       </Suspense>
     );
   }
@@ -259,7 +216,7 @@ function HomePage() {
           
           {role === "farmer" && (
           <div className="space-y-2">
-            <Text.Title size="xSmall" className="mb-2 font-semibold">
+            <Text.Title size="small" className="mb-2 font-semibold">
               Nông dân (Farmer)
             </Text.Title>
             <Button
@@ -269,40 +226,12 @@ function HomePage() {
             >
               Trang chủ và Giám sát
             </Button>
-            <Button
-              fullWidth
-              onClick={() => setActiveDemo('farmer-process')}
-              className="mb-2"
-            >
-              Quy trình và Nhật ký
-            </Button>
-            <Button
-              fullWidth
-              onClick={() => setActiveDemo('farmer-market-connect')}
-              className="mb-2"
-            >
-              Thị trường và Kết nối
-            </Button>
-            <Button
-              fullWidth
-              onClick={() => setActiveDemo('farmer-contracts')}
-              className="mb-2"
-            >
-              Quản lý Hợp đồng
-            </Button>
-            <Button
-              fullWidth
-              onClick={() => setActiveDemo('farmer-farm-profile')}
-              className="mb-2"
-            >
-              Hồ sơ Vườn
-            </Button>
           </div>
           )}
 
           {role === "trader" && (
           <div className="space-y-2">
-            <Text.Title size="xSmall" className="mb-2 font-semibold">
+            <Text.Title size="small" className="mb-2 font-semibold">
               Thương lái (Trader)
             </Text.Title>
             <Button
@@ -345,7 +274,7 @@ function HomePage() {
 
           {role === "buyer" && (
           <div className="space-y-2">
-            <Text.Title size="xSmall" className="mb-2 font-semibold">
+            <Text.Title size="small" className="mb-2 font-semibold">
               Người mua (Buyer)
             </Text.Title>
             <Button
@@ -395,7 +324,7 @@ function HomePage() {
 
           {role === "guest" && (
           <div className="space-y-2">
-            <Text.Title size="xSmall" className="mb-2 font-semibold">
+            <Text.Title size="small" className="mb-2 font-semibold">
               Khách (Guest)
             </Text.Title>
             <Button

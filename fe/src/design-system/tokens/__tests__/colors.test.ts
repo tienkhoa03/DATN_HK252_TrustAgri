@@ -17,7 +17,7 @@ import {
   toCssVariables,
   toJson,
   toTailwindConfig,
-  getNearestValidColor,
+  getDefaultColorFallback,
   getValidatedColor,
   getSemanticColor,
   getStatusColor,
@@ -204,8 +204,8 @@ describe('Color Tokens', () => {
       );
     });
 
-    test('getNearestValidColor should return a valid color', () => {
-      const nearestColor = getNearestValidColor('#INVALID');
+    test('getDefaultColorFallback should return a valid color', () => {
+      const nearestColor = getDefaultColorFallback('#INVALID');
       expect(validColorValues).toContain(nearestColor);
     });
   });

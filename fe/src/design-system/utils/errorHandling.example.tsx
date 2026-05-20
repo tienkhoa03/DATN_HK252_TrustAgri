@@ -276,7 +276,7 @@ export const ErrorHandlingExamples: React.FC = () => {
   return (
     <Page>
       <Box p={4}>
-        <Text bold size="xxLarge">Error Handling Examples</Text>
+        <Text bold size="xLarge">Error Handling Examples</Text>
         <Text size="small" style={{ color: '#666', marginTop: '4px' }}>
           Demonstrates comprehensive error handling for the design system
         </Text>

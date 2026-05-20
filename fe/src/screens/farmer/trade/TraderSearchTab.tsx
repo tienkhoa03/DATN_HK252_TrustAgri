@@ -31,10 +31,17 @@ import { authSessionAtom } from '@/state/authAtoms';
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type ConnectionStatus = ConnectionDto['status'];
-type TraderConnectionFilter = 'all' | 'none' | ConnectionStatus;
+// UI-only derived states layered on top of the connection lifecycle:
+//   negotiating = trader & farmer đang đàm phán hợp đồng (sau khi accept connection)
+//   signed      = hợp đồng đã ký kết
+// Hai trạng thái này không tồn tại trong ConnectionDto backend; UI sẽ suy ra
+// từ các API khác (vd: contracts) hoặc cập nhật cục bộ sau khi ký hợp đồng.
+type DerivedConnectionStatus = 'negotiating' | 'signed';
+type AnyConnectionStatus = ConnectionStatus | DerivedConnectionStatus;
+type TraderConnectionFilter = 'all' | 'none' | AnyConnectionStatus;
 
 interface ConnectionInfo {
-  status: ConnectionStatus;
+  status: AnyConnectionStatus;
   connectionId: string;
   /** 'outgoing' = farmer gửi đến trader; 'incoming' = trader gửi đến farmer */
   direction: 'outgoing' | 'incoming';
@@ -62,6 +69,7 @@ const STATUS_LABEL: Record<TraderConnectionFilter, string> = {
   negotiating: 'Đang đàm phán',
   signed: 'Đã ký kết',
   rejected: 'Đã từ chối',
+  cancelled: 'Đã hủy',
 };
 
 const STATUS_COLOR: Record<TraderConnectionFilter, string> = {
@@ -72,10 +80,12 @@ const STATUS_COLOR: Record<TraderConnectionFilter, string> = {
   negotiating: colors.primary.zaloBlue,
   signed: '#9B59B6',
   rejected: colors.functional.alertRed,
+  cancelled: colors.text.secondary,
 };
 
-const STATUS_PRIORITY: Record<ConnectionStatus, number> = {
+const STATUS_PRIORITY: Record<AnyConnectionStatus, number> = {
   rejected: 1,
+  cancelled: 1,
   pending: 2,
   accepted: 3,
   negotiating: 4,

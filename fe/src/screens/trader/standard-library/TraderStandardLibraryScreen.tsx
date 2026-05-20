@@ -562,7 +562,7 @@ export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inT
                     >
                       {step.order}
                     </div>
-                    <Text.Title size="xSmall" style={{ margin: 0 }}>
+                    <Text.Title size="small" style={{ margin: 0 }}>
                       {step.title}
                     </Text.Title>
                   </div>

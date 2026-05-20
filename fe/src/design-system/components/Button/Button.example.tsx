@@ -109,15 +109,15 @@ export const ButtonExamples: React.FC = () => {
         <h2 style={{ marginBottom: '16px' }}>Real-world Examples</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '400px' }}>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <Button variant="primary" style={{ flex: 1 }}>
+            <Button variant="primary">
               Đặt hàng ngay
             </Button>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            <Button variant="outline" style={{ flex: 1 }}>
+            <Button variant="outline">
               Hủy
             </Button>
-            <Button variant="primary" style={{ flex: 1 }}>
+            <Button variant="primary">
               Xác nhận
             </Button>
           </div>

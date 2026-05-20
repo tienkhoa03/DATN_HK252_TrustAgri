@@ -224,7 +224,7 @@ const AlertCard: React.FC<AlertCardProps> = ({ alert, onAcknowledge, isAcknowled
 
       {/* Footer: time + acknowledge button */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.xs }}>
-        <Text style={{ fontSize: fontSize.xSmall, color: colors.text.disabled, margin: 0 }}>
+        <Text style={{ fontSize: fontSize.small, color: colors.text.disabled, margin: 0 }}>
           {alert.acknowledged && alert.acknowledgedAt
             ? `Đã xử lý • ${formatRelativeTime(alert.acknowledgedAt)}`
             : formatRelativeTime(alert.createdAt)}
@@ -570,7 +570,7 @@ export const FarmerAlertListScreen: React.FC<FarmerAlertListScreenProps> = ({
           {!isLoading && (
             <span style={{
               marginLeft: 'auto',
-              fontSize: fontSize.xSmall,
+              fontSize: fontSize.small,
               color: colors.text.secondary,
             }}>
               {total} kết quả

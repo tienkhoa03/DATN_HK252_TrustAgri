@@ -38,7 +38,7 @@ function HomePage() {
           </div>
 
           <div className="mt-4">
-            <Text.Title size="xSmall" className="mb-2">
+            <Text.Title size="small" className="mb-2">
               Next Steps:
             </Text.Title>
             <Text size="small" className="text-gray-600">

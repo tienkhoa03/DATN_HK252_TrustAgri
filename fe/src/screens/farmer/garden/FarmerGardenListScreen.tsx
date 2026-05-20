@@ -34,7 +34,7 @@ async function resolveFarmListItem(
   standardNames: Map<string, string>,
 ): Promise<FarmListItem> {
   let statusLabel = 'Đang canh tác';
-  let statusColor = colors.primary.agriGreen;
+  let statusColor: string = colors.primary.agriGreen;
 
   const standardLabel = farm.standardId
     ? (standardNames.get(farm.standardId) ?? 'Tiêu chuẩn đã gán')

@@ -188,12 +188,12 @@ export const sensorIconMapping = {
   light: agricultureIcons.light,
 } as const;
 
-export type SensorType = keyof typeof sensorIconMapping;
+export type SensorIconKey = keyof typeof sensorIconMapping;
 
 /**
  * Get icon for sensor type
  */
-export const getSensorIcon = (sensorType: SensorType): string => {
+export const getSensorIcon = (sensorType: SensorIconKey): string => {
   return sensorIconMapping[sensorType];
 };
 

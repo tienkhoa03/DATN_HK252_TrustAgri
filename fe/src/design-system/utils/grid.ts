@@ -5,7 +5,8 @@
  * Requirements: 8.1
  */
 
-import { spacing, SpacingValue } from './spacing';
+import { getSpacing, padding } from './spacing';
+import type { SpacingValue } from './spacing';
 
 export interface GridConfig {
   columns: number;
@@ -34,13 +35,13 @@ export const gridContainer = (config: GridConfig): Record<string, string> => {
   };
   
   if (gap) {
-    styles.gap = spacing.getSpacing(gap);
+    styles.gap = getSpacing(gap);
   } else {
     if (rowGap) {
-      styles.rowGap = spacing.getSpacing(rowGap);
+      styles.rowGap = getSpacing(rowGap);
     }
     if (columnGap) {
-      styles.columnGap = spacing.getSpacing(columnGap);
+      styles.columnGap = getSpacing(columnGap);
     }
   }
   
@@ -85,7 +86,7 @@ export const flexContainer = (config: FlexConfig = {}): Record<string, string> =
   };
   
   if (gap) {
-    styles.gap = spacing.getSpacing(gap);
+    styles.gap = getSpacing(gap);
   }
   
   return styles;
@@ -155,7 +156,7 @@ export const screenLayout = {
    * Main container with padding
    */
   container: {
-    ...spacing.padding('md', 'all'),
+    ...padding('md', 'all'),
     width: '100%',
     maxWidth: '414px', // Max mobile width
     margin: '0 auto',
@@ -166,7 +167,7 @@ export const screenLayout = {
    */
   header: {
     height: '56px',
-    ...spacing.padding('md', 'horizontal'),
+    ...padding('md', 'horizontal'),
     ...flexContainer({ direction: 'row', justify: 'space-between', align: 'center' }),
   },
   
@@ -174,7 +175,7 @@ export const screenLayout = {
    * Content section (scrollable)
    */
   content: {
-    ...spacing.padding('md', 'all'),
+    ...padding('md', 'all'),
     overflowY: 'auto' as const,
   },
   
@@ -183,7 +184,7 @@ export const screenLayout = {
    */
   footer: {
     height: '64px',
-    ...spacing.padding('sm', 'horizontal'),
+    ...padding('sm', 'horizontal'),
     ...flexContainer({ direction: 'row', justify: 'space-around', align: 'center' }),
   },
 };

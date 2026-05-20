@@ -72,17 +72,7 @@ export const TraderStandardLibraryScreenDemo: React.FC<TraderStandardLibraryScre
 
       {/* Trader Standard Library Screen */}
       <div style={contentWrapperStyles}>
-        <TraderStandardLibraryScreen
-          onCreateStandard={(standard) => {
-            console.log('Create standard:', standard);
-          }}
-          onEditStandard={(id, standard) => {
-            console.log('Edit standard:', id, standard);
-          }}
-          onDeleteStandard={(id) => {
-            console.log('Delete standard:', id);
-          }}
-        />
+        <TraderStandardLibraryScreen />
       </div>
     </Page>
   );
