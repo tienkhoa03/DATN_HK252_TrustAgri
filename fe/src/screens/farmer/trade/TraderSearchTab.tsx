@@ -59,7 +59,6 @@ const CONNECTION_STATUS_FILTER_OPTIONS: { value: TraderConnectionFilter; label: 
   { value: 'accepted', label: 'Đã kết nối' },
   { value: 'negotiating', label: 'Đang đàm phán' },
   { value: 'signed', label: 'Đã ký kết' },
-  { value: 'rejected', label: 'Đã từ chối' },
 ];
 
 const STATUS_LABEL: Record<TraderConnectionFilter, string> = {
@@ -355,6 +354,8 @@ const TraderBrowser: React.FC<TraderBrowserProps> = ({ selectedFarm, onBack }) =
       const map: Record<string, ConnectionInfo> = {};
       res.items
         .filter((conn) => conn.farmId === selectedFarm.id)
+        // Kết nối đã từ chối / đã hủy coi như chưa kết nối — cho phép gửi lại từ đầu
+        .filter((conn) => conn.status !== 'rejected' && conn.status !== 'cancelled')
         .forEach((conn) => {
           // Identify the trader (the party that is not the current farmer)
           const traderId = conn.fromUserId === myUserId ? conn.toUserId : conn.fromUserId;
@@ -489,10 +490,12 @@ const TraderBrowser: React.FC<TraderBrowserProps> = ({ selectedFarm, onBack }) =
     if (!info || info.status !== 'pending' || info.direction !== 'incoming') return;
     try {
       await rejectConnection(info.connectionId);
-      setConnectionStatusMap((prev) => ({
-        ...prev,
-        [traderId]: { ...prev[traderId], status: 'rejected' },
-      }));
+      // Sau khi từ chối, trở về trạng thái "chưa kết nối" để có thể kết nối lại từ đầu
+      setConnectionStatusMap((prev) => {
+        const next = { ...prev };
+        delete next[traderId];
+        return next;
+      });
       openSnackbar({ type: 'success', text: 'Đã từ chối yêu cầu kết nối.', duration: 3000, icon: true });
     } catch (err) {
       openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'respond'), duration: 3000, icon: true });
@@ -900,11 +903,6 @@ const TraderBrowser: React.FC<TraderBrowserProps> = ({ selectedFarm, onBack }) =
                     <div style={{ ...connectBtnStyle, backgroundColor: '#9B59B612', color: '#9B59B6', cursor: 'default' }}>
                       <Icon name="star" size="sm" color="#9B59B6" />
                       Đã ký kết
-                    </div>
-                  ) : status === 'rejected' ? (
-                    <div style={{ ...connectBtnStyle, backgroundColor: `${colors.functional.alertRed}10`, color: colors.functional.alertRed, cursor: 'default' }}>
-                      <Icon name="close" size="sm" color={colors.functional.alertRed} />
-                      Đã từ chối
                     </div>
                   ) : (
                     <button

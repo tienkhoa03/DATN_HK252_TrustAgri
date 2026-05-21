@@ -156,7 +156,7 @@ export const BuyerDashboardScreen: React.FC = () => {
               minHeight: '44px',
             }}
           >
-            Bắt đầu đặt hàng đầu tiên
+            Bắt đầu đặt hàng
           </button>
         </div>
       </div>

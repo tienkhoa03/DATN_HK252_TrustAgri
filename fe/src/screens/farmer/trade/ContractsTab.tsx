@@ -20,7 +20,6 @@ import { contractFarmDisplay, partyTraderDisplay } from '@/utils/displayLabels';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
-import { ContractDiffModal } from './ContractDiffModal';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -153,13 +152,9 @@ export const ContractsTab: React.FC = () => {
   const [loaded, setLoaded] = useState(false);
 
   const [selectedContract, setSelectedContract] = useState<ContractDto | null>(null);
-  const [diffModal, setDiffModal] = useState<{
-    open: boolean;
-    contract?: ContractDto;
-  }>({ open: false });
 
-  const loadContracts = useCallback(async () => {
-    if (loaded) return;
+  const loadContracts = useCallback(async (force = false) => {
+    if (loaded && !force) return;
     setLoading(true);
     try {
       const [waitRes, pendChangeRes, activeRes, completedRes, cancelledRes] =
@@ -170,8 +165,9 @@ export const ContractsTab: React.FC = () => {
           listContracts({ role: 'farmer', status: 'completed', limit: 30 }),
           listContracts({ role: 'farmer', status: 'cancelled', limit: 30 }),
         ]);
-      setWaitingContracts([...waitRes.items, ...pendChangeRes.items]);
-      setSignedContracts(activeRes.items);
+      // pending_change = hợp đồng đã ký, đang chờ đối tác phản hồi yêu cầu thay đổi → tab "Đã ký"
+      setWaitingContracts(waitRes.items);
+      setSignedContracts([...activeRes.items, ...pendChangeRes.items]);
       setHistoryContracts([...completedRes.items, ...cancelledRes.items]);
       setLoaded(true);
     } catch (err) {
@@ -211,11 +207,8 @@ export const ContractsTab: React.FC = () => {
   };
 
   const handleCardTap = (contract: ContractDto) => {
-    if (contract.status === 'pending_change') {
-      setDiffModal({ open: true, contract });
-    } else {
-      setSelectedContract(contract);
-    }
+    // ContractDetailModal tự fetch change-requests + hiển thị diff/accept/reject cho mọi trạng thái
+    setSelectedContract(contract);
   };
 
   const renderContractList = (
@@ -277,23 +270,18 @@ export const ContractsTab: React.FC = () => {
           )}
       </StatusTabbedList>
 
-      {/* Contract detail modal */}
+      {/* Contract detail modal — handles sign/reject + change-request diff & accept/reject */}
       {selectedContract && (
         <ContractDetailModal
           contract={selectedContract}
           visible
-          onClose={() => setSelectedContract(null)}
+          onClose={() => {
+            setSelectedContract(null);
+            // Reload để phản ánh thay đổi trạng thái sau khi accept/reject change-request
+            void loadContracts(true);
+          }}
           onSigned={handleSigned}
           onRejected={handleRejected}
-        />
-      )}
-
-      {/* Diff modal for pending_change */}
-      {diffModal.open && diffModal.contract && (
-        <ContractDiffModal
-          open={diffModal.open}
-          onClose={() => setDiffModal({ open: false })}
-          contract={diffModal.contract}
         />
       )}
     </>
