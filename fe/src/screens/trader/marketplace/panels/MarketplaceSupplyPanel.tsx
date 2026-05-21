@@ -25,6 +25,7 @@ import { ApiError } from '@/api/errors';
 import {
   createConnection,
   cancelConnection,
+  disconnectConnection,
   acceptConnection,
   rejectConnection,
   listConnections,
@@ -220,6 +221,7 @@ export const MarketplaceSupplyPanel: React.FC = () => {
   const [connectionStatusMap, setConnectionStatusMap] = useState<Record<string, ConnectionInfo>>({});
   const [cancellingFarmId, setCancellingFarmId] = useState<string | null>(null);
   const [acceptingFarmId, setAcceptingFarmId] = useState<string | null>(null);
+  const [disconnectingFarmId, setDisconnectingFarmId] = useState<string | null>(null);
 
   // Standard lookup: id → StandardDto (cho hiển thị tên thay vì UUID)
   const [standardsById, setStandardsById] = useState<Record<string, StandardDto>>({});
@@ -403,6 +405,24 @@ export const MarketplaceSupplyPanel: React.FC = () => {
     }
   };
 
+  const handleDisconnect = async (farmId: string) => {
+    const info = connectionStatusMap[farmId];
+    if (!info || info.status !== 'accepted') return;
+    setDisconnectingFarmId(farmId);
+    try {
+      await disconnectConnection(info.connectionId);
+      setConnectionStatusMap((prev) => ({
+        ...prev,
+        [farmId]: { ...prev[farmId], status: 'cancelled' },
+      }));
+      openSnackbar({ type: 'success', text: 'Đã hủy kết nối thành công.', duration: 3000, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'disconnect'), duration: 3500, icon: true });
+    } finally {
+      setDisconnectingFarmId(null);
+    }
+  };
+
   const handleCancelConnectionRequest = async (farmId: string) => {
     const info = connectionStatusMap[farmId];
     if (!info || info.status !== 'pending') return;
@@ -581,6 +601,7 @@ export const MarketplaceSupplyPanel: React.FC = () => {
             const connInfo = connectionStatusMap[farm.id];
             const farmStatus = farmConnectionStatus(farm.id, connectionStatusMap);
             const isCancelling = cancellingFarmId === farm.id;
+            const isDisconnecting = disconnectingFarmId === farm.id;
 
             return (
               <div key={farm.id} style={farmCardStyle}>
@@ -681,9 +702,20 @@ export const MarketplaceSupplyPanel: React.FC = () => {
                     {isCancelling ? 'Đang hủy...' : 'Hủy yêu cầu'}
                   </button>
                 ) : connInfo?.status === 'accepted' ? (
-                  <div style={{ ...connectBtnStyle, backgroundColor: `${colors.primary.agriGreen}18`, color: colors.primary.agriGreen, cursor: 'default' }}>
-                    <Icon name="check" size="sm" color={colors.primary.agriGreen} />
-                    Đã kết nối
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm, marginTop: spacing.md }}>
+                    <div style={{ ...connectBtnStyle, marginTop: 0, backgroundColor: `${colors.primary.agriGreen}18`, color: colors.primary.agriGreen, cursor: 'default' }}>
+                      <Icon name="check" size="sm" color={colors.primary.agriGreen} />
+                      Đã kết nối
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isDisconnecting}
+                      onClick={() => void handleDisconnect(farm.id)}
+                      style={{ ...connectBtnStyle, marginTop: 0, backgroundColor: 'transparent', border: `1.5px solid ${isDisconnecting ? colors.text.disabled : colors.functional.alertRed}`, color: isDisconnecting ? colors.text.disabled : colors.functional.alertRed, cursor: isDisconnecting ? 'not-allowed' : 'pointer' }}
+                    >
+                      <Icon name="close" size="sm" color={isDisconnecting ? colors.text.disabled : colors.functional.alertRed} />
+                      {isDisconnecting ? 'Đang hủy...' : 'Hủy kết nối'}
+                    </button>
                   </div>
                 ) : connInfo?.status === 'negotiating' ? (
                   <div style={{ ...connectBtnStyle, backgroundColor: `${colors.primary.zaloBlue}12`, color: colors.primary.zaloBlue, cursor: 'default' }}>

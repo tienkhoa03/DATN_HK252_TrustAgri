@@ -147,12 +147,15 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
   const [connection, setConnection] = useState<ConnectionDto | null>(connectionProp ?? stateConnection ?? null);
   const [showCreateContract, setShowCreateContract] = useState(false);
   const [farmHasOngoingContract, setFarmHasOngoingContract] = useState(false);
+  // Chặn hủy kết nối khi giữa farmer↔trader này còn hợp đồng chưa hoàn thành (bất kỳ vườn nào)
+  const [pairHasOngoingContract, setPairHasOngoingContract] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
 
   useEffect(() => {
+    if (connection?.status !== 'accepted') return;
     const farmId = connection?.farmId;
-    if (!farmId) return;
-    // Kiểm tra cả 4 trạng thái block disconnect
+    const farmerId = connection.fromRole === 'farmer' ? connection.fromUserId : connection.toUserId;
+    // 4 trạng thái block: pending_signature, active, pending_change, in_settlement
     Promise.all([
       listContracts({ role: 'trader', status: 'active', limit: 100 }),
       listContracts({ role: 'trader', status: 'pending_signature', limit: 100 }),
@@ -160,16 +163,23 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
       listContracts({ role: 'trader', status: 'in_settlement', limit: 100 }),
     ])
       .then(([activeRes, pendingRes, changeRes, settlementRes]) => {
-        const busy = [
-          ...activeRes.items.map((c) => c.farmId),
-          ...pendingRes.items.map((c) => c.farmId),
-          ...changeRes.items.map((c) => c.farmId),
-          ...settlementRes.items.map((c) => c.farmId),
-        ].filter(Boolean);
-        setFarmHasOngoingContract(busy.includes(farmId));
+        const blocking = [
+          ...activeRes.items,
+          ...pendingRes.items,
+          ...changeRes.items,
+          ...settlementRes.items,
+        ];
+        // Tạo hợp đồng: chặn theo vườn (mỗi vườn chỉ 1 hợp đồng đang chạy)
+        setFarmHasOngoingContract(
+          !!farmId && blocking.some((c) => c.farmId === farmId),
+        );
+        // Hủy kết nối: chặn theo cặp farmer↔trader, bất kỳ vườn nào
+        setPairHasOngoingContract(
+          blocking.some((c) => c.partyFarmerId === farmerId),
+        );
       })
       .catch(() => {});
-  }, [connection?.farmId]);
+  }, [connection?.status, connection?.farmId, connection?.fromUserId, connection?.toUserId, connection?.fromRole]);
 
   const handleDisconnect = async () => {
     if (!connection) return;
@@ -452,7 +462,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
             boxShadow: '0 -4px 12px rgba(0,0,0,0.08)',
           }}
         >
-          {farmHasOngoingContract && (
+          {pairHasOngoingContract && (
             <Text
               size="xSmall"
               style={{
@@ -462,7 +472,7 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
                 marginBottom: spacing.sm,
               }}
             >
-              Vườn này đã có hợp đồng đang thực hiện — không thể hủy kết nối
+              Đang có hợp đồng chưa hoàn thành với nông dân này — không thể hủy kết nối
             </Text>
           )}
           <div style={{ display: 'flex', gap: spacing.sm }}>
@@ -488,17 +498,17 @@ export const TraderConnectionDetailScreen: React.FC<TraderConnectionDetailScreen
             </button>
             <button
               onClick={handleDisconnect}
-              disabled={isDisconnecting || farmHasOngoingContract}
+              disabled={isDisconnecting || pairHasOngoingContract}
               style={{
                 flex: 1,
                 padding: `${spacing.md} ${spacing.sm}`,
                 backgroundColor: 'transparent',
-                color: (isDisconnecting || farmHasOngoingContract) ? colors.text.disabled : colors.functional.alertRed,
-                border: `1.5px solid ${(isDisconnecting || farmHasOngoingContract) ? colors.text.disabled : colors.functional.alertRed}`,
+                color: (isDisconnecting || pairHasOngoingContract) ? colors.text.disabled : colors.functional.alertRed,
+                border: `1.5px solid ${(isDisconnecting || pairHasOngoingContract) ? colors.text.disabled : colors.functional.alertRed}`,
                 borderRadius: 12,
                 fontSize: fontSize.body,
                 fontWeight: fontWeight.semibold,
-                cursor: (isDisconnecting || farmHasOngoingContract) ? 'not-allowed' : 'pointer',
+                cursor: (isDisconnecting || pairHasOngoingContract) ? 'not-allowed' : 'pointer',
                 minHeight: 44,
               }}
             >

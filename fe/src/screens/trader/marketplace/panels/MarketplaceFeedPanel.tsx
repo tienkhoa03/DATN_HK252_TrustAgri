@@ -383,6 +383,7 @@ export const MarketplaceFeedPanel: React.FC = () => {
   const [buyingRequests, setBuyingRequests] = useState<BuyingRequestDto[]>([]);
   const [brLoading, setBrLoading] = useState(false);
   const [brError, setBrError] = useState<string | null>(null);
+  const [brLoaded, setBrLoaded] = useState(false);
   const [buyerNames, setBuyerNames] = useState<Record<string, string>>({});
 
   // Buying request detail modal
@@ -504,21 +505,23 @@ export const MarketplaceFeedPanel: React.FC = () => {
       .then((res) => {
         setBuyingRequests(res.items);
         setBrLoading(false);
+        setBrLoaded(true);
         void resolveBuyerNames(res.items);
       })
       .catch((err: unknown) => {
         const msg = toBuyingRequestViMessage(err, 'list');
         setBrError(msg);
         setBrLoading(false);
+        setBrLoaded(true);
         openSnackbar({ type: 'error', text: msg, duration: 4000, icon: true });
       });
   }, [openSnackbar, resolveBuyerNames]);
 
   useEffect(() => {
-    if (subTab === 'buying-requests' && buyingRequests.length === 0 && !brLoading && !brError) {
+    if (subTab === 'buying-requests' && !brLoaded && !brLoading) {
       loadBuyingRequests();
     }
-  }, [subTab, buyingRequests.length, brLoading, brError, loadBuyingRequests]);
+  }, [subTab, brLoaded, brLoading, loadBuyingRequests]);
 
   // ── Filtered buying requests ─────────────────────────────────────────────────
 

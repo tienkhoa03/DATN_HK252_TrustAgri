@@ -16,6 +16,7 @@ import {
   searchTraders,
   createConnection,
   cancelConnection,
+  disconnectConnection,
   acceptConnection,
   rejectConnection,
   listConnections,
@@ -340,6 +341,7 @@ const TraderBrowser: React.FC<TraderBrowserProps> = ({ selectedFarm, onBack }) =
   const [cancellingTraderId, setCancellingTraderId] = useState<string | null>(null);
   const [sendingTraderId, setSendingTraderId] = useState<string | null>(null);
   const [acceptingTraderId, setAcceptingTraderId] = useState<string | null>(null);
+  const [disconnectingTraderId, setDisconnectingTraderId] = useState<string | null>(null);
 
   const loadedKeyRef = useRef<string | null>(null);
   const inFlightRef = useRef(false);
@@ -443,6 +445,24 @@ const TraderBrowser: React.FC<TraderBrowserProps> = ({ selectedFarm, onBack }) =
       openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'cancel'), duration: 3500, icon: true });
     } finally {
       setCancellingTraderId(null);
+    }
+  };
+
+  const handleDisconnect = async (traderId: string) => {
+    const info = connectionStatusMap[traderId];
+    if (!info || info.status !== 'accepted') return;
+    setDisconnectingTraderId(traderId);
+    try {
+      await disconnectConnection(info.connectionId);
+      setConnectionStatusMap((prev) => ({
+        ...prev,
+        [traderId]: { ...prev[traderId], status: 'cancelled' },
+      }));
+      openSnackbar({ type: 'success', text: 'Đã hủy kết nối thành công.', duration: 3000, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toConnectionViMessage(err, 'disconnect'), duration: 3500, icon: true });
+    } finally {
+      setDisconnectingTraderId(null);
     }
   };
 
@@ -727,6 +747,7 @@ const TraderBrowser: React.FC<TraderBrowserProps> = ({ selectedFarm, onBack }) =
               const status = effectiveStatus(trader);
               const isCancelling = cancellingTraderId === trader.userId;
               const isSending = sendingTraderId === trader.userId;
+              const isDisconnecting = disconnectingTraderId === trader.userId;
 
               return (
                 <div
@@ -855,9 +876,20 @@ const TraderBrowser: React.FC<TraderBrowserProps> = ({ selectedFarm, onBack }) =
                       {isCancelling ? 'Đang hủy...' : 'Hủy yêu cầu'}
                     </button>
                   ) : status === 'accepted' ? (
-                    <div style={{ ...connectBtnStyle, backgroundColor: `${colors.primary.agriGreen}18`, color: colors.primary.agriGreen, cursor: 'default' }}>
-                      <Icon name="check" size="sm" color={colors.primary.agriGreen} />
-                      Đã kết nối
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm, marginTop: spacing.md }}>
+                      <div style={{ ...connectBtnStyle, marginTop: 0, backgroundColor: `${colors.primary.agriGreen}18`, color: colors.primary.agriGreen, cursor: 'default' }}>
+                        <Icon name="check" size="sm" color={colors.primary.agriGreen} />
+                        Đã kết nối
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isDisconnecting}
+                        onClick={() => void handleDisconnect(trader.userId)}
+                        style={{ ...connectBtnStyle, marginTop: 0, backgroundColor: 'transparent', border: `1.5px solid ${isDisconnecting ? colors.text.disabled : colors.functional.alertRed}`, color: isDisconnecting ? colors.text.disabled : colors.functional.alertRed, cursor: isDisconnecting ? 'not-allowed' : 'pointer' }}
+                      >
+                        <Icon name="close" size="sm" color={isDisconnecting ? colors.text.disabled : colors.functional.alertRed} />
+                        {isDisconnecting ? 'Đang hủy...' : 'Hủy kết nối'}
+                      </button>
                     </div>
                   ) : status === 'negotiating' ? (
                     <div style={{ ...connectBtnStyle, backgroundColor: `${colors.primary.zaloBlue}12`, color: colors.primary.zaloBlue, cursor: 'default' }}>
