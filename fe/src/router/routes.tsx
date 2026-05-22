@@ -255,6 +255,9 @@ export function AppRoutes() {
           <Route path="live/:contractId" element={<BuyerLiveMonitorDetailScreen />} />
           <Route path="me" element={<BuyerProfileNotificationScreen />} />
           <Route path="profile" element={<ProfileScreen />} />
+          {/* Truy xuất nguồn gốc trong shell buyer → giữ bottom nav */}
+          <Route path="trace" element={<TraceabilityScreen />} />
+          <Route path="trace/:code" element={<TraceabilityScreen />} />
           {/* Legacy redirects */}
           <Route path="request" element={<RedirectTo to="/buyer/sourcing?action=create" />} />
           <Route path="monitor" element={<RedirectTo to="/buyer/live" />} />

@@ -68,8 +68,8 @@ export const BuyerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
   const [contractsLoaded, setContractsLoaded] = useState(false);
   const [selectedContract, setSelectedContract] = useState<ContractDto | null>(null);
 
-  const loadOrders = useCallback(async () => {
-    if (ordersLoaded) return;
+  const loadOrders = useCallback(async (force = false) => {
+    if (ordersLoaded && !force) return;
     setOrdersLoading(true);
     try {
       const res = await listOrders({ status: 'pending' });
@@ -82,8 +82,8 @@ export const BuyerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
     }
   }, [ordersLoaded, openSnackbar]);
 
-  const loadContracts = useCallback(async () => {
-    if (contractsLoaded) return;
+  const loadContracts = useCallback(async (force = false) => {
+    if (contractsLoaded && !force) return;
     setContractsLoading(true);
     try {
       const [waitRes, activeRes, pendChangeRes, completedRes, cancelledRes] = await Promise.all([
@@ -121,6 +121,8 @@ export const BuyerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
     try {
       await acceptOrder(order.id);
       setOrders((prev) => prev.filter((o) => o.id !== order.id));
+      // Đơn hàng được chấp nhận → hợp đồng chờ ký mới xuất hiện ở tab "Chờ ký"
+      void loadContracts(true);
       openSnackbar({ type: 'success', text: 'Đã xác nhận đơn hàng.', duration: 3000, icon: true });
     } catch (err) {
       openSnackbar({ type: 'error', text: toOrderViMessage(err, 'accept'), duration: 3000, icon: true });
@@ -212,7 +214,11 @@ export const BuyerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
         <ContractDetailModal
           contract={selectedContract}
           visible
-          onClose={() => setSelectedContract(null)}
+          onClose={() => {
+            setSelectedContract(null);
+            // Reload để phản ánh thay đổi trạng thái sau ký / hoàn thành / hủy / điều chỉnh
+            void loadContracts(true);
+          }}
           onSigned={(updated) => {
             setSelectedContract(updated);
             if (updated.status === 'active') {

@@ -334,7 +334,7 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
                   whiteSpace: 'nowrap',
                   minHeight: '44px',
                 }}
-                onClick={() => navigate(`/trace/${encodeURIComponent(product.farmTraceabilityCode!)}`)}
+                onClick={() => navigate(`/buyer/trace/${encodeURIComponent(product.farmTraceabilityCode!)}`)}
               >
                 Xem vườn
               </button>

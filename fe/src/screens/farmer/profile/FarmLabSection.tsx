@@ -152,7 +152,7 @@ const FarmCard: React.FC<FarmCardProps> = ({ farm, isLocked, standardOptions, on
                 style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, boxSizing: 'border-box' }}
               />
 
-              <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Huyện/Quận</label>
+              <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Xã/Phường</label>
               <input
                 value={form.location?.district ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, location: { ...(p.location ?? farm.location), district: e.target.value } }))}
@@ -270,7 +270,7 @@ const CreateFarmForm: React.FC<CreateFarmFormProps> = ({ standardOptions, onCanc
       <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Tỉnh/Thành</label>
       <input value={form.location.province} onChange={(e) => setForm((p) => ({ ...p, location: { ...p.location, province: e.target.value } }))} style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, boxSizing: 'border-box' }} />
 
-      <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Huyện/Quận</label>
+      <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Xã/Phường</label>
       <input value={form.location.district} onChange={(e) => setForm((p) => ({ ...p, location: { ...p.location, district: e.target.value } }))} style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, boxSizing: 'border-box' }} />
 
       <div style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.sm }}>

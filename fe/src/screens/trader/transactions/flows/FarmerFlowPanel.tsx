@@ -55,8 +55,8 @@ export const FarmerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
   const [showSelectConnection, setShowSelectConnection] = useState(false);
   const [contractTarget, setContractTarget] = useState<SelectedConnectionInfo | null>(null);
 
-  const loadContracts = useCallback(async () => {
-    if (loaded) return;
+  const loadContracts = useCallback(async (force = false) => {
+    if (loaded && !force) return;
     setLoading(true);
     try {
       const [waitRes, activeRes, pendChangeRes, completedRes, cancelledRes] = await Promise.all([
@@ -182,7 +182,11 @@ export const FarmerFlowPanel: React.FC<Props> = ({ initialStatus }) => {
         <ContractDetailModal
           contract={selectedContract}
           visible
-          onClose={() => setSelectedContract(null)}
+          onClose={() => {
+            setSelectedContract(null);
+            // Reload để phản ánh thay đổi trạng thái sau ký / hoàn thành / hủy / điều chỉnh
+            void loadContracts(true);
+          }}
           onSigned={(updated) => {
             setSelectedContract(updated);
             if (updated.status === 'active') {
