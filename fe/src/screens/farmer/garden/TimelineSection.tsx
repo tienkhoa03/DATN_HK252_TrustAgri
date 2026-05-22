@@ -43,6 +43,8 @@ export interface TimelineSectionProps {
   farmId: string | null;
   standardId?: string;
   initialStep?: string;
+  /** Chế độ chỉ xem (vd: buyer theo dõi vườn) — ẩn nút cập nhật & form ghi nhật ký */
+  readOnly?: boolean;
 }
 
 function buildTimelineNodes(
@@ -54,6 +56,7 @@ function buildTimelineNodes(
   alerts: AlertDto[],
   onStepAction: (step: StandardStepDto) => void,
   onStepDetail: (step: StandardStepDto) => void,
+  readOnly: boolean,
 ): TimelineNode[] {
   const taskMap = new Map(tasks.map((t) => [t.standardStepId, t]));
   const unackedAlerts = alerts.filter((a) => !a.acknowledged);
@@ -103,8 +106,11 @@ function buildTimelineNodes(
       dueDate,
       dueDayLabel,
       completedAt,
-      onAction: status === 'completed' ? () => onStepDetail(step) : () => onStepAction(step),
-      actionLabel: status === 'completed' ? 'Xem chi tiết' : 'Cập nhật',
+      // readOnly: chỉ cho xem chi tiết bước đã hoàn thành, không cho cập nhật
+      onAction: status === 'completed'
+        ? () => onStepDetail(step)
+        : readOnly ? undefined : () => onStepAction(step),
+      actionLabel: status === 'completed' ? 'Xem chi tiết' : readOnly ? undefined : 'Cập nhật',
     });
 
     // Inject alerts after last completed step (insert before first in-progress/pending)
@@ -124,9 +130,10 @@ function buildTimelineNodes(
   return nodes;
 }
 
-export const TimelineSection: React.FC<TimelineSectionProps> = ({ farmId, standardId, initialStep }) => {
+export const TimelineSection: React.FC<TimelineSectionProps> = ({ farmId, standardId, initialStep, readOnly = false }) => {
   const openSnackbar = useStableOpenSnackbar();
-  const { plan, tasks, isLoading: planLoading, error: planError, clearError: clearPlanError, reload } = useCarePlan(farmId);
+  // readOnly: bỏ qua care-plan (endpoint chỉ dành cho chủ vườn → 403); dựng timeline từ standard + care logs
+  const { plan, tasks, isLoading: planLoading, error: planError, clearError: clearPlanError, reload } = useCarePlan(readOnly ? null : farmId);
   const { alerts } = useMonitoring(farmId);
   const [standard, setStandard] = useState<StandardDto | null>(null);
   const [stdLoading, setStdLoading] = useState(false);
@@ -230,6 +237,7 @@ export const TimelineSection: React.FC<TimelineSectionProps> = ({ farmId, standa
     alerts,
     (step) => setSheetState({ open: true, step }),
     (step) => setDetailSheetState({ open: true, step }),
+    readOnly,
   );
 
   const handleCareLogSuccess = () => {
@@ -245,17 +253,19 @@ export const TimelineSection: React.FC<TimelineSectionProps> = ({ farmId, standa
         </Text.Title>
       </div>
       <Timeline nodes={nodes} />
-      <QuickUpdateSheet
-        open={sheetState.open}
-        onClose={() => setSheetState({ open: false })}
-        farmId={farmId ?? ''}
-        standardStepId={sheetState.step?.id}
-        stepTitle={sheetState.step?.title}
-        onSuccess={() => {
-          setSheetState({ open: false });
-          handleCareLogSuccess();
-        }}
-      />
+      {!readOnly && (
+        <QuickUpdateSheet
+          open={sheetState.open}
+          onClose={() => setSheetState({ open: false })}
+          farmId={farmId ?? ''}
+          standardStepId={sheetState.step?.id}
+          stepTitle={sheetState.step?.title}
+          onSuccess={() => {
+            setSheetState({ open: false });
+            handleCareLogSuccess();
+          }}
+        />
+      )}
       <StepDetailSheet
         open={detailSheetState.open}
         onClose={() => setDetailSheetState({ open: false })}
@@ -263,6 +273,7 @@ export const TimelineSection: React.FC<TimelineSectionProps> = ({ farmId, standa
         standardStepId={detailSheetState.step?.id}
         stepTitle={detailSheetState.step?.title}
         onSuccess={handleCareLogSuccess}
+        readOnly={readOnly}
       />
     </div>
   );

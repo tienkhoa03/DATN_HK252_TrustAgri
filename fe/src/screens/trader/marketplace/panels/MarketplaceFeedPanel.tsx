@@ -35,6 +35,8 @@ import {
 } from '@/services/buyingRequestService';
 import {
   createProposal,
+  cancelProposal,
+  listProposals,
   toProposalViMessage,
 } from '@/services/proposalService';
 import {
@@ -406,6 +408,10 @@ export const MarketplaceFeedPanel: React.FC = () => {
   const [proposalFarmId, setProposalFarmId] = useState('');
   const [proposalSaving, setProposalSaving] = useState(false);
 
+  // Đề xuất đang chờ của chính trader: buyingRequestId → proposalId
+  const [myPendingProposals, setMyPendingProposals] = useState<Record<string, string>>({});
+  const [cancelingReqId, setCancelingReqId] = useState<string | null>(null);
+
   // ── Loaders ─────────────────────────────────────────────────────────────────
 
   const loadProducts = useCallback(() => {
@@ -498,6 +504,20 @@ export const MarketplaceFeedPanel: React.FC = () => {
     setBuyerNames((prev) => ({ ...prev, ...map }));
   }, []);
 
+  const loadMyPendingProposals = useCallback(async () => {
+    try {
+      // Server lọc theo JWT → chỉ trả đề xuất của trader hiện tại
+      const res = await listProposals({ status: 'pending', limit: 100 });
+      const map: Record<string, string> = {};
+      res.items.forEach((p) => {
+        map[p.buyingRequestId] = p.id;
+      });
+      setMyPendingProposals(map);
+    } catch {
+      // Không chặn luồng chính nếu không tải được — chỉ mất nút "Hủy đề xuất"
+    }
+  }, []);
+
   const loadBuyingRequests = useCallback(() => {
     setBrLoading(true);
     setBrError(null);
@@ -507,6 +527,7 @@ export const MarketplaceFeedPanel: React.FC = () => {
         setBrLoading(false);
         setBrLoaded(true);
         void resolveBuyerNames(res.items);
+        void loadMyPendingProposals();
       })
       .catch((err: unknown) => {
         const msg = toBuyingRequestViMessage(err, 'list');
@@ -515,7 +536,7 @@ export const MarketplaceFeedPanel: React.FC = () => {
         setBrLoaded(true);
         openSnackbar({ type: 'error', text: msg, duration: 4000, icon: true });
       });
-  }, [openSnackbar, resolveBuyerNames]);
+  }, [openSnackbar, resolveBuyerNames, loadMyPendingProposals]);
 
   useEffect(() => {
     if (subTab === 'buying-requests' && !brLoaded && !brLoading) {
@@ -605,7 +626,7 @@ export const MarketplaceFeedPanel: React.FC = () => {
         setProposalSaving(false);
         return;
       }
-      await createProposal({
+      const created = await createProposal({
         buyingRequestId: proposingFor.id,
         sourceContractId: selectedFarm.currentContractId,
         price: parseFloat(proposalPrice),
@@ -613,6 +634,7 @@ export const MarketplaceFeedPanel: React.FC = () => {
         standardCode: proposingFor.qualityStandardCode,
         note: proposalNote.trim() || undefined,
       });
+      setMyPendingProposals((prev) => ({ ...prev, [created.buyingRequestId]: created.id }));
       openSnackbar({ type: 'success', text: 'Đã gửi đề xuất tới người mua!', duration: 3000, icon: true });
       setProposingFor(null);
       setProposalPrice('');
@@ -625,7 +647,36 @@ export const MarketplaceFeedPanel: React.FC = () => {
     }
   };
 
+  const handleCancelProposal = async (req: BuyingRequestDto) => {
+    const proposalId = myPendingProposals[req.id];
+    if (!proposalId) return;
+    if (!window.confirm('Hủy đề xuất đã gửi cho nhu cầu này?')) return;
+    setCancelingReqId(req.id);
+    try {
+      await cancelProposal(proposalId);
+      setMyPendingProposals((prev) => {
+        const next = { ...prev };
+        delete next[req.id];
+        return next;
+      });
+      openSnackbar({ type: 'success', text: 'Đã hủy đề xuất.', duration: 3000, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toProposalViMessage(err, 'cancel'), duration: 4000, icon: true });
+    } finally {
+      setCancelingReqId(null);
+    }
+  };
+
   const openProposalFor = (req: BuyingRequestDto) => {
+    if (myPendingProposals[req.id]) {
+      openSnackbar({
+        type: 'info',
+        text: 'Bạn đã gửi đề xuất cho nhu cầu này. Hãy hủy đề xuất cũ nếu muốn gửi lại.',
+        duration: 4000,
+        icon: true,
+      });
+      return;
+    }
     if (linkedFarmsLoading) {
       openSnackbar({ type: 'info', text: 'Đang tải danh sách vườn theo hợp đồng...', duration: 2500, icon: true });
       return;
@@ -892,9 +943,19 @@ export const MarketplaceFeedPanel: React.FC = () => {
 
               <div style={{ display: 'flex', gap: spacing.sm }}>
                 <button style={actionButtonStyles(false)} onClick={() => setDetailRequest(req)}>Xem chi tiết</button>
-                <button style={actionButtonStyles(true)} onClick={() => openProposalFor(req)}>
-                  Gửi đề xuất
-                </button>
+                {myPendingProposals[req.id] ? (
+                  <button
+                    style={{ ...dangerButtonStyles, flex: 1, opacity: cancelingReqId === req.id ? 0.6 : 1 }}
+                    disabled={cancelingReqId === req.id}
+                    onClick={() => void handleCancelProposal(req)}
+                  >
+                    {cancelingReqId === req.id ? 'Đang hủy...' : 'Hủy đề xuất'}
+                  </button>
+                ) : (
+                  <button style={actionButtonStyles(true)} onClick={() => openProposalFor(req)}>
+                    Gửi đề xuất
+                  </button>
+                )}
               </div>
             </div>
           );

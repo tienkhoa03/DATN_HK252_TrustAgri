@@ -222,7 +222,7 @@ export function partyTraderLabel(
   return userDisplayLabel(name, traderId, 'Thương lái', phone);
 }
 
-type ContractCtx = 'list' | 'get' | 'create' | 'audit' | 'compliance' | 'reject';
+type ContractCtx = 'list' | 'get' | 'create' | 'audit' | 'compliance' | 'reject' | 'sign';
 
 export function toContractViMessage(err: unknown, context: ContractCtx = 'list'): string {
   if (err instanceof ApiError) {
@@ -262,6 +262,7 @@ export function toContractViMessage(err: unknown, context: ContractCtx = 'list')
     audit: 'Không thể tải nhật ký hợp đồng.',
     compliance: 'Không thể tải dữ liệu tuân thủ quy trình.',
     reject: 'Không thể từ chối hợp đồng.',
+    sign: 'Không thể ký hợp đồng.',
   };
   return fallback[context];
 }

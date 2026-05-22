@@ -43,6 +43,7 @@ import {
 } from '@/utils/displayLabels';
 import {
   listContracts,
+  signContract,
   contractStatusLabelVi,
   contractTypeLabelVi,
   toContractViMessage,
@@ -196,7 +197,7 @@ export const BuyerOrdersScreen: React.FC = () => {
   useEffect(() => {
     if ((activeTab === 'negotiating') && !propLoaded) loadProposals();
     if ((activeTab === 'negotiating' || activeTab === 'completed' || activeTab === 'cancelled') && !ordersLoaded) loadOrders();
-    if ((activeTab === 'deposited' || activeTab === 'completed' || activeTab === 'cancelled') && !contractLoaded) loadContracts();
+    if ((activeTab === 'negotiating' || activeTab === 'deposited' || activeTab === 'completed' || activeTab === 'cancelled') && !contractLoaded) loadContracts();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
@@ -217,8 +218,10 @@ export const BuyerOrdersScreen: React.FC = () => {
     try {
       const updated = await acceptProposal(id);
       setProposals((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-      openSnackbar({ type: 'success', text: 'Đã chấp nhận đề xuất!', duration: 4000, icon: true });
+      openSnackbar({ type: 'success', text: 'Đã chấp nhận đề xuất! Hợp đồng chờ ký đã được tạo.', duration: 4000, icon: true });
       setOrdersLoaded(false);
+      // Hợp đồng pending_signature vừa tạo → tải lại ngay để hiển thị ở tab Chờ thương lượng
+      loadContracts();
     } catch (err) {
       openSnackbar({ type: 'error', text: toProposalViMessage(err, 'accept'), duration: 4000, icon: true });
     } finally {
@@ -252,6 +255,19 @@ export const BuyerOrdersScreen: React.FC = () => {
     }
   };
 
+  const handleSignContract = async (id: string) => {
+    setActionId(id);
+    try {
+      const updated = await signContract(id);
+      setContracts((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      openSnackbar({ type: 'success', text: 'Đã ký hợp đồng.', duration: 3000, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toContractViMessage(err, 'sign'), duration: 4000, icon: true });
+    } finally {
+      setActionId(null);
+    }
+  };
+
   const handleChangeRequestApproved = (contractId: string, changeId: string) => {
     setChangeRequests((prev) => ({
       ...prev,
@@ -269,7 +285,20 @@ export const BuyerOrdersScreen: React.FC = () => {
   // ── Derived data ──────────────────────────────────────────────────────────
 
   const negotiatingOrders = orders.filter((o) => ['pending', 'accepted'].includes(o.status));
-  const pendingProposals = proposals.filter((p) => p.status === 'pending');
+  // Chỉ hiển thị 1 đề xuất đang chờ cho mỗi cặp (thương lái, nhu cầu) — phòng dữ liệu trùng cũ
+  const pendingProposals = (() => {
+    const seen = new Set<string>();
+    const out: ProposalDto[] = [];
+    for (const p of proposals) {
+      if (p.status !== 'pending') continue;
+      const key = `${p.traderId}::${p.buyingRequestId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(p);
+    }
+    return out;
+  })();
+  const pendingSignatureContracts = contracts.filter((c) => c.status === 'pending_signature');
   const depositedContracts = contracts.filter((c) => c.status === 'active' || (c.status as string) === 'deposited');
   const completedOrders = orders.filter((o) => o.status === 'completed');
   const completedContracts = contracts.filter((c) => c.status === 'completed');
@@ -335,23 +364,23 @@ export const BuyerOrdersScreen: React.FC = () => {
   // ── Tab renderers ─────────────────────────────────────────────────────────
 
   const renderNegotiatingTab = () => {
-    const loading = propLoading || ordersLoading;
+    const loading = propLoading || ordersLoading || (contractLoading && !contractLoaded);
     const error = propError || ordersError;
 
     if (loading) return <>{Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}</>;
 
-    if (error && pendingProposals.length === 0 && negotiatingOrders.length === 0) {
+    if (error && pendingProposals.length === 0 && negotiatingOrders.length === 0 && pendingSignatureContracts.length === 0) {
       return (
         <EmptyState
           icon="⚠️"
           title="Không tải được dữ liệu"
           description={error}
-          cta={{ label: 'Thử lại', onClick: () => { loadProposals(); loadOrders(); } }}
+          cta={{ label: 'Thử lại', onClick: () => { loadProposals(); loadOrders(); loadContracts(); } }}
         />
       );
     }
 
-    if (pendingProposals.length === 0 && negotiatingOrders.length === 0) {
+    if (pendingProposals.length === 0 && negotiatingOrders.length === 0 && pendingSignatureContracts.length === 0) {
       return (
         <EmptyState
           icon="💬"
@@ -363,6 +392,69 @@ export const BuyerOrdersScreen: React.FC = () => {
 
     return (
       <>
+        {/* Hợp đồng chờ ký — tạo từ đề xuất đã chấp nhận */}
+        {pendingSignatureContracts.length > 0 && (
+          <>
+            <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: spacing.sm, display: 'block', fontWeight: fontWeight.semibold }}>
+              Hợp đồng chờ ký ({pendingSignatureContracts.length})
+            </Text>
+            {pendingSignatureContracts.map((c) => {
+              const isActing = actionId === c.id;
+              const buyerSigned = c.buyerSignedAt != null;
+              return (
+                <div key={c.id} style={cardStyle}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
+                    <div>
+                      <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                        {contractTypeLabelVi(c.contractType)}
+                      </Text>
+                      <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
+                        Thương lái: {partyTraderDisplay(c)}
+                      </Text>
+                      {contractFarmDisplay(c) && (
+                        <Text size="xSmall" style={{ color: colors.text.primary, marginTop: spacing.xs }}>
+                          Vườn: {contractFarmDisplay(c)}
+                        </Text>
+                      )}
+                    </div>
+                    <span style={statusBadgeStyle(colors.functional.warningYellow)}>
+                      ✍️ {contractStatusLabelVi(c.status)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${spacing.xs} ${spacing.md}`, padding: spacing.sm, backgroundColor: colors.background.secondary, borderRadius: '8px', marginBottom: spacing.sm }}>
+                    <div>
+                      <Text size="xSmall" style={{ color: colors.text.secondary }}>Khối lượng</Text>
+                      <Text size="small" style={{ fontWeight: fontWeight.semibold }}>{c.quantity} {c.unit}</Text>
+                    </div>
+                    <div>
+                      <Text size="xSmall" style={{ color: colors.text.secondary }}>Tổng giá trị</Text>
+                      <Text size="small" style={{ fontWeight: fontWeight.bold, color: colors.primary.zaloBlue }}>{formatCurrency(c.totalPrice)}</Text>
+                    </div>
+                    <div style={{ gridColumn: '1 / -1' }}>
+                      <Text size="xSmall" style={{ color: colors.text.secondary }}>
+                        {new Date(c.startDate).toLocaleDateString('vi-VN')} — {new Date(c.endDate).toLocaleDateString('vi-VN')}
+                      </Text>
+                    </div>
+                  </div>
+                  {buyerSigned ? (
+                    <Text size="xSmall" style={{ color: colors.primary.agriGreen, fontWeight: fontWeight.medium }}>
+                      ✓ Bạn đã ký — chờ thương lái ký để kích hoạt hợp đồng.
+                    </Text>
+                  ) : (
+                    <button
+                      style={{ ...btnStyle('primary'), opacity: isActing ? 0.6 : 1 }}
+                      disabled={isActing}
+                      onClick={() => handleSignContract(c.id)}
+                    >
+                      {isActing ? '...' : 'Ký hợp đồng'}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </>
+        )}
+
         {/* Pending proposals */}
         {pendingProposals.length > 0 && (
           <>

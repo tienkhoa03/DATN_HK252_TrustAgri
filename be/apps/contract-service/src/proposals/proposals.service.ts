@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -96,6 +97,20 @@ export class ProposalsService {
     }
     if (buyingRequest.status !== 'open') {
       throw new BadRequestException('Chỉ có thể gửi đề xuất cho nhu cầu mua đang mở');
+    }
+
+    // Một thương lái chỉ được giữ một đề xuất đang chờ cho mỗi nhu cầu mua
+    const existingPending = await this.proposalRepo.findOne({
+      where: {
+        buyingRequestId: dto.buyingRequestId,
+        traderId,
+        status: 'pending',
+      },
+    });
+    if (existingPending) {
+      throw new ConflictException(
+        'Bạn đã có một đề xuất đang chờ cho nhu cầu này. Hãy hủy đề xuất cũ trước khi gửi lại.',
+      );
     }
 
     // Validate sourceContractId and get active farmer_trader contract
@@ -201,6 +216,26 @@ export class ProposalsService {
     const saved = await this.proposalRepo.save(proposal);
     this.logger.log(`Proposal rejected: id=${id} buyerId=${buyerId}`);
     return this.toDto(saved);
+  }
+
+  /**
+   * DELETE /api/v1/proposals/:id (trader)
+   * Thương lái tự hủy đề xuất đang chờ của mình — soft delete để không còn hiển thị.
+   */
+  async cancelProposal(id: string, traderId: string): Promise<void> {
+    const proposal = await this.requireProposal(id);
+
+    if (proposal.traderId !== traderId) {
+      throw new ForbiddenException('Chỉ thương lái sở hữu mới có thể hủy đề xuất');
+    }
+    if (proposal.status !== 'pending') {
+      throw new BadRequestException(
+        `Không thể hủy đề xuất ở trạng thái "${proposal.status}"`,
+      );
+    }
+
+    await this.proposalRepo.softRemove(proposal);
+    this.logger.log(`Proposal cancelled: id=${id} traderId=${traderId}`);
   }
 
   // ─── Private helpers ───────────────────────────────────────────────────────

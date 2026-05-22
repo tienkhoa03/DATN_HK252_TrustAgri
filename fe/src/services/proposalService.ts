@@ -83,7 +83,7 @@ export function proposalStatusLabel(status: ProposalDto['status']): string {
   }
 }
 
-type PropCtx = 'list' | 'create' | 'accept' | 'reject';
+type PropCtx = 'list' | 'create' | 'accept' | 'reject' | 'cancel';
 
 export function toProposalViMessage(err: unknown, context: PropCtx = 'list'): string {
   if (err instanceof ApiError) {
@@ -95,6 +95,9 @@ export function toProposalViMessage(err: unknown, context: PropCtx = 'list'): st
       case 'NOT_FOUND':
         return 'Không tìm thấy đề xuất hoặc nhu cầu mua.';
       case 'CONFLICT':
+        if (context === 'create') {
+          return 'Bạn đã có một đề xuất đang chờ cho nhu cầu này. Hãy hủy đề xuất cũ trước khi gửi lại.';
+        }
         return 'Đề xuất đã được xử lý. Vui lòng tải lại.';
       case 'INVALID_INPUT':
         return 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.';
@@ -113,6 +116,7 @@ export function toProposalViMessage(err: unknown, context: PropCtx = 'list'): st
     create: 'Không thể gửi đề xuất.',
     accept: 'Không thể chấp nhận đề xuất.',
     reject: 'Không thể từ chối đề xuất.',
+    cancel: 'Không thể hủy đề xuất.',
   };
   return fallback[context];
 }
@@ -143,4 +147,8 @@ export async function acceptProposal(id: string): Promise<ProposalDto> {
 export async function rejectProposal(id: string): Promise<ProposalDto> {
   const { data } = await apiClient.post<ProposalDto>(`/proposals/${id}/reject`);
   return data;
+}
+
+export async function cancelProposal(id: string): Promise<void> {
+  await apiClient.delete(`/proposals/${id}`);
 }

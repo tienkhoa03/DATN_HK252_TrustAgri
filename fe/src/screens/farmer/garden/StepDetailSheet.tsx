@@ -21,6 +21,8 @@ export interface StepDetailSheetProps {
   standardStepId?: string;
   stepTitle?: string;
   onSuccess?: () => void;
+  /** Chế độ chỉ xem — ẩn form thêm ghi chú/minh chứng (vd: buyer theo dõi vườn) */
+  readOnly?: boolean;
 }
 
 function formatDateTime(iso: string): string {
@@ -37,7 +39,7 @@ function evidenceExtra(uploaded: number, failed: number): string {
 }
 
 export const StepDetailSheet: React.FC<StepDetailSheetProps> = ({
-  open, onClose, farmId, standardStepId, stepTitle, onSuccess,
+  open, onClose, farmId, standardStepId, stepTitle, onSuccess, readOnly = false,
 }) => {
   const openSnackbar = useStableOpenSnackbar();
   const [careLogs, setCareLogs] = useState<CareLogDto[]>([]);
@@ -237,10 +239,12 @@ export const StepDetailSheet: React.FC<StepDetailSheetProps> = ({
           ))}
         </div>
 
+        {/* Form thêm ghi chú/minh chứng — ẩn ở chế độ chỉ xem */}
+        {!readOnly && (
+        <>
         {/* Divider */}
         <div style={{ height: 1, backgroundColor: colors.background.secondary, margin: `0 0 ${spacing.md}` }} />
 
-        {/* Form thêm ghi chú */}
         <span style={{ fontSize: fontSize.caption, fontWeight: fontWeight.semibold, color: colors.text.secondary }}>
           Thêm ghi chú & minh chứng
         </span>
@@ -338,6 +342,8 @@ export const StepDetailSheet: React.FC<StepDetailSheetProps> = ({
         >
           {submitting ? 'Đang lưu…' : 'Lưu ghi chú'}
         </button>
+        </>
+        )}
       </div>
     </div>
   );

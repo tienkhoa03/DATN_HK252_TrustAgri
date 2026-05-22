@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   Query,
@@ -103,5 +104,24 @@ export class ProposalsController {
     @CurrentUser() user: JwtPayload,
   ): Promise<ProposalDto> {
     return this.proposalsService.rejectProposal(id, user.sub);
+  }
+
+  /**
+   * DELETE /api/v1/proposals/:id
+   * Trader tự hủy đề xuất đang chờ của mình.
+   */
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Roles('trader')
+  @ApiOperation({ summary: 'Cancel own pending proposal (trader only)' })
+  @ApiResponse({ status: 204, description: 'Proposal cancelled' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - not proposal owner' })
+  @ApiResponse({ status: 404, description: 'Proposal not found' })
+  cancelProposal(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<void> {
+    return this.proposalsService.cancelProposal(id, user.sub);
   }
 }
