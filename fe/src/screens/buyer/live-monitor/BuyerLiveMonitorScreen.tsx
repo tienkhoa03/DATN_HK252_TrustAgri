@@ -92,7 +92,7 @@ export const BuyerLiveMonitorScreen: React.FC = () => {
 
   return (
     <Page className="buyer-live-monitor-screen">
-      <BuyerHeader title="Trực tiếp" />
+      <BuyerHeader title="Giám sát" />
 
       <div style={{ padding: spacing.md, paddingBottom: spacing.xl }}>
         {loading && (

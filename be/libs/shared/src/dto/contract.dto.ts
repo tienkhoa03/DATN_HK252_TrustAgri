@@ -23,6 +23,7 @@ export interface ProductDto {
   traderDisplayName?: string | null;
   traderPhone?: string | null;
   farmName?: string | null;
+  farmTraceabilityCode?: string;
   name: string;
   cropType: string;
   unit: string;

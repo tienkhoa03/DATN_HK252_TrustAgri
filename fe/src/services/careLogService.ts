@@ -29,6 +29,7 @@ export interface CareLogDto {
   id: string;
   farmId: string;
   standardStepId?: string;
+  standardStepTitle?: string;
   action: string;          // "watering" | "fertilizing" | "pest_control" | ...
   notes?: string;
   performedAt: string;     // ISO-8601

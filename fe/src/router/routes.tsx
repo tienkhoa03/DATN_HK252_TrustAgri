@@ -39,8 +39,8 @@ const GuestHomeMarketNewsScreen = lazy(() =>
 const GuestProductDetailScreen = lazy(() =>
   import('@/screens/guest/product-detail').then((m) => ({ default: m.GuestProductDetailScreen })),
 );
-const GuestTraceabilityScanResultScreen = lazy(() =>
-  import('@/screens/guest/traceability-scan').then((m) => ({ default: m.GuestTraceabilityScanResultScreen })),
+const TraceabilityScreen = lazy(() =>
+  import('@/screens/shared/traceability').then((m) => ({ default: m.TraceabilityScreen })),
 );
 
 const BuyerMarketplaceScreen = lazy(() =>
@@ -234,11 +234,15 @@ export function AppRoutes() {
         {/* ── Trung tâm thông báo (shared, mọi role auth) ───── */}
         <Route path="/notifications"           element={<NotificationsScreen />} />
 
+        {/* ── Truy xuất nguồn gốc — public, mọi role ───────── */}
+        <Route path="/trace" element={<TraceabilityScreen />} />
+        <Route path="/trace/:code" element={<TraceabilityScreen />} />
+
         {/* ── Guest (chỉ role guest / chưa đăng nhập) ───────── */}
         <Route path="/guest" element={<RoleLayout role="guest" />}>
           <Route index element={<GuestHomeMarketNewsScreen />} />
           <Route path="products/:productId" element={<GuestProductDetailScreen />} />
-          <Route path="trace/:code" element={<GuestTraceabilityScanResultScreen />} />
+          <Route path="trace/:code" element={<TraceabilityScreen />} />
         </Route>
 
         {/* ── Buyer ─────────────────────────────────────────── */}
@@ -250,6 +254,7 @@ export function AppRoutes() {
           <Route path="live" element={<BuyerLiveMonitorScreen />} />
           <Route path="live/:contractId" element={<BuyerLiveMonitorDetailScreen />} />
           <Route path="me" element={<BuyerProfileNotificationScreen />} />
+          <Route path="profile" element={<ProfileScreen />} />
           {/* Legacy redirects */}
           <Route path="request" element={<RedirectTo to="/buyer/sourcing?action=create" />} />
           <Route path="monitor" element={<RedirectTo to="/buyer/live" />} />

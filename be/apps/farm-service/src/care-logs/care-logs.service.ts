@@ -58,7 +58,7 @@ export class CareLogsService {
 
     const [rows, total] = await this.careLogRepo.findAndCount({
       where,
-      relations: ['evidences'],
+      relations: ['evidences', 'standardStep'],
       order: { performedAt: 'DESC' },
       skip,
       take: limit,
@@ -273,6 +273,7 @@ export class CareLogsService {
       id: entity.id,
       farmId: entity.farmId,
       standardStepId: entity.standardStepId ?? undefined,
+      standardStepTitle: entity.standardStep?.title ?? undefined,
       action: entity.action,
       notes: entity.notes ?? undefined,
       performedAt: entity.performedAt.toISOString(),

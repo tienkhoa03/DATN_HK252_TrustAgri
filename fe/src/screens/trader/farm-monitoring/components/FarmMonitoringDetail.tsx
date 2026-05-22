@@ -105,7 +105,7 @@ const TableRow: React.FC<{
     <tr>
       <td style={{ ...cellBase, borderRight: `1px solid ${colors.background.tertiary}`, width: '50%' }}>
         <div style={{ fontWeight: fontWeight.medium, marginBottom: 2 }}>
-          {log.action}
+          {log.standardStepTitle ?? log.action}
         </div>
         {log.notes && (
           <div style={{ color: colors.text.secondary, fontSize: fontSize.small }}>

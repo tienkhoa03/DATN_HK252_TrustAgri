@@ -26,6 +26,8 @@ import {
 import { notificationLinkToAppPath } from '@/services/notificationNavigation';
 import { notificationUnreadCountAtom } from '@/state/notificationBadgeAtom';
 import { BUYER_ME_TAB_STORAGE_KEY } from '@/screens/buyer/components/BuyerNotificationBell';
+import { logout as authLogout } from '@/services/authService';
+import { authSessionAtom } from '@/state/authAtoms';
 
 export interface BuyerProfileNotificationScreenProps {
   buyerName?: string;
@@ -78,8 +80,11 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
   const navigate = useNavigate();
   const openSnackbar = useStableOpenSnackbar();
   const setUnreadGlobal = useSetAtom(notificationUnreadCountAtom);
+  const setSession = useSetAtom(authSessionAtom);
   const unreadBadge = useAtomValue(notificationUnreadCountAtom);
   const [activeTab, setActiveTab] = useState<TabType>('profile');
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
 
   // ── Tải hồ sơ từ mockProfileService (Phase 2.1) ──────────────────────────
   const { profile, isLoading: profileLoading } = useProfile();
@@ -500,7 +505,7 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
         {/* Menu Items */}
         <div
           style={menuItemStyles}
-          onClick={() => openSnackbar({ type: 'info', text: 'Chức năng đang phát triển', duration: 2000 })}
+          onClick={() => navigate('/buyer/profile')}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = colors.background.secondary;
           }}
@@ -534,7 +539,7 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
 
         <div
           style={menuItemStyles}
-          onClick={() => openSnackbar({ type: 'info', text: 'Chức năng đang phát triển', duration: 2000 })}
+          onClick={() => setPaymentModalOpen(true)}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = colors.background.secondary;
           }}
@@ -551,7 +556,7 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
 
         <div
           style={menuItemStyles}
-          onClick={() => openSnackbar({ type: 'info', text: 'Chức năng đang phát triển', duration: 2000 })}
+          onClick={() => setSettingsModalOpen(true)}
           onMouseEnter={(e) => {
             e.currentTarget.style.backgroundColor = colors.background.secondary;
           }}
@@ -802,6 +807,106 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
     );
   };
 
+  const handleLogout = async () => {
+    try {
+      await authLogout();
+    } catch {
+      // ignore server-side error; clear session regardless
+    }
+    setSession(null);
+    setSettingsModalOpen(false);
+    navigate('/login');
+  };
+
+  // Overlay backdrop shared by both modals
+  const overlayStyles: React.CSSProperties = {
+    position: 'fixed',
+    inset: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    zIndex: 1000,
+    display: 'flex',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  };
+
+  const modalCardStyles: React.CSSProperties = {
+    backgroundColor: colors.background.primary,
+    borderRadius: '16px 16px 0 0',
+    width: '100%',
+    maxWidth: '480px',
+    padding: spacing.lg,
+    paddingBottom: `calc(${spacing.lg} + env(safe-area-inset-bottom, 0px))`,
+    boxShadow: '0 -4px 24px rgba(0, 0, 0, 0.15)',
+  };
+
+  const modalTitleStyles: React.CSSProperties = {
+    fontSize: fontSize.h2,
+    fontWeight: fontWeight.bold,
+    color: colors.text.primary,
+    marginBottom: spacing.md,
+  };
+
+  const modalCloseButtonStyles: React.CSSProperties = {
+    width: '100%',
+    padding: spacing.md,
+    marginTop: spacing.md,
+    backgroundColor: colors.background.secondary,
+    color: colors.text.primary,
+    border: 'none',
+    borderRadius: '8px',
+    fontSize: fontSize.body,
+    fontWeight: fontWeight.semibold,
+    cursor: 'pointer',
+    minHeight: '44px',
+  };
+
+  const modalSectionLabelStyles: React.CSSProperties = {
+    fontSize: fontSize.caption,
+    fontWeight: fontWeight.semibold,
+    color: colors.text.secondary,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    marginBottom: spacing.sm,
+    marginTop: spacing.md,
+  };
+
+  const modalRowStyles: React.CSSProperties = {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: `${spacing.md} 0`,
+    borderBottom: `1px solid ${colors.background.secondary}`,
+    minHeight: '44px',
+    cursor: 'pointer',
+  };
+
+  const modalRowLabelStyles: React.CSSProperties = {
+    fontSize: fontSize.body,
+    color: colors.text.primary,
+    display: 'flex',
+    alignItems: 'center',
+    gap: spacing.sm,
+  };
+
+  const modalRowValueStyles: React.CSSProperties = {
+    fontSize: fontSize.body,
+    color: colors.text.secondary,
+  };
+
+  const infoBoxStyles: React.CSSProperties = {
+    backgroundColor: colors.background.secondary,
+    borderRadius: '8px',
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  };
+
+  const infoBoxTextStyles: React.CSSProperties = {
+    fontSize: fontSize.caption,
+    color: colors.text.secondary,
+    lineHeight: 1.6,
+    margin: 0,
+  };
+
   return (
     <Page className="buyer-profile-notification-screen">
       {/* Header */}
@@ -847,6 +952,92 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
         {activeTab === 'notifications' && renderNotifications()}
         {activeTab === 'qr' && renderQRCode()}
       </div>
+
+      {/* Payment Method Modal */}
+      {paymentModalOpen && (
+        <div style={overlayStyles} onClick={() => setPaymentModalOpen(false)}>
+          <div style={modalCardStyles} onClick={(e) => e.stopPropagation()}>
+            <div style={modalTitleStyles}>Phương thức thanh toán</div>
+
+            <div style={infoBoxStyles}>
+              <p style={infoBoxTextStyles}>
+                Thanh toán trên TrustAgri được thực hiện qua chuyển khoản ngân hàng theo điều khoản
+                hợp đồng. Vui lòng liên hệ thương lái để xác nhận tài khoản thanh toán khi ký hợp
+                đồng.
+              </p>
+            </div>
+
+            {(profile?.displayName || profile?.phone) && (
+              <div style={{ marginBottom: spacing.sm }}>
+                <div style={modalSectionLabelStyles}>Thông tin người mua</div>
+                {profile.displayName && (
+                  <div style={{ ...modalRowStyles, cursor: 'default' }}>
+                    <span style={modalRowLabelStyles}>
+                      <Icon name="user" size="sm" color={colors.text.secondary} />
+                      Họ tên
+                    </span>
+                    <span style={modalRowValueStyles}>{profile.displayName}</span>
+                  </div>
+                )}
+                {profile.phone && (
+                  <div style={{ ...modalRowStyles, borderBottom: 'none', cursor: 'default' }}>
+                    <span style={modalRowLabelStyles}>Điện thoại</span>
+                    <span style={modalRowValueStyles}>{profile.phone}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div style={infoBoxStyles}>
+              <p style={{ ...infoBoxTextStyles, color: colors.text.primary, fontWeight: fontWeight.medium }}>
+                Thông tin tài khoản ngân hàng được xử lý ngoài hệ thống để bảo mật.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              style={modalCloseButtonStyles}
+              onClick={() => setPaymentModalOpen(false)}
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {settingsModalOpen && (
+        <div style={overlayStyles} onClick={() => setSettingsModalOpen(false)}>
+          <div style={modalCardStyles} onClick={(e) => e.stopPropagation()}>
+            <div style={modalTitleStyles}>Cài đặt</div>
+
+            <div style={modalSectionLabelStyles}>Tài khoản</div>
+            <div
+              style={modalRowStyles}
+              onClick={() => void handleLogout()}
+            >
+              <span style={{ ...modalRowLabelStyles, color: colors.functional.alertRed }}>
+                <Icon name="alert-triangle" size="sm" color={colors.functional.alertRed} />
+                Đăng xuất
+              </span>
+            </div>
+
+            <div style={{ ...modalSectionLabelStyles, marginTop: spacing.lg }}>Ứng dụng</div>
+            <div style={{ ...modalRowStyles, borderBottom: 'none', cursor: 'default' }}>
+              <span style={modalRowLabelStyles}>Phiên bản</span>
+              <span style={modalRowValueStyles}>1.0.0</span>
+            </div>
+
+            <button
+              type="button"
+              style={modalCloseButtonStyles}
+              onClick={() => setSettingsModalOpen(false)}
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
     </Page>
   );
 };

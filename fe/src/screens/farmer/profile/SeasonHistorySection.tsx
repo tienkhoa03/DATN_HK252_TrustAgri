@@ -40,7 +40,7 @@ function groupBySeason(logs: CareLogDto[]): SeasonGroup[] {
   map.forEach((groupLogs, key) => {
     // Only include if ≥5 logs (qualify as a "season")
     if (groupLogs.length >= 5) {
-      const actionSet = new Set(groupLogs.map((l) => l.action));
+      const actionSet = new Set(groupLogs.map((l) => l.standardStepTitle ?? l.action));
       groups.push({
         key,
         label: key,

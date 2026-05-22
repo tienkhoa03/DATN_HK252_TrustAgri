@@ -45,12 +45,14 @@ export class TraceabilityService {
 
     const logs = await this.careLogRepo.find({
       where: { farmId: farm.id },
+      relations: ['standardStep'],
       order: { performedAt: 'ASC' },
       take: 500,
     });
 
     const careLogTimeline = logs.map((l) => ({
       action: l.action,
+      standardStepTitle: l.standardStep?.title ?? undefined,
       performedAt: l.performedAt.toISOString(),
       notes: l.notes ?? undefined,
     }));
@@ -72,9 +74,24 @@ export class TraceabilityService {
   }
 
   private async findFarmByCode(code: string): Promise<FarmEntity> {
-    const farm = await this.farmRepo.findOne({
-      where: [{ id: code }, { traceabilityCode: code }],
-    });
+    const UUID_RE =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    let farm: FarmEntity | null = null;
+
+    // Only attempt uuid lookup when code is actually a valid UUID —
+    // passing a non-uuid string (e.g. "TR-…") into a uuid column throws a
+    // PostgreSQL "invalid input syntax for type uuid" error.
+    // withDeleted: true — QR codes on packaging must remain scannable even
+    // after a farm is soft-deleted.
+    if (UUID_RE.test(code)) {
+      farm = await this.farmRepo.findOne({ where: { id: code }, withDeleted: true });
+    }
+
+    if (!farm) {
+      farm = await this.farmRepo.findOne({ where: { traceabilityCode: code }, withDeleted: true });
+    }
+
     if (!farm) {
       throw new NotFoundException('Không tìm thấy thông tin truy xuất cho mã này');
     }

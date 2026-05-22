@@ -296,6 +296,50 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
 
           {/* 3-Tab Panel */}
           <ProductDetailTabs product={product} />
+
+          {product.farmTraceabilityCode && (
+            <div style={{
+              margin: `0 ${spacing.md} ${spacing.sm}`,
+              padding: spacing.md,
+              backgroundColor: `${colors.primary.agriGreen}10`,
+              border: `1.5px solid ${colors.primary.agriGreen}40`,
+              borderRadius: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: spacing.sm,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+                <span style={{ fontSize: '20px' }}>🌿</span>
+                <div>
+                  <Text size="small" style={{ fontWeight: fontWeight.semibold, color: colors.primary.agriGreen, margin: 0 }}>
+                    Nguồn gốc minh bạch
+                  </Text>
+                  <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+                    Xem lịch sử canh tác & cảm biến vườn
+                  </Text>
+                </div>
+              </div>
+              <button
+                type="button"
+                style={{
+                  padding: `${spacing.xs} ${spacing.md}`,
+                  backgroundColor: colors.primary.agriGreen,
+                  color: colors.text.inverse,
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: fontSize.caption,
+                  fontWeight: fontWeight.semibold,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  minHeight: '44px',
+                }}
+                onClick={() => navigate(`/trace/${encodeURIComponent(product.farmTraceabilityCode!)}`)}
+              >
+                Xem vườn
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Sticky Footer CTA */}

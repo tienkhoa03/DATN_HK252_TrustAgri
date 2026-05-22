@@ -457,6 +457,31 @@ export const GuestProductDetailScreen: React.FC<GuestProductDetailScreenProps> =
                   </Text>
                 </div>
               </div>
+
+              {product.farmTraceabilityCode && (
+                <button
+                  type="button"
+                  style={{
+                    marginTop: spacing.sm,
+                    padding: `${spacing.sm} ${spacing.md}`,
+                    backgroundColor: 'transparent',
+                    color: colors.primary.agriGreen,
+                    border: `1.5px solid ${colors.primary.agriGreen}`,
+                    borderRadius: '6px',
+                    fontSize: fontSize.caption,
+                    fontWeight: fontWeight.medium,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: spacing.xs,
+                    minHeight: '44px',
+                  }}
+                  onClick={() => navigate(`/trace/${encodeURIComponent(product.farmTraceabilityCode!)}`)}
+                >
+                  <span>🔍</span>
+                  <span>Truy xuất nguồn gốc vườn</span>
+                </button>
+              )}
             </div>
           )}
 

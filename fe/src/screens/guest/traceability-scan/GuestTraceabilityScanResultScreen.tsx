@@ -23,6 +23,7 @@ export interface GuestTraceabilityScanResultScreenProps {
   /** Khi nhúng ngoài router (demo / test), truyền mã QR; mặc định lấy từ `/guest/trace/:code`. */
   qrCode?: string;
   onLogin?: () => void;
+  hideCta?: boolean;
 }
 
 const SENSOR_TAB_LABELS: Record<string, string> = {
@@ -84,6 +85,7 @@ function sensorDescription(sensorType: string): string {
 export const GuestTraceabilityScanResultScreen: React.FC<GuestTraceabilityScanResultScreenProps> = ({
   qrCode,
   onLogin,
+  hideCta = false,
 }) => {
   const navigate = useNavigate();
   const openSnackbar = useStableOpenSnackbar();
@@ -573,7 +575,7 @@ export const GuestTraceabilityScanResultScreen: React.FC<GuestTraceabilityScanRe
                 <div style={timelineIconStyles}>🌾</div>
                 <div style={timelineContentStyles}>
                   <div style={timelineTitleStyles}>
-                    {CARE_ACTION_VI[ev.action] ?? ev.action}
+                    {ev.standardStepTitle ?? CARE_ACTION_VI[ev.action] ?? ev.action}
                   </div>
                   <div style={timelineDateStyles}>📅 {formatViDateTime(ev.performedAt)}</div>
                   {ev.notes ? (
@@ -585,12 +587,14 @@ export const GuestTraceabilityScanResultScreen: React.FC<GuestTraceabilityScanRe
           </div>
         </div>
 
-        <div style={stickyFooterStyles}>
-          <button type="button" style={ctaButtonStyles} onClick={handleCta}>
-            <Icon name="user" size="md" color={colors.text.inverse} />
-            <span>Đăng nhập để xem chi tiết toàn bộ quá trình và đặt mua vụ sau</span>
-          </button>
-        </div>
+        {!hideCta && (
+          <div style={stickyFooterStyles}>
+            <button type="button" style={ctaButtonStyles} onClick={handleCta}>
+              <Icon name="user" size="md" color={colors.text.inverse} />
+              <span>Đăng nhập để xem chi tiết toàn bộ quá trình và đặt mua vụ sau</span>
+            </button>
+          </div>
+        )}
       </div>
     </Page>
   );

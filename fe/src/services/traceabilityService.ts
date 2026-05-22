@@ -30,6 +30,7 @@ export interface TraceabilityStandardDto {
 
 export interface TraceabilityCareLogTimelineItemDto {
   action: string;
+  standardStepTitle?: string;
   performedAt: string;
   notes?: string;
 }
@@ -109,7 +110,8 @@ function mapCareItem(raw: unknown): TraceabilityCareLogTimelineItemDto | null {
   const performedAt = val<string>(o, 'performedAt', 'performed_at');
   if (!action || !performedAt) return null;
   const notes = val<string | undefined>(o, 'notes', 'notes');
-  return { action, performedAt, notes };
+  const standardStepTitle = val<string | undefined>(o, 'standardStepTitle', 'standard_step_title');
+  return { action, standardStepTitle, performedAt, notes };
 }
 
 function mapSeriesPoint(raw: unknown): TraceabilitySensorChartPointDto | null {

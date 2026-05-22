@@ -236,6 +236,9 @@ export class ProductsService {
       traderDisplayName: entity.traderDisplayName ?? null,
       traderPhone: entity.traderPhone ?? null,
       farmName: entity.farmName ?? null,
+      farmTraceabilityCode: entity.farmId
+        ? `TR-${entity.farmId.replace(/-/g, '').slice(0, 12)}`
+        : undefined,
       name: entity.name,
       cropType: entity.cropType,
       unit: entity.unit,

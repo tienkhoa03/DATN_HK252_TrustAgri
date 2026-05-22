@@ -152,6 +152,7 @@ export interface CareLogDto {
   id: string;
   farmId: string;
   standardStepId?: string;
+  standardStepTitle?: string;
   action: string;
   notes?: string;
   performedAt: string;
@@ -335,7 +336,7 @@ export interface TraceabilityDto {
   productCode: string;
   farm: Pick<FarmDto, 'id' | 'name' | 'location' | 'cropType'>;
   standard?: Pick<StandardDto, 'code' | 'name'>;
-  careLogTimeline: Array<Pick<CareLogDto, 'action' | 'performedAt' | 'notes'>>;
+  careLogTimeline: Array<Pick<CareLogDto, 'action' | 'performedAt' | 'notes' | 'standardStepTitle'>>;
   sensorChart: Array<{
     sensorType: string;
     series: Array<{ t: string; value: number }>;

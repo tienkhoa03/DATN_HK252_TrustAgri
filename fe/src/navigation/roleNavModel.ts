@@ -19,7 +19,7 @@ const BUYER_TABS: RoleNavItem[] = [
   { id: 'discover',  label: 'Khám phá',   path: '/buyer',          icon: 'shopping-cart' },
   { id: 'sourcing',  label: 'Nguồn hàng', path: '/buyer/sourcing', icon: 'plus-circle' },
   { id: 'orders',    label: 'Đơn hàng',   path: '/buyer/orders',   icon: 'package' },
-  { id: 'live',      label: 'Trực tiếp',  path: '/buyer/live',     icon: 'eye' },
+  { id: 'live',      label: 'Giám sát',  path: '/buyer/live',     icon: 'eye' },
   { id: 'profile',   label: 'Hồ sơ',      path: '/buyer/me',       icon: 'user' },
 ];
 
