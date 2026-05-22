@@ -1,12 +1,15 @@
 /**
  * BuyerOrdersScreen — Phase 3 Refactor (FR-U04, FR-U06)
- * Route: /buyer/orders?status=negotiating|deposited|completed|cancelled
+ * Route: /buyer/orders?status=negotiating|deposited|history
  *
- * 4 status tabs:
- *   negotiating → proposals pending + orders pending/accepted
- *   deposited   → contracts active/deposited + RenegotiationCard if pending change-request
- *   completed   → completed orders + completed contracts (replaces TransactionHistory)
- *   cancelled   → cancelled orders + cancelled contracts
+ * 3 status tabs (mirroring the trader transactions UI):
+ *   negotiating → pending proposals + pending/accepted orders + pending_signature contracts
+ *   deposited   → active / pending_change contracts (tap → ContractDetailModal:
+ *                 yêu cầu hoàn thành/hủy/điều chỉnh + chấp nhận/từ chối yêu cầu của thương lái)
+ *   history     → completed / cancelled contracts + completed / cancelled orders
+ *
+ * Hợp đồng trader_buyer dùng chung ContractDetailModal với role trader/farmer —
+ * modal tự xử lý ký, yêu cầu thay đổi (cancel/complete/modify) và accept/reject.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -17,7 +20,7 @@ import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import { BuyerHeader } from '../components/BuyerHeader';
 import { OrderStatusTabs, type OrderStatusTab } from './components/OrderStatusTabs';
-import { RenegotiationCard, type ContractChangeRequest } from './components/RenegotiationCard';
+import { ContractDetailModal } from '@/screens/trader/transactions/components/ContractDetailModal';
 import {
   listProposals,
   acceptProposal,
@@ -38,21 +41,15 @@ import {
   orderTraderDisplay,
   partyTraderDisplay,
   proposalTraderDisplay,
-  contractPartyDisplay,
   contractFarmDisplay,
 } from '@/utils/displayLabels';
 import {
   listContracts,
-  signContract,
   contractStatusLabelVi,
   contractTypeLabelVi,
   toContractViMessage,
   type ContractDto,
 } from '@/services/contractService';
-import {
-  listContractChangeRequests,
-  type ContractChangeRequestDto,
-} from '@/services/contractChangeRequestService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -62,14 +59,26 @@ function getInitialTab(): OrderStatusTab {
     const search = typeof window !== 'undefined' ? window.location.search : '';
     const params = new URLSearchParams(search);
     const s = params.get('status');
-    if (s === 'negotiating' || s === 'deposited' || s === 'completed' || s === 'cancelled') {
-      return s;
-    }
+    if (s === 'negotiating' || s === 'deposited') return s;
+    // Các deep link cũ (completed/cancelled) gộp vào tab Lịch sử
+    if (s === 'history' || s === 'completed' || s === 'cancelled') return 'history';
   } catch {
     // ignore
   }
   return 'negotiating';
 }
+
+const formatCurrency = (n: number) =>
+  new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(n);
+
+const ageLabel = (iso: string) => {
+  const ms = Date.now() - new Date(iso).getTime();
+  const h = Math.floor(ms / 3600000);
+  const d = Math.floor(ms / 86400000);
+  if (d >= 1) return `${d} ngày trước`;
+  if (h >= 1) return `${h} giờ trước`;
+  return 'Vừa xong';
+};
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
 
@@ -98,6 +107,81 @@ const SkeletonCard: React.FC = () => (
   </div>
 );
 
+// ── Contract info card (tappable → ContractDetailModal) ─────────────────────────
+
+const ContractInfoCard: React.FC<{ contract: ContractDto; onTap: () => void }> = ({ contract, onTap }) => {
+  const statusColor =
+    contract.status === 'active'
+      ? colors.primary.agriGreen
+      : contract.status === 'pending_signature'
+      ? colors.primary.zaloBlue
+      : contract.status === 'pending_change'
+      ? colors.functional.warningYellow
+      : contract.status === 'completed'
+      ? colors.primary.zaloBlue
+      : colors.text.secondary;
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onTap}
+      onKeyDown={(e) => e.key === 'Enter' && onTap()}
+      style={{
+        backgroundColor: colors.background.primary,
+        borderRadius: '12px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        marginBottom: spacing.md,
+        padding: spacing.md,
+        cursor: 'pointer',
+        minHeight: '44px',
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
+        <div style={{ flex: 1 }}>
+          <Text size="xSmall" style={{ color: colors.text.secondary, display: 'block', fontSize: fontSize.caption }}>
+            {contractTypeLabelVi(contract.contractType)}
+          </Text>
+          <Text.Title size="small" style={{ margin: `${spacing.xs} 0` }}>
+            {contract.productId ? productDisplayName(contract.productId) : 'Hợp đồng'}
+          </Text.Title>
+          <Text size="xSmall" style={{ color: colors.text.secondary, fontSize: fontSize.caption }}>
+            Thương lái: {partyTraderDisplay(contract)}
+          </Text>
+          {contractFarmDisplay(contract) && (
+            <Text size="xSmall" style={{ color: colors.text.primary, fontSize: fontSize.caption, marginTop: 2 }}>
+              Vườn: {contractFarmDisplay(contract)}
+            </Text>
+          )}
+        </div>
+        <span
+          style={{
+            padding: `${spacing.xs} ${spacing.sm}`,
+            backgroundColor: `${statusColor}18`,
+            color: statusColor,
+            borderRadius: '6px',
+            fontSize: fontSize.caption,
+            fontWeight: fontWeight.semibold,
+            whiteSpace: 'nowrap',
+            marginLeft: spacing.sm,
+          }}
+        >
+          {contractStatusLabelVi(contract.status)}
+        </span>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text size="small" style={{ color: colors.text.secondary }}>{contract.quantity} {contract.unit}</Text>
+        <Text size="small" style={{ fontWeight: fontWeight.bold, color: colors.primary.zaloBlue }}>
+          {formatCurrency(contract.totalPrice)}
+        </Text>
+      </div>
+      <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.xs }}>
+        {new Date(contract.startDate).toLocaleDateString('vi-VN')} — {new Date(contract.endDate).toLocaleDateString('vi-VN')}
+      </Text>
+    </div>
+  );
+};
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export const BuyerOrdersScreen: React.FC = () => {
@@ -122,10 +206,10 @@ export const BuyerOrdersScreen: React.FC = () => {
   const [contractError, setContractError] = useState<string | null>(null);
   const [contractLoaded, setContractLoaded] = useState(false);
 
-  // Change requests for deposited tab (contractId → requests)
-  const [changeRequests, setChangeRequests] = useState<Record<string, ContractChangeRequestDto[]>>({});
+  // Selected contract → ContractDetailModal
+  const [selectedContract, setSelectedContract] = useState<ContractDto | null>(null);
 
-  // In-flight action tracking
+  // In-flight action tracking (proposals / orders)
   const [actionId, setActionId] = useState<string | null>(null);
 
   // ── Data fetching ─────────────────────────────────────────────────────────
@@ -178,38 +262,12 @@ export const BuyerOrdersScreen: React.FC = () => {
     }
   }, [openSnackbar]);
 
-  // Load change-requests for active contracts when deposited tab is shown
-  const loadChangeRequestsForContracts = useCallback(async (activeContracts: ContractDto[]) => {
-    const results: Record<string, ContractChangeRequestDto[]> = {};
-    await Promise.all(
-      activeContracts.map(async (c) => {
-        try {
-          const reqs = await listContractChangeRequests(c.id);
-          results[c.id] = reqs.filter((r) => r.status === 'pending');
-        } catch {
-          results[c.id] = [];
-        }
-      }),
-    );
-    setChangeRequests((prev) => ({ ...prev, ...results }));
-  }, []);
-
   useEffect(() => {
-    if ((activeTab === 'negotiating') && !propLoaded) loadProposals();
-    if ((activeTab === 'negotiating' || activeTab === 'completed' || activeTab === 'cancelled') && !ordersLoaded) loadOrders();
-    if ((activeTab === 'negotiating' || activeTab === 'deposited' || activeTab === 'completed' || activeTab === 'cancelled') && !contractLoaded) loadContracts();
+    if (activeTab === 'negotiating' && !propLoaded) loadProposals();
+    if ((activeTab === 'negotiating' || activeTab === 'history') && !ordersLoaded) loadOrders();
+    if (!contractLoaded) loadContracts();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
-
-  useEffect(() => {
-    if (activeTab === 'deposited' && contractLoaded) {
-      const activeContracts = contracts.filter((c) => c.status === 'active' || (c.status as string) === 'deposited');
-      if (activeContracts.length > 0) {
-        loadChangeRequestsForContracts(activeContracts);
-      }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, contractLoaded]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
@@ -219,8 +277,7 @@ export const BuyerOrdersScreen: React.FC = () => {
       const updated = await acceptProposal(id);
       setProposals((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
       openSnackbar({ type: 'success', text: 'Đã chấp nhận đề xuất! Hợp đồng chờ ký đã được tạo.', duration: 4000, icon: true });
-      setOrdersLoaded(false);
-      // Hợp đồng pending_signature vừa tạo → tải lại ngay để hiển thị ở tab Chờ thương lượng
+      // Hợp đồng pending_signature vừa tạo → tải lại để hiển thị ở tab Chờ thương lượng
       loadContracts();
     } catch (err) {
       openSnackbar({ type: 'error', text: toProposalViMessage(err, 'accept'), duration: 4000, icon: true });
@@ -255,31 +312,15 @@ export const BuyerOrdersScreen: React.FC = () => {
     }
   };
 
-  const handleSignContract = async (id: string) => {
-    setActionId(id);
-    try {
-      const updated = await signContract(id);
-      setContracts((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-      openSnackbar({ type: 'success', text: 'Đã ký hợp đồng.', duration: 3000, icon: true });
-    } catch (err) {
-      openSnackbar({ type: 'error', text: toContractViMessage(err, 'sign'), duration: 4000, icon: true });
-    } finally {
-      setActionId(null);
-    }
+  // After signing in the modal: keep selection in sync + refresh list
+  const handleContractSigned = (updated: ContractDto) => {
+    setSelectedContract(updated);
+    setContracts((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
   };
 
-  const handleChangeRequestApproved = (contractId: string, changeId: string) => {
-    setChangeRequests((prev) => ({
-      ...prev,
-      [contractId]: (prev[contractId] ?? []).filter((r) => r.id !== changeId),
-    }));
-  };
-
-  const handleChangeRequestRejected = (contractId: string, changeId: string) => {
-    setChangeRequests((prev) => ({
-      ...prev,
-      [contractId]: (prev[contractId] ?? []).filter((r) => r.id !== changeId),
-    }));
+  const handleContractRejected = (updated: ContractDto) => {
+    setSelectedContract(null);
+    setContracts((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
   };
 
   // ── Derived data ──────────────────────────────────────────────────────────
@@ -299,11 +340,12 @@ export const BuyerOrdersScreen: React.FC = () => {
     return out;
   })();
   const pendingSignatureContracts = contracts.filter((c) => c.status === 'pending_signature');
-  const depositedContracts = contracts.filter((c) => c.status === 'active' || (c.status as string) === 'deposited');
+  const depositedContracts = contracts.filter(
+    (c) => c.status === 'active' || c.status === 'pending_change' || c.status === 'in_settlement',
+  );
   const completedOrders = orders.filter((o) => o.status === 'completed');
-  const completedContracts = contracts.filter((c) => c.status === 'completed');
   const cancelledOrders = orders.filter((o) => ['cancelled', 'rejected'].includes(o.status));
-  const cancelledContracts = contracts.filter((c) => c.status === 'cancelled');
+  const historyContracts = contracts.filter((c) => c.status === 'completed' || c.status === 'cancelled');
 
   // ── Styles ────────────────────────────────────────────────────────────────
 
@@ -327,7 +369,7 @@ export const BuyerOrdersScreen: React.FC = () => {
     fontWeight: fontWeight.semibold,
   });
 
-  const btnStyle = (variant: 'primary' | 'danger' | 'ghost'): React.CSSProperties => ({
+  const btnStyle = (variant: 'primary' | 'danger'): React.CSSProperties => ({
     flex: 1,
     minHeight: '44px',
     padding: spacing.sm,
@@ -336,30 +378,10 @@ export const BuyerOrdersScreen: React.FC = () => {
     fontWeight: fontWeight.semibold,
     cursor: 'pointer',
     backgroundColor:
-      variant === 'primary' ? colors.primary.agriGreen :
-      variant === 'danger' ? `${colors.functional.alertRed}15` :
-      'transparent',
-    color:
-      variant === 'primary' ? colors.text.inverse :
-      variant === 'danger' ? colors.functional.alertRed :
-      colors.text.secondary,
-    border:
-      variant === 'ghost' ? `1px solid ${colors.background.tertiary}` :
-      variant === 'danger' ? `1px solid ${colors.functional.alertRed}40` :
-      'none',
+      variant === 'primary' ? colors.primary.agriGreen : `${colors.functional.alertRed}15`,
+    color: variant === 'primary' ? colors.text.inverse : colors.functional.alertRed,
+    border: variant === 'danger' ? `1px solid ${colors.functional.alertRed}40` : 'none',
   });
-
-  const formatCurrency = (n: number) =>
-    new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(n);
-
-  const ageLabel = (iso: string) => {
-    const ms = Date.now() - new Date(iso).getTime();
-    const h = Math.floor(ms / 3600000);
-    const d = Math.floor(ms / 86400000);
-    if (d >= 1) return `${d} ngày trước`;
-    if (h >= 1) return `${h} giờ trước`;
-    return 'Vừa xong';
-  };
 
   // ── Tab renderers ─────────────────────────────────────────────────────────
 
@@ -369,7 +391,10 @@ export const BuyerOrdersScreen: React.FC = () => {
 
     if (loading) return <>{Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}</>;
 
-    if (error && pendingProposals.length === 0 && negotiatingOrders.length === 0 && pendingSignatureContracts.length === 0) {
+    const isEmpty =
+      pendingProposals.length === 0 && negotiatingOrders.length === 0 && pendingSignatureContracts.length === 0;
+
+    if (error && isEmpty) {
       return (
         <EmptyState
           icon="⚠️"
@@ -380,7 +405,7 @@ export const BuyerOrdersScreen: React.FC = () => {
       );
     }
 
-    if (pendingProposals.length === 0 && negotiatingOrders.length === 0 && pendingSignatureContracts.length === 0) {
+    if (isEmpty) {
       return (
         <EmptyState
           icon="💬"
@@ -392,66 +417,15 @@ export const BuyerOrdersScreen: React.FC = () => {
 
     return (
       <>
-        {/* Hợp đồng chờ ký — tạo từ đề xuất đã chấp nhận */}
+        {/* Hợp đồng chờ ký — tạo từ đề xuất / đơn hàng đã chấp nhận */}
         {pendingSignatureContracts.length > 0 && (
           <>
             <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: spacing.sm, display: 'block', fontWeight: fontWeight.semibold }}>
               Hợp đồng chờ ký ({pendingSignatureContracts.length})
             </Text>
-            {pendingSignatureContracts.map((c) => {
-              const isActing = actionId === c.id;
-              const buyerSigned = c.buyerSignedAt != null;
-              return (
-                <div key={c.id} style={cardStyle}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
-                    <div>
-                      <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                        {contractTypeLabelVi(c.contractType)}
-                      </Text>
-                      <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-                        Thương lái: {partyTraderDisplay(c)}
-                      </Text>
-                      {contractFarmDisplay(c) && (
-                        <Text size="xSmall" style={{ color: colors.text.primary, marginTop: spacing.xs }}>
-                          Vườn: {contractFarmDisplay(c)}
-                        </Text>
-                      )}
-                    </div>
-                    <span style={statusBadgeStyle(colors.functional.warningYellow)}>
-                      ✍️ {contractStatusLabelVi(c.status)}
-                    </span>
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: `${spacing.xs} ${spacing.md}`, padding: spacing.sm, backgroundColor: colors.background.secondary, borderRadius: '8px', marginBottom: spacing.sm }}>
-                    <div>
-                      <Text size="xSmall" style={{ color: colors.text.secondary }}>Khối lượng</Text>
-                      <Text size="small" style={{ fontWeight: fontWeight.semibold }}>{c.quantity} {c.unit}</Text>
-                    </div>
-                    <div>
-                      <Text size="xSmall" style={{ color: colors.text.secondary }}>Tổng giá trị</Text>
-                      <Text size="small" style={{ fontWeight: fontWeight.bold, color: colors.primary.zaloBlue }}>{formatCurrency(c.totalPrice)}</Text>
-                    </div>
-                    <div style={{ gridColumn: '1 / -1' }}>
-                      <Text size="xSmall" style={{ color: colors.text.secondary }}>
-                        {new Date(c.startDate).toLocaleDateString('vi-VN')} — {new Date(c.endDate).toLocaleDateString('vi-VN')}
-                      </Text>
-                    </div>
-                  </div>
-                  {buyerSigned ? (
-                    <Text size="xSmall" style={{ color: colors.primary.agriGreen, fontWeight: fontWeight.medium }}>
-                      ✓ Bạn đã ký — chờ thương lái ký để kích hoạt hợp đồng.
-                    </Text>
-                  ) : (
-                    <button
-                      style={{ ...btnStyle('primary'), opacity: isActing ? 0.6 : 1 }}
-                      disabled={isActing}
-                      onClick={() => handleSignContract(c.id)}
-                    >
-                      {isActing ? '...' : 'Ký hợp đồng'}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+            {pendingSignatureContracts.map((c) => (
+              <ContractInfoCard key={c.id} contract={c} onTap={() => setSelectedContract(c)} />
+            ))}
           </>
         )}
 
@@ -580,104 +554,43 @@ export const BuyerOrdersScreen: React.FC = () => {
 
     return (
       <>
-        {depositedContracts.map((c) => {
-          const pendingReqs = changeRequests[c.id] ?? [];
-          return (
-            <div key={c.id}>
-              {/* Change request banners */}
-              {pendingReqs.map((req) => {
-                const changeReq: ContractChangeRequest = {
-                  id: req.id,
-                  contractId: c.id,
-                  status: req.status === 'accepted' ? 'approved' : req.status,
-                  before: {
-                    quantity: req.changes['quantity']?.oldValue as number | undefined,
-                    pricePerUnit: req.changes['totalPrice']?.oldValue as number | undefined,
-                    depositAmount: req.changes['deposit']?.oldValue as number | undefined,
-                    deliveryDate: req.changes['endDate']?.oldValue as string | undefined,
-                    notes: req.changes['terms']?.oldValue as string | undefined,
-                  },
-                  after: {
-                    quantity: req.changes['quantity']?.newValue as number | undefined,
-                    pricePerUnit: req.changes['totalPrice']?.newValue as number | undefined,
-                    depositAmount: req.changes['deposit']?.newValue as number | undefined,
-                    deliveryDate: req.changes['endDate']?.newValue as string | undefined,
-                    notes: req.changes['terms']?.newValue as string | undefined,
-                  },
-                  requestedAt: req.createdAt,
-                  requestedBy: req.requestedBy
-                    ? contractPartyDisplay(req.requestedBy, c)
-                    : undefined,
-                };
-                return (
-                  <RenegotiationCard
-                    key={req.id}
-                    changeRequest={changeReq}
-                    onApprove={(id) => handleChangeRequestApproved(c.id, id)}
-                    onReject={(id) => handleChangeRequestRejected(c.id, id)}
-                  />
-                );
-              })}
-
-              {/* Contract card */}
-              <div style={cardStyle}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
-                  <div>
-                    <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                      {contractTypeLabelVi(c.contractType)}
-                    </Text>
-                    <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-                      {c.productId ? productDisplayName(c.productId) : 'Hợp đồng'}
-                    </Text>
-                    <Text size="xSmall" style={{ color: colors.text.secondary }}>
-                      Thương lái: {partyTraderDisplay(c)}
-                    </Text>
-                    {contractFarmDisplay(c) && (
-                      <Text size="xSmall" style={{ color: colors.text.primary, marginTop: spacing.xs }}>
-                        Vườn: {contractFarmDisplay(c)}
-                      </Text>
-                    )}
-                  </div>
-                  <span style={statusBadgeStyle(colors.primary.agriGreen)}>
-                    {contractStatusLabelVi(c.status)}
-                  </span>
-                </div>
-                <div style={{ padding: spacing.sm, backgroundColor: colors.background.secondary, borderRadius: '8px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Text size="xSmall" style={{ color: colors.text.secondary }}>Khối lượng</Text>
-                    <Text size="small" style={{ fontWeight: fontWeight.semibold }}>{c.quantity} {c.unit}</Text>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: spacing.xs }}>
-                    <Text size="xSmall" style={{ color: colors.text.secondary }}>Tổng giá trị</Text>
-                    <Text size="small" style={{ fontWeight: fontWeight.semibold }}>{formatCurrency(c.totalPrice)}</Text>
-                  </div>
-                  <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.sm }}>
-                    {new Date(c.startDate).toLocaleDateString('vi-VN')} — {new Date(c.endDate).toLocaleDateString('vi-VN')}
-                  </Text>
-                </div>
-              </div>
-            </div>
-          );
-        })}
+        {depositedContracts.map((c) => (
+          <ContractInfoCard key={c.id} contract={c} onTap={() => setSelectedContract(c)} />
+        ))}
       </>
     );
   };
 
-  const renderCompletedTab = () => {
+  const renderHistoryTab = () => {
     const loading = ordersLoading || contractLoading;
     if (loading && !ordersLoaded && !contractLoaded) {
       return <>{Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)}</>;
     }
 
-    if (completedOrders.length === 0 && completedContracts.length === 0) {
-      return <EmptyState icon="✅" title="Chưa có giao dịch hoàn tất" description="Đơn hàng và hợp đồng hoàn tất sẽ hiển thị tại đây" />;
+    if (
+      completedOrders.length === 0 &&
+      cancelledOrders.length === 0 &&
+      historyContracts.length === 0
+    ) {
+      return <EmptyState icon="🗂️" title="Chưa có lịch sử giao dịch" description="Đơn hàng và hợp đồng đã hoàn tất hoặc đã hủy sẽ hiển thị tại đây" />;
     }
 
     return (
       <>
-        {completedOrders.length > 0 && (
+        {historyContracts.length > 0 && (
           <>
             <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: spacing.sm, display: 'block', fontWeight: fontWeight.semibold }}>
+              Hợp đồng ({historyContracts.length})
+            </Text>
+            {historyContracts.map((c) => (
+              <ContractInfoCard key={c.id} contract={c} onTap={() => setSelectedContract(c)} />
+            ))}
+          </>
+        )}
+
+        {completedOrders.length > 0 && (
+          <>
+            <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: spacing.sm, marginTop: spacing.md, display: 'block', fontWeight: fontWeight.semibold }}>
               Đơn hàng hoàn tất ({completedOrders.length})
             </Text>
             {completedOrders.map((order) => (
@@ -705,94 +618,37 @@ export const BuyerOrdersScreen: React.FC = () => {
           </>
         )}
 
-        {completedContracts.length > 0 && (
+        {cancelledOrders.length > 0 && (
           <>
             <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: spacing.sm, marginTop: spacing.md, display: 'block', fontWeight: fontWeight.semibold }}>
-              Hợp đồng hoàn tất ({completedContracts.length})
+              Đơn hàng đã hủy ({cancelledOrders.length})
             </Text>
-            {completedContracts.map((c) => (
-              <div key={c.id} style={cardStyle}>
+            {cancelledOrders.map((order) => (
+              <div key={order.id} style={{ ...cardStyle, opacity: 0.75 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
                   <div>
                     <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-                      {c.productId ? productDisplayName(c.productId) : 'Hợp đồng'}
+                      {orderTraderDisplay(order)}
                     </Text>
                     <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                      {partyTraderDisplay(c)}
+                      {new Date(order.updatedAt).toLocaleDateString('vi-VN')}
                     </Text>
                   </div>
-                  <span style={statusBadgeStyle(colors.primary.zaloBlue)}>Hoàn thành</span>
+                  <span style={statusBadgeStyle(colors.functional.alertRed)}>
+                    ✕ {orderStatusLabel(order.status)}
+                  </span>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Text size="small" style={{ color: colors.text.secondary }}>{c.quantity} {c.unit}</Text>
-                  <Text size="small" style={{ fontWeight: fontWeight.bold }}>{formatCurrency(c.totalPrice)}</Text>
-                </div>
-                <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.xs }}>
-                  {new Date(c.endDate).toLocaleDateString('vi-VN')}
+                <Text size="small" style={{ fontWeight: fontWeight.medium, marginBottom: spacing.xs }}>
+                  {productDisplayName(order.productId)}
                 </Text>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Text size="small" style={{ color: colors.text.secondary }}>{order.quantity} {order.unit}</Text>
+                  <Text size="small" style={{ fontWeight: fontWeight.semibold }}>{formatCurrency(order.totalPrice)}</Text>
+                </div>
               </div>
             ))}
           </>
         )}
-      </>
-    );
-  };
-
-  const renderCancelledTab = () => {
-    const loading = ordersLoading || contractLoading;
-    if (loading && !ordersLoaded && !contractLoaded) {
-      return <>{Array.from({ length: 2 }).map((_, i) => <SkeletonCard key={i} />)}</>;
-    }
-
-    if (cancelledOrders.length === 0 && cancelledContracts.length === 0) {
-      return <EmptyState icon="📭" title="Không có giao dịch đã hủy" description="Đơn hàng và hợp đồng bị hủy sẽ hiển thị tại đây" />;
-    }
-
-    return (
-      <>
-        {cancelledOrders.map((order) => (
-          <div key={order.id} style={{ ...cardStyle, opacity: 0.75 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
-              <div>
-                <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-                  {orderTraderDisplay(order)}
-                </Text>
-                <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                  {new Date(order.updatedAt).toLocaleDateString('vi-VN')}
-                </Text>
-              </div>
-              <span style={statusBadgeStyle(colors.functional.alertRed)}>
-                ✕ {orderStatusLabel(order.status)}
-              </span>
-            </div>
-            <Text size="small" style={{ fontWeight: fontWeight.medium, marginBottom: spacing.xs }}>
-              {productDisplayName(order.productId)}
-            </Text>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Text size="small" style={{ color: colors.text.secondary }}>{order.quantity} {order.unit}</Text>
-              <Text size="small" style={{ fontWeight: fontWeight.semibold }}>{formatCurrency(order.totalPrice)}</Text>
-            </div>
-          </div>
-        ))}
-        {cancelledContracts.map((c) => (
-          <div key={c.id} style={{ ...cardStyle, opacity: 0.75 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
-              <div>
-                <Text size="small" style={{ fontWeight: fontWeight.semibold, margin: 0 }}>
-                  {c.productId ? productDisplayName(c.productId) : 'Hợp đồng'}
-                </Text>
-                <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-                  {partyTraderDisplay(c)}
-                </Text>
-              </div>
-              <span style={statusBadgeStyle(colors.text.secondary)}>Đã hủy</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Text size="small" style={{ color: colors.text.secondary }}>{c.quantity} {c.unit}</Text>
-              <Text size="small" style={{ fontWeight: fontWeight.semibold }}>{formatCurrency(c.totalPrice)}</Text>
-            </div>
-          </div>
-        ))}
       </>
     );
   };
@@ -807,9 +663,22 @@ export const BuyerOrdersScreen: React.FC = () => {
       <div style={{ padding: spacing.md, paddingBottom: spacing.xl }}>
         {activeTab === 'negotiating' && renderNegotiatingTab()}
         {activeTab === 'deposited' && renderDepositedTab()}
-        {activeTab === 'completed' && renderCompletedTab()}
-        {activeTab === 'cancelled' && renderCancelledTab()}
+        {activeTab === 'history' && renderHistoryTab()}
       </div>
+
+      {selectedContract && (
+        <ContractDetailModal
+          contract={selectedContract}
+          visible
+          onClose={() => {
+            setSelectedContract(null);
+            // Tải lại để phản ánh thay đổi trạng thái sau khi ký / accept / reject change-request
+            loadContracts();
+          }}
+          onSigned={handleContractSigned}
+          onRejected={handleContractRejected}
+        />
+      )}
     </Page>
   );
 };
