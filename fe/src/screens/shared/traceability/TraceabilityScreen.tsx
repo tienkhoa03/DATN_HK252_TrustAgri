@@ -22,6 +22,10 @@ import {
 import { cropEmoji, cropLabel } from '@/services/marketplaceService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { authSessionAtom } from '@/state/authAtoms';
+import { ProcessComplianceCard } from './ProcessComplianceCard';
+import { EnvironmentSnapshotCard } from './EnvironmentSnapshotCard';
+import { ComplianceCertificateCard } from './ComplianceCertificateCard';
+import { ContractContextBanner } from './ContractContextBanner';
 
 const SENSOR_TAB_LABELS: Record<string, string> = {
   temperature_c: '🌡️ Nhiệt độ',
@@ -383,6 +387,19 @@ export const TraceabilityScreen: React.FC = () => {
     cursor: 'pointer',
   };
 
+  const timelineBadge = (color: string): React.CSSProperties => ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    padding: `2px ${spacing.sm}`,
+    backgroundColor: `${color}18`,
+    border: `1px solid ${color}`,
+    borderRadius: '12px',
+    fontSize: fontSize.caption,
+    fontWeight: fontWeight.medium,
+    color,
+    minHeight: '22px',
+  });
+
   const isSearchDisabled = !inputValue.trim() || loading;
   const showStickyFooter = !session && !!data;
   const contentPaddingBottom = showStickyFooter ? '80px' : spacing.xl;
@@ -409,7 +426,7 @@ export const TraceabilityScreen: React.FC = () => {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
-              placeholder="Nhập mã QR vườn (VD: TR-abc123def456)"
+              placeholder="Nhập mã QR (VD: TR-abc123... hoặc LOT-abc123...)"
               style={inputStyles}
             />
             <button
@@ -480,7 +497,10 @@ export const TraceabilityScreen: React.FC = () => {
               <div style={{ fontSize: '120px', textAlign: 'center' }}>{cropEmoji(data.farm.cropType)}</div>
             </div>
 
-            {/* Product info */}
+            {/* Contract scope banner */}
+            <ContractContextBanner scope={data.scope ?? 'farm-overview'} contract={data.contract} />
+
+            {/* Lớp 1: Identity — Product & Farm info */}
             <div style={{ padding: spacing.md, backgroundColor: colors.background.primary }}>
               <div style={productNameStyles}>{data.productCode}</div>
               <Text size="small" style={{ color: colors.text.secondary, marginBottom: spacing.sm }}>
@@ -494,6 +514,24 @@ export const TraceabilityScreen: React.FC = () => {
                 <Icon name="location" size="sm" color={colors.text.secondary} />
                 <span>{formatFarmLocation(data.farm)}</span>
               </div>
+              {data.farm.area != null && (
+                <div style={farmDetailsStyles}>
+                  <span>📐</span>
+                  <span>Diện tích: {data.farm.area} ha</span>
+                </div>
+              )}
+              {data.farm.plantingDate && (
+                <div style={farmDetailsStyles}>
+                  <span>🌱</span>
+                  <span>Ngày trồng: {new Date(data.farm.plantingDate).toLocaleDateString('vi-VN')}</span>
+                </div>
+              )}
+              {data.farm.ownerDisplayName && (
+                <div style={farmDetailsStyles}>
+                  <span>👤</span>
+                  <span>Chủ vườn: {data.farm.ownerDisplayName}</span>
+                </div>
+              )}
             </div>
 
             {/* Certification */}
@@ -515,11 +553,30 @@ export const TraceabilityScreen: React.FC = () => {
               )}
             </div>
 
+            {/* Lớp 2: Process Compliance */}
+            {data.process && <ProcessComplianceCard process={data.process} />}
+
+            {/* Lớp 4: Compliance Certificate */}
+            {data.scope === 'contract' && data.complianceCertificate && data.complianceCertificate.status !== 'none' && (
+              <div style={{ paddingTop: spacing.md, backgroundColor: colors.background.primary }}>
+                <div style={{ ...sectionTitleStyles, padding: `0 ${spacing.md}` }}>Chứng nhận hợp đồng</div>
+                <ComplianceCertificateCard certificate={data.complianceCertificate} />
+              </div>
+            )}
+
+            {/* Lớp 3: IoT Snapshot — chỉ hiển thị cho farm-overview hoặc contract đang hoạt động */}
+            {(data.scope === 'farm-overview' ||
+              (data.scope === 'contract' && (data.contract?.status === 'active' || data.contract?.status === 'pending_change'))) && (
+              <EnvironmentSnapshotCard readings={data.currentEnvironment ?? []} />
+            )}
+
             {/* Sensor chart */}
             <div style={{ padding: spacing.md, backgroundColor: colors.background.secondary }}>
               <div style={sectionTitleStyles}>📊 Giám sát cảm biến</div>
               <Text size="small" style={{ color: colors.text.secondary, marginBottom: spacing.md }}>
-                Dữ liệu minh họa theo thời gian (public traceability)
+                {data.scope === 'contract' && data.contract
+                  ? `Dữ liệu cảm biến từ ${new Date(data.contract.startDate).toLocaleDateString('vi-VN')} đến ${new Date(data.contract.endDate).toLocaleDateString('vi-VN')}`
+                  : 'Dữ liệu 7 ngày gần nhất (public traceability)'}
               </Text>
               {data.sensorChart.length > 0 ? (
                 <>
@@ -576,7 +633,7 @@ export const TraceabilityScreen: React.FC = () => {
               <div style={timelineContainerStyles}>
                 <div style={timelineLineStyles} />
                 {sortedTimeline.map((ev, index) => (
-                  <div key={`${ev.performedAt}-${index}`} style={timelineEventStyles}>
+                  <div key={ev.id ?? `${ev.performedAt}-${index}`} style={timelineEventStyles}>
                     <div style={timelineIconStyles}>🌾</div>
                     <div style={timelineContentStyles}>
                       <div style={{ fontSize: fontSize.body, fontWeight: fontWeight.semibold, color: colors.text.primary, marginBottom: spacing.xs }}>
@@ -585,9 +642,62 @@ export const TraceabilityScreen: React.FC = () => {
                       <div style={{ fontSize: fontSize.small, color: colors.primary.zaloBlue, fontWeight: fontWeight.medium, marginBottom: spacing.xs }}>
                         📅 {formatViDateTime(ev.performedAt)}
                       </div>
+
+                      {/* Badges */}
+                      {(ev.deviation || ev.isLate || ev.isEdited) && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.xs }}>
+                          {ev.deviation && (
+                            <span style={timelineBadge('#EF4444')}>Lệch quy trình</span>
+                          )}
+                          {ev.isLate && (
+                            <span style={timelineBadge('#F97316')}>Trễ tiến độ</span>
+                          )}
+                          {ev.isEdited && (
+                            <span
+                              style={timelineBadge('#6366F1')}
+                              title="Bản ghi đã sửa — thông tin gốc lưu trong sổ kiểm toán hệ thống"
+                            >
+                              Đã chỉnh sửa
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       {ev.notes ? (
-                        <div style={{ fontSize: fontSize.caption, color: colors.text.secondary }}>{ev.notes}</div>
+                        <div style={{ fontSize: fontSize.caption, color: colors.text.secondary, marginBottom: spacing.xs }}>{ev.notes}</div>
                       ) : null}
+
+                      {/* Evidence thumbnails (max 3) */}
+                      {ev.evidences && ev.evidences.length > 0 && (
+                        <div style={{ display: 'flex', gap: spacing.xs, flexWrap: 'wrap' }}>
+                          {ev.evidences.slice(0, 3).map((e, ei) => (
+                            e.mimeType.startsWith('image/') ? (
+                              <a key={ei} href={e.fileUrl} target="_blank" rel="noopener noreferrer">
+                                <img
+                                  src={e.fileUrl}
+                                  alt="Minh chứng"
+                                  style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '6px', border: `1px solid ${colors.background.tertiary}` }}
+                                />
+                              </a>
+                            ) : (
+                              <a
+                                key={ei}
+                                href={e.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background.tertiary, borderRadius: '6px', fontSize: '24px', textDecoration: 'none' }}
+                              >
+                                📄
+                              </a>
+                            )
+                          ))}
+                          {ev.evidences.length > 3 && (
+                            <div style={{ width: '60px', height: '60px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background.tertiary, borderRadius: '6px', fontSize: fontSize.caption, color: colors.text.secondary }}>
+                              +{ev.evidences.length - 3}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

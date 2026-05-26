@@ -9,6 +9,6 @@ module.exports = {
     '^@trustagri/shared$': '<rootDir>/../../libs/shared/src/index.ts',
   },
   transform: {
-    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
+    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.test.json' }],
   },
 };

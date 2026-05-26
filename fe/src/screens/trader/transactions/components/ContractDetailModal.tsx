@@ -35,6 +35,7 @@ import { contractFarmDisplay, partyBuyerDisplay, partyFarmerDisplay } from '@/ut
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
+import { ContractQrCodeModal } from '@/screens/shared/contracts/ContractQrCodeModal';
 
 export interface ContractDetailModalProps {
   contract: ContractDto;
@@ -133,6 +134,7 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
   const [rejectReason, setRejectReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
   const [showStandardInfo, setShowStandardInfo] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
 
   const userId = session?.userId ?? '';
   const sessionRole = session?.role;
@@ -449,6 +451,34 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
             }).format(contract.totalPrice)}
           />
         </div>
+
+        {/* QR Code button — only for farmer_trader contracts with a traceabilityCode */}
+        {contract.contractType === 'farmer_trader' && contract.traceabilityCode && (
+          <button
+            type="button"
+            onClick={() => setShowQrModal(true)}
+            style={{
+              width: '100%',
+              padding: spacing.md,
+              backgroundColor: colors.background.secondary,
+              color: colors.text.primary,
+              border: `1px solid ${colors.background.tertiary}`,
+              borderRadius: '10px',
+              fontSize: fontSize.body,
+              fontWeight: fontWeight.medium,
+              cursor: 'pointer',
+              minHeight: '44px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: spacing.sm,
+              marginBottom: spacing.md,
+            }}
+          >
+            <span>🏷️</span>
+            <span>{`Mã QR lô hàng (${contract.traceabilityCode})`}</span>
+          </button>
+        )}
 
         {/* Sign / Reject actions */}
         {showSignButton && (
@@ -872,6 +902,14 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
           ))}
         </div>
       </div>
+
+      {showQrModal && contract.traceabilityCode && (
+        <ContractQrCodeModal
+          visible={showQrModal}
+          onClose={() => setShowQrModal(false)}
+          traceabilityCode={contract.traceabilityCode}
+        />
+      )}
 
       {showStandardInfo && contract.standardId && (
         <StandardInfoModal

@@ -55,6 +55,7 @@ export interface ContractDto {
   buyerSignedAt?: string;
   createdAt: string;
   updatedAt?: string;
+  traceabilityCode?: string | null;
 }
 
 export interface ContractAuditLogDto {

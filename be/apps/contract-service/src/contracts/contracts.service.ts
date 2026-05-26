@@ -586,6 +586,9 @@ export class ContractsService {
         await this.assertFarmHasNoOngoingContract(entity.farmId, entity.id);
       }
       entity.status = 'active';
+      if (entity.contractType === 'farmer_trader' && !entity.traceabilityCode) {
+        entity.traceabilityCode = `LOT-${entity.id.replace(/-/g, '').slice(0, 12)}`;
+      }
     }
 
     const saved = await this.contractRepo.save(entity);

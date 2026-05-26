@@ -167,6 +167,11 @@ export class ContractEntity {
   @Column({ name: 'buyer_signed_at', type: 'timestamptz', nullable: true })
   buyerSignedAt: Date | null;
 
+  // Mã QR lô hàng — sinh khi farmer_trader contract chuyển sang active (LOT-xxxxxxxxxx)
+  @Index('idx_contracts_traceability_code')
+  @Column({ name: 'traceability_code', type: 'varchar', length: 32, nullable: true, unique: true })
+  traceabilityCode: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

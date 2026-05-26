@@ -2,10 +2,11 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  ConflictException,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, FindOptionsWhere, Repository } from 'typeorm';
+import { Between, FindOptionsWhere, Repository, DataSource } from 'typeorm';
 import {
   CareLogDto,
   CareLogSyncResponse,
@@ -16,12 +17,16 @@ import {
 } from '@trustagri/shared';
 import { CareLogEntity } from './entities/care-log.entity';
 import { EvidenceEntity } from './entities/evidence.entity';
+import { CareAuditLogEntity } from './entities/care-audit-log.entity';
 import { FarmEntity } from '../farms/entities/farm.entity';
 import { StandardStepEntity } from '../standards/entities/standard-step.entity';
 import { ListCareLogsQueryDto } from './dto/list-care-logs-query.dto';
 import { SyncCareLogsDto } from './dto/sync-care-logs.dto';
 import { AuthClientService } from '../clients/auth-client.service';
 import { settledValue } from '../clients/settled.util';
+
+// Cột không được phép sửa sau khi đã tạo (đóng dấu)
+const IMMUTABLE_FIELDS = ['action', 'performedAt', 'farmId'] as const;
 
 const CONFLICT_WINDOW_MS =
   parseInt(process.env.CARE_LOG_CONFLICT_WINDOW_SECONDS ?? '60', 10) * 1000;
@@ -35,11 +40,14 @@ export class CareLogsService {
     private readonly careLogRepo: Repository<CareLogEntity>,
     @InjectRepository(EvidenceEntity)
     private readonly evidenceRepo: Repository<EvidenceEntity>,
+    @InjectRepository(CareAuditLogEntity)
+    private readonly auditRepo: Repository<CareAuditLogEntity>,
     @InjectRepository(FarmEntity)
     private readonly farmRepo: Repository<FarmEntity>,
     @InjectRepository(StandardStepEntity)
     private readonly stepRepo: Repository<StandardStepEntity>,
     private readonly authClient: AuthClientService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async listCareLogs(
@@ -102,6 +110,15 @@ export class CareLogsService {
     });
 
     const saved = await this.careLogRepo.save(entity);
+    await this.auditRepo.save(
+      this.auditRepo.create({
+        careLogId: saved.id,
+        action: 'CREATE',
+        changedBy: userId,
+        oldValues: null,
+        newValues: { action: saved.action, performedAt: saved.performedAt, farmId: saved.farmId },
+      }),
+    );
     const withEvidence = await this.careLogRepo.findOne({
       where: { id: saved.id },
       relations: ['evidences'],
@@ -217,6 +234,63 @@ export class CareLogsService {
   }
 
   /**
+   * Cập nhật nhật ký chăm sóc. Chỉ cho phép sửa `notes`.
+   * Các cột đóng dấu (action, performedAt, farmId) sẽ trả 409 nếu cố sửa.
+   */
+  async updateCareLog(
+    farmId: string,
+    careLogId: string,
+    updates: { notes?: string },
+    userId: string,
+  ): Promise<CareLogDto> {
+    await this.requireFarmOwner(farmId, userId);
+
+    const log = await this.careLogRepo.findOne({ where: { id: careLogId, farmId }, relations: ['evidences', 'standardStep'] });
+    if (!log) throw new NotFoundException('Nhật ký chăm sóc không tồn tại hoặc không thuộc vườn này');
+
+    // Attempt to set any immutable field → 409
+    const attempted = (Object.keys(updates) as string[]).filter((k) =>
+      (IMMUTABLE_FIELDS as readonly string[]).includes(k),
+    );
+    if (attempted.length > 0) {
+      throw new ConflictException(
+        `Không thể sửa trường đóng dấu: ${attempted.join(', ')}`,
+      );
+    }
+
+    const oldValues = { notes: log.notes };
+    log.notes = updates.notes !== undefined ? (updates.notes ?? null) : log.notes;
+
+    const qr = this.dataSource.createQueryRunner();
+    await qr.connect();
+    await qr.startTransaction();
+    try {
+      const saved = await qr.manager.save(CareLogEntity, log);
+      await qr.manager.save(
+        CareAuditLogEntity,
+        this.auditRepo.create({
+          careLogId: saved.id,
+          action: 'UPDATE',
+          changedBy: userId,
+          oldValues,
+          newValues: { notes: saved.notes },
+        }),
+      );
+      await qr.commitTransaction();
+      const withRelations = await this.careLogRepo.findOne({
+        where: { id: saved.id },
+        relations: ['evidences', 'standardStep'],
+      });
+      return this.toDto(withRelations!);
+    } catch (err) {
+      await qr.rollbackTransaction();
+      throw err;
+    } finally {
+      await qr.release();
+    }
+  }
+
+  /**
    * Phát hiện deviation dựa trên progression — bước kế tiếp chưa hoàn thành trong sequence.
    * Nếu farm không có standard hoặc không truyền standardStepId → false.
    */
@@ -249,6 +323,26 @@ export class CareLogsService {
     );
 
     return isDeviation(steps, completedStepIds, standardStepId);
+  }
+
+  /** Trả về set care_log_id đã từng bị UPDATE (dùng bởi TraceabilityService). */
+  async getEditedLogIds(farmId: string): Promise<Set<string>> {
+    const logs = await this.careLogRepo.find({
+      where: { farmId },
+      select: ['id'],
+    });
+    const logIds = logs.map((l) => l.id);
+    if (logIds.length === 0) return new Set();
+
+    const edited = await this.auditRepo
+      .createQueryBuilder('a')
+      .select('a.care_log_id', 'careLogId')
+      .where('a.care_log_id IN (:...ids)', { ids: logIds })
+      .andWhere("a.action = 'UPDATE'")
+      .distinct(true)
+      .getRawMany<{ careLogId: string }>();
+
+    return new Set(edited.map((r) => r.careLogId));
   }
 
   private async requireFarm(farmId: string): Promise<FarmEntity> {

@@ -7,7 +7,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Page, Text, Spinner, useNavigate } from 'zmp-ui';
-import { useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { Icon } from '@/design-system/components/Icon';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
@@ -21,6 +21,8 @@ import {
   type NotificationDto,
 } from '@/services/notificationService';
 import { notificationUnreadCountAtom } from '@/state/notificationBadgeAtom';
+import { currentRoleAtom } from '@/state/authAtoms';
+import { RoleBottomNav } from '@/navigation/RoleBottomNav';
 
 const SEVERITY_COLOR: Record<NonNullable<NotificationDto['severity']>, string> = {
   info: colors.primary.zaloBlue,
@@ -53,6 +55,7 @@ export const NotificationsScreen: React.FC = () => {
   const openSnackbar = useStableOpenSnackbar();
   const navigate = useNavigate();
   const setUnread = useSetAtom(notificationUnreadCountAtom);
+  const role = useAtomValue(currentRoleAtom);
 
   const [items, setItems] = useState<NotificationDto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -231,6 +234,24 @@ export const NotificationsScreen: React.FC = () => {
           );
         })}
       </div>
+
+      {/* Bottom nav — screen nằm ngoài RoleAppShell nên tự render nav theo role hiện tại */}
+      {role && role !== 'guest' && (
+        <div
+          style={{
+            position: 'fixed',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 1000,
+            backgroundColor: colors.background.primary,
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+            borderTop: `1px solid ${colors.background.secondary}`,
+          }}
+        >
+          <RoleBottomNav role={role} />
+        </div>
+      )}
     </Page>
   );
 };
