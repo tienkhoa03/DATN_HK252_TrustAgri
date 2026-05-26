@@ -5,7 +5,7 @@ import type { NextFunction, Request, Response } from 'express';
  * Gán correlation id: ưu tiên header X-Request-Id (Gateway/nginx), sinh UUID nếu thiếu.
  */
 export function requestIdMiddleware(
-  req: Request,
+  req: Request & { requestId?: string },
   res: Response,
   next: NextFunction,
 ): void {

@@ -330,10 +330,39 @@ export class UpdateStandardDto {
 // ─── TRACEABILITY ──────────────────────────────────────────────────────────────
 
 /**
+ * Khối thông tin contract trong response truy xuất (chỉ có khi QR sinh từ farmer_trader contract).
+ * `sourceContractId` xuất hiện khi QR ban đầu thuộc trader_buyer contract → đã resolve về farmer_trader gốc.
+ */
+export interface TraceabilityContractDto {
+  id: string;
+  contractType: 'farmer_trader' | 'trader_buyer';
+  status: string;
+  productName?: string | null;
+  quantity: number;
+  unit: string;
+  startDate: string;
+  endDate: string;
+  plantingDate?: string | null;
+  signedAt?: string | null;
+  sourceContractId?: string | null;
+}
+
+/** Khối bên tham gia (farmer/trader/buyer) — chỉ tên hiển thị + phone đã denorm tại contract. */
+export interface TraceabilityPartyDto {
+  name?: string | null;
+  phone?: string | null;
+}
+
+/**
  * Truy xuất nguồn gốc QR (design.md §4.3 TraceabilityDto) — public endpoint
+ * QR ưu tiên gắn theo contract (TRC-…); fallback gắn theo farm (TR-…) cho dữ liệu cũ.
  */
 export interface TraceabilityDto {
   productCode: string;
+  contract?: TraceabilityContractDto;
+  farmer?: TraceabilityPartyDto;
+  trader?: TraceabilityPartyDto;
+  buyer?: TraceabilityPartyDto;
   farm: Pick<FarmDto, 'id' | 'name' | 'location' | 'cropType'>;
   standard?: Pick<StandardDto, 'code' | 'name'>;
   careLogTimeline: Array<Pick<CareLogDto, 'action' | 'performedAt' | 'notes' | 'standardStepTitle'>>;

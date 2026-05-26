@@ -32,6 +32,7 @@ import {
 } from '@/services/contractChangeRequestService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { contractFarmDisplay, partyBuyerDisplay, partyFarmerDisplay } from '@/utils/displayLabels';
+import { QRCode } from '@/design-system/components/QRCode';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
@@ -449,6 +450,37 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
             }).format(contract.totalPrice)}
           />
         </div>
+
+        {/* Mã QR truy xuất nguồn gốc — chỉ hợp đồng farmer_trader đã active mới có */}
+        {contract.traceabilityCode && (
+          <div
+            style={{
+              backgroundColor: colors.background.primary,
+              border: `1px solid ${colors.background.secondary}`,
+              borderRadius: '10px',
+              padding: spacing.md,
+              marginBottom: spacing.md,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: spacing.sm,
+            }}
+          >
+            <Text style={{ fontSize: fontSize.body, fontWeight: fontWeight.semibold, color: colors.text.primary, margin: 0 }}>
+              📜 Mã QR truy xuất nguồn gốc
+            </Text>
+            <Text size="xSmall" style={{ color: colors.text.secondary, textAlign: 'center', margin: 0 }}>
+              In lên bao bì sản phẩm. Mọi người có thể quét để xem nông dân, vườn, quy trình canh tác và nhật ký theo đúng phạm vi hợp đồng này.
+            </Text>
+            <QRCode
+              value={`${window.location.origin}/guest/trace/${contract.traceabilityCode}`}
+              size={140}
+            />
+            <Text size="xSmall" style={{ color: colors.text.secondary, fontFamily: 'monospace', margin: 0 }}>
+              {contract.traceabilityCode}
+            </Text>
+          </div>
+        )}
 
         {/* Sign / Reject actions */}
         {showSignButton && (

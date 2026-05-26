@@ -45,8 +45,31 @@ export interface TraceabilitySensorChartSeriesDto {
   series: TraceabilitySensorChartPointDto[];
 }
 
+export interface TraceabilityContractDto {
+  id: string;
+  contractType: 'farmer_trader' | 'trader_buyer';
+  status: string;
+  productName?: string | null;
+  quantity: number;
+  unit: string;
+  startDate: string;
+  endDate: string;
+  plantingDate?: string | null;
+  signedAt?: string | null;
+  sourceContractId?: string | null;
+}
+
+export interface TraceabilityPartyDto {
+  name?: string | null;
+  phone?: string | null;
+}
+
 export interface TraceabilityDto {
   productCode: string;
+  contract?: TraceabilityContractDto;
+  farmer?: TraceabilityPartyDto;
+  trader?: TraceabilityPartyDto;
+  buyer?: TraceabilityPartyDto;
   farm: TraceabilityFarmDto;
   standard?: TraceabilityStandardDto;
   careLogTimeline: TraceabilityCareLogTimelineItemDto[];
@@ -135,6 +158,42 @@ function mapSensorSeries(raw: unknown): TraceabilitySensorChartSeriesDto | null 
   return { sensorType, series };
 }
 
+function mapContract(raw: unknown): TraceabilityContractDto | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const o = raw as Record<string, unknown>;
+  const id = val<string>(o, 'id', 'id');
+  const contractType = val<'farmer_trader' | 'trader_buyer'>(o, 'contractType', 'contract_type');
+  const status = val<string>(o, 'status', 'status');
+  const unit = val<string>(o, 'unit', 'unit');
+  const startDate = val<string>(o, 'startDate', 'start_date');
+  const endDate = val<string>(o, 'endDate', 'end_date');
+  const quantityRaw = val<number | string>(o, 'quantity', 'quantity');
+  if (!id || !contractType || !status || !unit || !startDate || !endDate) return undefined;
+  const quantity = typeof quantityRaw === 'number' ? quantityRaw : Number(quantityRaw ?? 0);
+  return {
+    id,
+    contractType,
+    status,
+    unit,
+    startDate,
+    endDate,
+    quantity,
+    productName: val<string | null>(o, 'productName', 'product_name') ?? null,
+    plantingDate: val<string | null>(o, 'plantingDate', 'planting_date') ?? null,
+    signedAt: val<string | null>(o, 'signedAt', 'signed_at') ?? null,
+    sourceContractId: val<string | null>(o, 'sourceContractId', 'source_contract_id') ?? null,
+  };
+}
+
+function mapParty(raw: unknown): TraceabilityPartyDto | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const o = raw as Record<string, unknown>;
+  const name = val<string | null>(o, 'name', 'name') ?? null;
+  const phone = val<string | null>(o, 'phone', 'phone') ?? null;
+  if (!name && !phone) return undefined;
+  return { name, phone };
+}
+
 export function mapTraceabilityDto(raw: unknown): TraceabilityDto {
   if (!raw || typeof raw !== 'object') {
     throw new ApiError('INVALID_INPUT', 'Phản hồi truy xuất không hợp lệ.', 500);
@@ -146,6 +205,10 @@ export function mapTraceabilityDto(raw: unknown): TraceabilityDto {
   }
   const farm = mapFarm(o.farm ?? o['farm']);
   const standard = mapStandard(o.standard ?? o['standard']);
+  const contract = mapContract(o.contract);
+  const farmer = mapParty(o.farmer);
+  const trader = mapParty(o.trader);
+  const buyer = mapParty(o.buyer);
   const careRaw = val<unknown[]>(o, 'careLogTimeline', 'care_log_timeline') ?? [];
   const careLogTimeline = Array.isArray(careRaw)
     ? (careRaw.map(mapCareItem).filter(Boolean) as TraceabilityCareLogTimelineItemDto[])
@@ -156,6 +219,10 @@ export function mapTraceabilityDto(raw: unknown): TraceabilityDto {
     : [];
   return {
     productCode,
+    contract,
+    farmer,
+    trader,
+    buyer,
     farm,
     standard,
     careLogTimeline,

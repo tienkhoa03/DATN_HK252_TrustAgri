@@ -19,7 +19,7 @@ export class AuditWriteInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const ctx = context.switchToHttp();
-    const req = ctx.getRequest<Request>();
+    const req = ctx.getRequest<Request & { requestId?: string; user?: unknown }>();
 
     if (!WRITE_METHODS.has(req.method)) {
       return next.handle();

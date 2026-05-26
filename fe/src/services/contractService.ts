@@ -53,6 +53,8 @@ export interface ContractDto {
   farmerSignedAt?: string;
   traderSignedAt?: string;
   buyerSignedAt?: string;
+  /** Mã QR truy xuất công khai (chỉ có ở farmer_trader contract đã active). Format `TRC-…`. */
+  traceabilityCode?: string | null;
   createdAt: string;
   updatedAt?: string;
 }
@@ -169,6 +171,10 @@ function normalizeContract(raw: ContractDto): ContractDto {
     quantity: Number(raw.quantity),
     totalPrice: Number(raw.totalPrice),
     deposit: raw.deposit != null ? Number(raw.deposit) : undefined,
+    traceabilityCode:
+      raw.traceabilityCode ??
+      (typeof r.traceability_code === 'string' ? r.traceability_code : null) ??
+      null,
   };
 }
 

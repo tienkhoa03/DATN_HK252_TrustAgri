@@ -155,6 +155,14 @@ export class ContractEntity {
   @Column({ name: 'source_contract_id', nullable: true, type: 'uuid' })
   sourceContractId: string | null;
 
+  /**
+   * Mã QR truy xuất công khai (duy nhất) — sinh khi farmer_trader contract chuyển sang 'active'.
+   * Định dạng: `TRC-<12 hex chars>` để phân biệt với mã farm (`TR-…`).
+   */
+  @Index('idx_contracts_traceability_code', { unique: true, where: 'traceability_code IS NOT NULL' })
+  @Column({ name: 'traceability_code', type: 'varchar', nullable: true, length: 32 })
+  traceabilityCode: string | null;
+
   /** Nông dân đã ký (farmer_trader contracts). */
   @Column({ name: 'farmer_signed_at', type: 'timestamptz', nullable: true })
   farmerSignedAt: Date | null;

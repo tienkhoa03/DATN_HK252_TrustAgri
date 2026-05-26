@@ -6,6 +6,7 @@ import {
   ConflictException,
   Logger,
   Optional,
+  OnApplicationBootstrap,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -31,8 +32,19 @@ import type { UserDenormSnapshot } from '@trustagri/shared';
 import { ContractEventPublisherService } from '../contract-change-requests/services/contract-event-publisher.service';
 
 @Injectable()
-export class ContractsService {
+export class ContractsService implements OnApplicationBootstrap {
   private readonly logger = new Logger(ContractsService.name);
+
+  async onApplicationBootstrap(): Promise<void> {
+    // Backfill mã trace cho contracts cũ — non-blocking, log lỗi nhưng không crash boot.
+    try {
+      await this.backfillTraceabilityCodes();
+    } catch (err) {
+      this.logger.warn(
+        `backfillTraceabilityCodes failed: ${(err as Error).message}`,
+      );
+    }
+  }
 
   constructor(
     @InjectRepository(ContractEntity)
@@ -496,6 +508,49 @@ export class ContractsService {
     }
   }
 
+  /** Sinh mã trace cho farmer_trader contract: `TRC-<12 hex từ contract id>` (phân biệt với farm `TR-…`). */
+  private buildContractTraceCode(contractId: string): string {
+    return `TRC-${contractId.replace(/-/g, '').slice(0, 12)}`;
+  }
+
+  /**
+   * Lookup contract theo mã traceability (public-trace) — dùng cho internal call từ farm-service.
+   * Trả về raw entity (đã denorm), KHÔNG check JWT (đã được internal-secret guard ở controller).
+   */
+  async findByTraceabilityCode(code: string): Promise<ContractEntity | null> {
+    return this.contractRepo.findOne({
+      where: { traceabilityCode: code },
+      withDeleted: true,
+    });
+  }
+
+  async findById(id: string): Promise<ContractEntity | null> {
+    return this.contractRepo.findOne({ where: { id }, withDeleted: true });
+  }
+
+  /**
+   * Backfill mã trace cho các farmer_trader contract đã active nhưng chưa có code
+   * (vd: ký trước khi triển khai tính năng). Chạy idempotent ở bootstrap.
+   */
+  async backfillTraceabilityCodes(): Promise<number> {
+    const missing = await this.contractRepo
+      .createQueryBuilder('c')
+      .select(['c.id'])
+      .where('c.contract_type = :t', { t: 'farmer_trader' })
+      .andWhere('c.traceability_code IS NULL')
+      .andWhere(`c.status IN ('active', 'pending_change', 'in_settlement', 'completed')`)
+      .getMany();
+    if (missing.length === 0) return 0;
+    for (const c of missing) {
+      await this.contractRepo.update(
+        { id: c.id },
+        { traceabilityCode: this.buildContractTraceCode(c.id) },
+      );
+    }
+    this.logger.log(`Backfilled traceability_code cho ${missing.length} farmer_trader contracts`);
+    return missing.length;
+  }
+
   private validateCreateParties(dto: CreateContractDto): void {
     if (dto.contractType === 'farmer_trader') {
       if (!dto.partyFarmerId) {
@@ -586,6 +641,10 @@ export class ContractsService {
         await this.assertFarmHasNoOngoingContract(entity.farmId, entity.id);
       }
       entity.status = 'active';
+      // Sinh mã QR truy xuất công khai cho farmer_trader contract khi vừa active
+      if (entity.contractType === 'farmer_trader' && !entity.traceabilityCode) {
+        entity.traceabilityCode = this.buildContractTraceCode(entity.id);
+      }
     }
 
     const saved = await this.contractRepo.save(entity);
@@ -755,6 +814,7 @@ export class ContractsService {
       createdAt: entity.createdAt.toISOString(),
       updatedAt: entity.updatedAt.toISOString(),
       sourceContractId: entity.sourceContractId ?? undefined,
+      traceabilityCode: entity.traceabilityCode ?? null,
     };
   }
 }

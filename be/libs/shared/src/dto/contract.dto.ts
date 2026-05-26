@@ -276,6 +276,11 @@ export interface ContractDto {
   traderSignedAt?: string;
   /** ISO timestamp — người mua đã ký (trader_buyer contracts). */
   buyerSignedAt?: string;
+  /**
+   * Mã QR truy xuất nguồn gốc sản phẩm (chỉ có ở farmer_trader contract đã active).
+   * Format: `TRC-<12 hex>` — public, dùng để build link `/guest/trace/:code`.
+   */
+  traceabilityCode?: string | null;
   createdAt: string;
   updatedAt: string;
 }

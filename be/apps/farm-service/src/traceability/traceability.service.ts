@@ -5,8 +5,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import {
+  ContractDto,
   TraceabilityDto,
   resolveServiceUrl,
   SERVICE_URL_KEYS,
@@ -14,6 +15,7 @@ import {
 import { FarmEntity } from '../farms/entities/farm.entity';
 import { CareLogEntity } from '../care-logs/entities/care-log.entity';
 import { StandardEntity } from '../standards/entities/standard.entity';
+import { ContractClientService } from '../clients/contract-client.service';
 
 @Injectable()
 export class TraceabilityService {
@@ -27,9 +29,129 @@ export class TraceabilityService {
     @InjectRepository(StandardEntity)
     private readonly standardRepo: Repository<StandardEntity>,
     private readonly configService: ConfigService,
+    private readonly contractClient: ContractClientService,
   ) {}
 
+  /**
+   * Tra cứu thông tin truy xuất theo mã QR công khai.
+   * - Mã `TRC-…` → contract-based: lấy contract, farm, parties, care-logs theo phạm vi hợp đồng.
+   * - Mã `TR-…` hoặc UUID → farm-based (fallback cho dữ liệu cũ): lấy farm + toàn bộ care-logs.
+   */
   async getByQrCode(code: string): Promise<TraceabilityDto> {
+    // Ưu tiên contract code (prefix TRC- hoặc bất kỳ code nào contract-service biết)
+    if (this.looksLikeContractCode(code)) {
+      const contract = await this.contractClient.getByTraceCode(code);
+      if (contract) {
+        return this.buildContractTrace(code, contract);
+      }
+    }
+    return this.buildFarmTrace(code);
+  }
+
+  // ─── Contract-based trace ──────────────────────────────────────────────
+
+  private async buildContractTrace(
+    code: string,
+    contract: ContractDto,
+  ): Promise<TraceabilityDto> {
+    if (!contract.farmId) {
+      // Trade contract không gắn farm — không đủ dữ liệu trace
+      throw new NotFoundException(
+        'Hợp đồng không có vườn liên kết — không thể truy xuất',
+      );
+    }
+
+    const farm = await this.farmRepo.findOne({
+      where: { id: contract.farmId },
+      withDeleted: true,
+    });
+    if (!farm) {
+      throw new NotFoundException('Vườn của hợp đồng không tồn tại');
+    }
+
+    // Standard: ưu tiên contract.standardId, fallback farm.standardId
+    const standardId = contract.standardId ?? farm.standardId ?? null;
+    let standard: TraceabilityDto['standard'];
+    if (standardId) {
+      const std = await this.standardRepo.findOne({ where: { id: standardId } });
+      if (std) standard = { code: std.code, name: std.name };
+    }
+
+    // Care logs trong khoảng hợp đồng: từ plantingDate (hoặc startDate) đến endDate.
+    const from = new Date(contract.plantingDate ?? contract.startDate);
+    const to = new Date(contract.endDate);
+    // Bao gồm cả ngày cuối — cộng 1 ngày
+    to.setDate(to.getDate() + 1);
+
+    const logs = await this.careLogRepo.find({
+      where: {
+        farmId: farm.id,
+        performedAt: Between(from, to),
+      },
+      relations: ['standardStep'],
+      order: { performedAt: 'ASC' },
+      take: 500,
+    });
+
+    const careLogTimeline = logs.map((l) => ({
+      action: l.action,
+      standardStepTitle: l.standardStep?.title ?? undefined,
+      performedAt: l.performedAt.toISOString(),
+      notes: l.notes ?? undefined,
+    }));
+
+    const sensorChart = await this.fetchSensorChart(
+      farm.id,
+      from.toISOString(),
+      to.toISOString(),
+    );
+
+    return {
+      productCode: code,
+      contract: {
+        id: contract.id,
+        contractType: contract.contractType,
+        status: contract.status,
+        productName: contract.farmName ?? null,
+        quantity: contract.quantity,
+        unit: contract.unit,
+        startDate: contract.startDate,
+        endDate: contract.endDate,
+        plantingDate: contract.plantingDate ?? null,
+        signedAt:
+          contract.farmerSignedAt ?? contract.traderSignedAt ?? null,
+        sourceContractId: contract.sourceContractId ?? null,
+      },
+      farmer: {
+        name: contract.partyFarmerName ?? null,
+        phone: contract.partyFarmerPhone ?? null,
+      },
+      trader: {
+        name: contract.partyTraderName ?? null,
+        phone: contract.partyTraderPhone ?? null,
+      },
+      buyer:
+        contract.partyBuyerName || contract.partyBuyerPhone
+          ? {
+              name: contract.partyBuyerName ?? null,
+              phone: contract.partyBuyerPhone ?? null,
+            }
+          : undefined,
+      farm: {
+        id: farm.id,
+        name: farm.name,
+        location: farm.location,
+        cropType: farm.cropType,
+      },
+      standard,
+      careLogTimeline,
+      sensorChart,
+    };
+  }
+
+  // ─── Farm-based trace (legacy fallback) ────────────────────────────────
+
+  private async buildFarmTrace(code: string): Promise<TraceabilityDto> {
     const farm = await this.findFarmByCode(code);
     await this.ensureTraceabilityCodePersisted(farm);
 
@@ -73,6 +195,10 @@ export class TraceabilityService {
     };
   }
 
+  private looksLikeContractCode(code: string): boolean {
+    return /^TRC-/i.test(code);
+  }
+
   private async findFarmByCode(code: string): Promise<FarmEntity> {
     const UUID_RE =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -107,13 +233,17 @@ export class TraceabilityService {
 
   private async fetchSensorChart(
     farmId: string,
+    fromIso?: string,
+    toIso?: string,
   ): Promise<TraceabilityDto['sensorChart']> {
     const base = resolveServiceUrl(
       this.configService.get<string>(SERVICE_URL_KEYS.MONITORING),
       SERVICE_URL_KEYS.MONITORING,
     );
-    const to = new Date();
-    const from = new Date(to.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const to = toIso ? new Date(toIso) : new Date();
+    const from = fromIso
+      ? new Date(fromIso)
+      : new Date(to.getTime() - 7 * 24 * 60 * 60 * 1000);
     const q = new URLSearchParams({
       from: from.toISOString(),
       to: to.toISOString(),

@@ -76,7 +76,12 @@ function mockAuthClient() {
 }
 
 function mockFarmClient() {
-  return { listFarmsByIds: jest.fn() } as unknown as import('../clients/farm-client.service').FarmClientService;
+  return {
+    listFarmsByIds: jest.fn(),
+    applyStandardToFarm: jest.fn().mockResolvedValue(undefined),
+    setPlantingDate: jest.fn().mockResolvedValue(undefined),
+    setCurrentContract: jest.fn().mockResolvedValue(undefined),
+  } as unknown as import('../clients/farm-client.service').FarmClientService;
 }
 
 function makeService() {
@@ -156,6 +161,12 @@ describe('ContractsService.sign', () => {
     });
     contractRepo.findOne.mockResolvedValue(signedFarmer);
     contractRepo.save.mockImplementation(async (e: ContractEntity) => ({ ...e }));
+    // Stub assertFarmHasNoOngoingContract's query builder chain
+    (contractRepo.createQueryBuilder as jest.Mock).mockReturnValue({
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getCount: jest.fn().mockResolvedValue(0),
+    });
 
     const dto = await service.sign('contract-uuid-1', { sub: 'trader-1', role: 'trader' });
 

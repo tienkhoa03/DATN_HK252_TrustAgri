@@ -5,6 +5,7 @@ import { ContractEntity } from './entities/contract.entity';
 import { ContractAuditLogEntity } from './entities/contract-audit-log.entity';
 import { ContractsService } from './contracts.service';
 import { ContractsController } from './contracts.controller';
+import { ContractsInternalController } from './contracts-internal.controller';
 import { ContractAuditService } from './contract-audit.service';
 import { ComplianceService } from './compliance.service';
 import { ConnectionsModule } from '../connections/connections.module';
@@ -16,7 +17,7 @@ import { ContractEventPublisherService } from '../contract-change-requests/servi
     TypeOrmModule.forFeature([ContractEntity, ContractAuditLogEntity]),
     ConnectionsModule,
   ],
-  controllers: [ContractsController],
+  controllers: [ContractsController, ContractsInternalController],
   providers: [
     ContractsService,
     ContractAuditService,

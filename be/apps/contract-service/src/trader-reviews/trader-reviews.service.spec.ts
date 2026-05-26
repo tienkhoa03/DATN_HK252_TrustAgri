@@ -3,6 +3,7 @@ import { DataSource, Repository } from 'typeorm';
 import { TraderReviewsService } from './trader-reviews.service';
 import { TraderReviewEntity } from './entities/trader-review.entity';
 import { OrderEntity } from '../orders/entities/order.entity';
+import { AuthClientService } from '../clients/auth-client.service';
 
 const mockReviewRepo = () =>
   ({
@@ -21,12 +22,18 @@ const mockDataSource = () =>
     query: jest.fn(),
   }) as unknown as jest.Mocked<DataSource>;
 
+const mockAuthClient = () =>
+  ({
+    getUserSnapshot: jest.fn().mockResolvedValue(null),
+  }) as unknown as jest.Mocked<AuthClientService>;
+
 function makeService() {
   const reviewRepo = mockReviewRepo();
   const orderRepo = mockOrderRepo();
   const dataSource = mockDataSource();
-  const service = new TraderReviewsService(reviewRepo, orderRepo, dataSource);
-  return { service, reviewRepo, orderRepo, dataSource };
+  const authClient = mockAuthClient();
+  const service = new TraderReviewsService(reviewRepo, orderRepo, dataSource, authClient);
+  return { service, reviewRepo, orderRepo, dataSource, authClient };
 }
 
 const BUYER_ID = 'buyer-uuid-001';

@@ -2,6 +2,8 @@ import { Repository } from 'typeorm';
 import { AlertsService } from './alerts.service';
 import { AlertEntity } from './alert.entity';
 import { AlertPublisherService } from './services/alert-publisher.service';
+import { FarmClientService } from '../clients/farm-client.service';
+import { AuthClientService } from '../clients/auth-client.service';
 import type { SensorReadingDto } from '@trustagri/shared';
 
 function mockRepo() {
@@ -19,6 +21,19 @@ function mockPublisher() {
   } as unknown as jest.Mocked<Pick<AlertPublisherService, 'publishAlertCreated'>>;
 }
 
+function mockFarmClient() {
+  return {
+    getFarmSnapshot: jest.fn().mockResolvedValue(null),
+    getFarmName: jest.fn().mockResolvedValue(null),
+  } as unknown as jest.Mocked<FarmClientService>;
+}
+
+function mockAuthClient() {
+  return {
+    getUserSnapshot: jest.fn().mockResolvedValue(null),
+  } as unknown as jest.Mocked<AuthClientService>;
+}
+
 function reading(overrides: Partial<SensorReadingDto>): SensorReadingDto {
   return {
     farmId: 'farm-1',
@@ -34,7 +49,12 @@ describe('AlertsService', () => {
     it('no-op when sensor type has no threshold config', async () => {
       const alertRepo = mockRepo();
       const publisher = mockPublisher();
-      const svc = new AlertsService(alertRepo, publisher as unknown as AlertPublisherService);
+      const svc = new AlertsService(
+        alertRepo,
+        publisher as unknown as AlertPublisherService,
+        mockFarmClient(),
+        mockAuthClient(),
+      );
 
       await svc.checkAndCreateAlert({
         ...reading({ sensorType: 'temperature' }),
@@ -49,7 +69,12 @@ describe('AlertsService', () => {
     it('no-op when value inside safe band', async () => {
       const alertRepo = mockRepo();
       const publisher = mockPublisher();
-      const svc = new AlertsService(alertRepo, publisher as unknown as AlertPublisherService);
+      const svc = new AlertsService(
+        alertRepo,
+        publisher as unknown as AlertPublisherService,
+        mockFarmClient(),
+        mockAuthClient(),
+      );
 
       await svc.checkAndCreateAlert(reading({ sensorType: 'temperature', value: 22 }));
 
@@ -66,7 +91,12 @@ describe('AlertsService', () => {
         createdAt: new Date(),
       }));
       const publisher = mockPublisher();
-      const svc = new AlertsService(alertRepo, publisher as unknown as AlertPublisherService);
+      const svc = new AlertsService(
+        alertRepo,
+        publisher as unknown as AlertPublisherService,
+        mockFarmClient(),
+        mockAuthClient(),
+      );
 
       await svc.checkAndCreateAlert(reading({ sensorType: 'temperature', value: 41 }));
 
@@ -89,7 +119,12 @@ describe('AlertsService', () => {
       const alertRepo = mockRepo();
       alertRepo.findOne.mockResolvedValue({ id: 'existing' } as AlertEntity);
       const publisher = mockPublisher();
-      const svc = new AlertsService(alertRepo, publisher as unknown as AlertPublisherService);
+      const svc = new AlertsService(
+        alertRepo,
+        publisher as unknown as AlertPublisherService,
+        mockFarmClient(),
+        mockAuthClient(),
+      );
 
       await svc.checkAndCreateAlert(reading({ sensorType: 'humidity', value: 95 }));
 
@@ -103,7 +138,12 @@ describe('AlertsService', () => {
       const alertRepo = mockRepo();
       alertRepo.findOne.mockResolvedValue(null);
       const publisher = mockPublisher();
-      const svc = new AlertsService(alertRepo, publisher as unknown as AlertPublisherService);
+      const svc = new AlertsService(
+        alertRepo,
+        publisher as unknown as AlertPublisherService,
+        mockFarmClient(),
+        mockAuthClient(),
+      );
 
       await expect(svc.acknowledgeAlert('missing', 'user-1')).rejects.toThrow('Cảnh báo không tồn tại');
     });
@@ -118,7 +158,12 @@ describe('AlertsService', () => {
       alertRepo.findOne.mockResolvedValue(entity);
       alertRepo.save.mockImplementation(async (e: AlertEntity) => e);
       const publisher = mockPublisher();
-      const svc = new AlertsService(alertRepo, publisher as unknown as AlertPublisherService);
+      const svc = new AlertsService(
+        alertRepo,
+        publisher as unknown as AlertPublisherService,
+        mockFarmClient(),
+        mockAuthClient(),
+      );
 
       const res = await svc.acknowledgeAlert('a1', 'user-1');
 

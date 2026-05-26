@@ -3,6 +3,7 @@ import { Repository } from 'typeorm';
 import { StandardsService } from './standards.service';
 import { StandardEntity } from './entities/standard.entity';
 import { StandardStepEntity } from './entities/standard-step.entity';
+import { AuthClientService } from '../clients/auth-client.service';
 
 function mockStandardRepo() {
   return {
@@ -20,13 +21,19 @@ function mockStepRepo() {
   } as unknown as jest.Mocked<Repository<StandardStepEntity>>;
 }
 
+function mockAuthClient() {
+  return {
+    getUserSnapshot: jest.fn().mockResolvedValue(null),
+  } as unknown as jest.Mocked<AuthClientService>;
+}
+
 describe('StandardsService', () => {
   describe('findOne', () => {
     it('throws NotFoundException when standard does not exist', async () => {
       const standardRepo = mockStandardRepo();
       standardRepo.findOne.mockResolvedValue(null);
       const stepRepo = mockStepRepo();
-      const svc = new StandardsService(standardRepo, stepRepo);
+      const svc = new StandardsService(standardRepo, stepRepo, mockAuthClient());
 
       await expect(svc.findOne('missing-id')).rejects.toBeInstanceOf(NotFoundException);
     });
@@ -68,7 +75,7 @@ describe('StandardsService', () => {
       } as StandardEntity;
       standardRepo.findOne.mockResolvedValue(entity);
       const stepRepo = mockStepRepo();
-      const svc = new StandardsService(standardRepo, stepRepo);
+      const svc = new StandardsService(standardRepo, stepRepo, mockAuthClient());
 
       const dto = await svc.findOne('std-1');
 
