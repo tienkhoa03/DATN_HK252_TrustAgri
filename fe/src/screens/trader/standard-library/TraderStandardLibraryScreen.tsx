@@ -278,7 +278,8 @@ export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inT
 
     content: {
       padding: spacing.md,
-      paddingBottom: spacing.xl,
+      // 80px = ~56px tabbar + 24px breathing room để tránh bị che bởi bottom navbar
+      paddingBottom: '80px',
     } as React.CSSProperties,
 
     card: {
@@ -803,7 +804,7 @@ export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inT
     </>
   );
 
-  if (inTab) return <div style={{ flex: 1, overflowY: 'auto' }}>{content}</div>;
+  if (inTab) return <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>{content}</div>;
   return <Page className="trader-standard-library-screen">{content}</Page>;
 };
 

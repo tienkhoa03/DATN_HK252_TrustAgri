@@ -118,7 +118,7 @@ influx config create \
 # 3. Ghi 1 điểm dữ liệu (Line Protocol)
 influx write --bucket sensor_data \
   --precision s \
-  "sensor_reading,farmId=<FARM_ID>,sensorType=temperature,isImputed=false value=28.5"
+  "sensor_reading,farmId=1be8074d-7c15-4d5d-8368-32830d0663ca,sensorType=soil_moisture,isImputed=false value=48.5"
 
 # 4. Ghi batch nhiều điểm
 influx write --bucket sensor_data --precision s @/path/to/lp.txt
@@ -126,11 +126,11 @@ influx write --bucket sensor_data --precision s @/path/to/lp.txt
 
 Trong đó `lp.txt`:
 ```
-sensor_reading,farmId=<FARM_ID>,sensorType=temperature,isImputed=false value=26.3
-sensor_reading,farmId=<FARM_ID>,sensorType=temperature,isImputed=false value=27.1 1715000000
-sensor_reading,farmId=<FARM_ID>,sensorType=humidity,isImputed=false value=72
-sensor_reading,farmId=<FARM_ID>,sensorType=light,isImputed=false value=8200
-sensor_reading,farmId=<FARM_ID>,sensorType=soil_moisture,isImputed=false value=48.5
+sensor_reading,farmId=1be8074d-7c15-4d5d-8368-32830d0663ca,sensorType=temperature,isImputed=false value=26.3
+sensor_reading,farmId=1be8074d-7c15-4d5d-8368-32830d0663ca,sensorType=temperature,isImputed=false value=27.1 1715000000
+sensor_reading,farmId=1be8074d-7c15-4d5d-8368-32830d0663ca,sensorType=humidity,isImputed=false value=72
+sensor_reading,farmId=1be8074d-7c15-4d5d-8368-32830d0663ca,sensorType=light,isImputed=false value=8200
+sensor_reading,farmId=1be8074d-7c15-4d5d-8368-32830d0663ca,sensorType=soil_moisture,isImputed=false value=48.5
 ```
 
 ---
@@ -199,7 +199,7 @@ Hoặc trong UI Mini App: bấm vào card vườn → URL có dạng `/farmer/ga
 docker exec trustagri-influxdb influx query \
   --org trustagri \
   --token trustagri-influx-token \
-  'from(bucket: "sensor_data") |> range(start: -24h) |> filter(fn: (r) => r._measurement == "sensor_reading" and r.farmId == "<FARM_ID>") |> last()'
+  'from(bucket: "sensor_data") |> range(start: -24h) |> filter(fn: (r) => r._measurement == "sensor_reading" and r.farmId == "1be8074d-7c15-4d5d-8368-32830d0663ca") |> last()'
 ```
 
 Hoặc qua UI InfluxDB: mở `http://localhost:8086` (login = trustagri / trustagri_secret) → Data Explorer → chọn bucket `sensor_data` → query.

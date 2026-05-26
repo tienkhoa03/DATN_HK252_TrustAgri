@@ -53,7 +53,7 @@ export interface ContractDto {
   farmerSignedAt?: string;
   traderSignedAt?: string;
   buyerSignedAt?: string;
-  /** Mã QR truy xuất công khai (chỉ có ở farmer_trader contract đã active). Format `TRC-…`. */
+  /** Mã QR lô hàng truy xuất công khai (chỉ có ở farmer_trader contract đã active). Format `LOT-…`. */
   traceabilityCode?: string | null;
   createdAt: string;
   updatedAt?: string;

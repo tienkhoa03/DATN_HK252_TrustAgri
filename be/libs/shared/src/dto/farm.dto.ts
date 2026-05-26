@@ -329,45 +329,81 @@ export class UpdateStandardDto {
 
 // ─── TRACEABILITY ──────────────────────────────────────────────────────────────
 
-/**
- * Khối thông tin contract trong response truy xuất (chỉ có khi QR sinh từ farmer_trader contract).
- * `sourceContractId` xuất hiện khi QR ban đầu thuộc trader_buyer contract → đã resolve về farmer_trader gốc.
- */
-export interface TraceabilityContractDto {
+export interface CareLogTimelineItemDto {
   id: string;
-  contractType: 'farmer_trader' | 'trader_buyer';
-  status: string;
-  productName?: string | null;
-  quantity: number;
-  unit: string;
+  action: string;
+  standardStepTitle?: string;
+  standardStepOrder?: number;
+  performedAt: string;
+  notes?: string;
+  deviation: boolean;
+  isLate: boolean;
+  isEdited: boolean;
+  evidences: Array<Pick<EvidenceDto, 'fileUrl' | 'mimeType' | 'capturedAt'>>;
+}
+
+export interface ProcessComplianceSummaryDto {
+  totalSteps: number;
+  completedSteps: number;
+  deviationCount: number;
+  lateCount: number;
+  coverageRatio: number;
+  steps: Array<{
+    order: number;
+    title: string;
+    expectedDurationDays: number | null;
+    completed: boolean;
+  }>;
+}
+
+export interface ComplianceCertificateDto {
+  contractId: string;
+  standardCode?: string;
+  totalSteps?: number;
+  completedSteps?: number;
+  deviationCount?: number;
+  complianceScore?: number;
+  lastComputedAt?: string;
+  status: 'verified' | 'pending' | 'none';
+}
+
+export interface TraceabilityContractContextDto {
+  id: string;
+  traceabilityCode: string;
+  status: 'pending_signature' | 'active' | 'pending_change' | 'in_settlement' | 'completed' | 'cancelled';
   startDate: string;
   endDate: string;
   plantingDate?: string | null;
-  signedAt?: string | null;
-  sourceContractId?: string | null;
+  standardName?: string | null;
+  productName?: string | null;
+  quantity?: number;
+  unit?: string;
 }
 
-/** Khối bên tham gia (farmer/trader/buyer) — chỉ tên hiển thị + phone đã denorm tại contract. */
-export interface TraceabilityPartyDto {
-  name?: string | null;
-  phone?: string | null;
+export interface EnvironmentReadingDto {
+  sensorType: string;
+  value: number;
+  recordedAt: string;
+  isImputed?: boolean;
 }
 
 /**
- * Truy xuất nguồn gốc QR (design.md §4.3 TraceabilityDto) — public endpoint
- * QR ưu tiên gắn theo contract (TRC-…); fallback gắn theo farm (TR-…) cho dữ liệu cũ.
+ * Truy xuất nguồn gốc QR (design.md §4.3 TraceabilityDto) — public endpoint.
+ * Mở rộng pipeline 4 lớp: Identity → Process → IoT → Compliance.
+ * Khi QR là `LOT-…` từ farmer_trader contract → `scope='contract'`; fallback `TR-…` → `scope='farm-overview'`.
  */
 export interface TraceabilityDto {
   productCode: string;
-  contract?: TraceabilityContractDto;
-  farmer?: TraceabilityPartyDto;
-  trader?: TraceabilityPartyDto;
-  buyer?: TraceabilityPartyDto;
-  farm: Pick<FarmDto, 'id' | 'name' | 'location' | 'cropType'>;
+  scope: 'contract' | 'farm-overview';
+  contract?: TraceabilityContractContextDto;
+  farm: Pick<FarmDto, 'id' | 'name' | 'location' | 'cropType' | 'area' | 'plantingDate' | 'ownerDisplayName'>;
   standard?: Pick<StandardDto, 'code' | 'name'>;
-  careLogTimeline: Array<Pick<CareLogDto, 'action' | 'performedAt' | 'notes' | 'standardStepTitle'>>;
+  careLogTimeline: CareLogTimelineItemDto[];
+  process?: ProcessComplianceSummaryDto;
   sensorChart: Array<{
     sensorType: string;
     series: Array<{ t: string; value: number }>;
   }>;
+  currentEnvironment: EnvironmentReadingDto[];
+  complianceCertificate?: ComplianceCertificateDto;
 }

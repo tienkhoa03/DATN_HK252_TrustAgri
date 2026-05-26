@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "strictNullChecks": false
+  },
+  "include": ["src/**/*", "../../libs/shared/src/types/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

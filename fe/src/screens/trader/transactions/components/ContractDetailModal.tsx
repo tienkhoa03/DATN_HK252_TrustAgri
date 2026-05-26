@@ -32,10 +32,10 @@ import {
 } from '@/services/contractChangeRequestService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { contractFarmDisplay, partyBuyerDisplay, partyFarmerDisplay } from '@/utils/displayLabels';
-import { QRCode } from '@/design-system/components/QRCode';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
+import { ContractQrCodeModal } from '@/screens/shared/contracts/ContractQrCodeModal';
 
 export interface ContractDetailModalProps {
   contract: ContractDto;
@@ -134,6 +134,7 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
   const [rejectReason, setRejectReason] = useState('');
   const [rejecting, setRejecting] = useState(false);
   const [showStandardInfo, setShowStandardInfo] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
 
   const userId = session?.userId ?? '';
   const sessionRole = session?.role;
@@ -451,35 +452,32 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
           />
         </div>
 
-        {/* Mã QR truy xuất nguồn gốc — chỉ hợp đồng farmer_trader đã active mới có */}
-        {contract.traceabilityCode && (
-          <div
+        {/* Mã QR lô hàng truy xuất nguồn gốc — chỉ farmer_trader contract đã active mới có */}
+        {contract.contractType === 'farmer_trader' && contract.traceabilityCode && (
+          <button
+            type="button"
+            onClick={() => setShowQrModal(true)}
             style={{
-              backgroundColor: colors.background.primary,
-              border: `1px solid ${colors.background.secondary}`,
-              borderRadius: '10px',
+              width: '100%',
               padding: spacing.md,
-              marginBottom: spacing.md,
+              backgroundColor: colors.background.secondary,
+              color: colors.text.primary,
+              border: `1px solid ${colors.background.tertiary}`,
+              borderRadius: '10px',
+              fontSize: fontSize.body,
+              fontWeight: fontWeight.medium,
+              cursor: 'pointer',
+              minHeight: '44px',
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: spacing.sm,
+              marginBottom: spacing.md,
             }}
           >
-            <Text style={{ fontSize: fontSize.body, fontWeight: fontWeight.semibold, color: colors.text.primary, margin: 0 }}>
-              📜 Mã QR truy xuất nguồn gốc
-            </Text>
-            <Text size="xSmall" style={{ color: colors.text.secondary, textAlign: 'center', margin: 0 }}>
-              In lên bao bì sản phẩm. Mọi người có thể quét để xem nông dân, vườn, quy trình canh tác và nhật ký theo đúng phạm vi hợp đồng này.
-            </Text>
-            <QRCode
-              value={`${window.location.origin}/guest/trace/${contract.traceabilityCode}`}
-              size={140}
-            />
-            <Text size="xSmall" style={{ color: colors.text.secondary, fontFamily: 'monospace', margin: 0 }}>
-              {contract.traceabilityCode}
-            </Text>
-          </div>
+            <span>🏷️</span>
+            <span>{`Mã QR lô hàng (${contract.traceabilityCode})`}</span>
+          </button>
         )}
 
         {/* Sign / Reject actions */}
@@ -904,6 +902,14 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
           ))}
         </div>
       </div>
+
+      {showQrModal && contract.traceabilityCode && (
+        <ContractQrCodeModal
+          visible={showQrModal}
+          onClose={() => setShowQrModal(false)}
+          traceabilityCode={contract.traceabilityCode}
+        />
+      )}
 
       {showStandardInfo && contract.standardId && (
         <StandardInfoModal

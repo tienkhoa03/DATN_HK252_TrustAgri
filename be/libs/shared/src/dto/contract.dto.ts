@@ -495,3 +495,21 @@ export interface DashboardBuyerDto {
   activeContracts: number;
   completedOrders: number;
 }
+
+// ─── INTERNAL (cross-service only) ─────────────────────────────────────────────
+
+export interface InternalContractRefDto {
+  id: string;
+  traceabilityCode: string | null;
+  contractType: 'farmer_trader' | 'trader_buyer';
+  status: 'pending_signature' | 'active' | 'pending_change' | 'in_settlement' | 'completed' | 'cancelled';
+  farmId: string | null;
+  standardId: string | null;
+  standardName: string | null;
+  startDate: string;
+  endDate: string;
+  plantingDate: string | null;
+  productName: string | null;
+  quantity: number;
+  unit: string;
+}

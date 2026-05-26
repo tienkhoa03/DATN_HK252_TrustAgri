@@ -156,8 +156,8 @@ export class ContractEntity {
   sourceContractId: string | null;
 
   /**
-   * Mã QR truy xuất công khai (duy nhất) — sinh khi farmer_trader contract chuyển sang 'active'.
-   * Định dạng: `TRC-<12 hex chars>` để phân biệt với mã farm (`TR-…`).
+   * Mã QR lô hàng truy xuất công khai (duy nhất) — sinh khi farmer_trader contract chuyển sang 'active'.
+   * Định dạng: `LOT-<12 hex chars>` để phân biệt với mã farm (`TR-…`).
    */
   @Index('idx_contracts_traceability_code', { unique: true, where: 'traceability_code IS NOT NULL' })
   @Column({ name: 'traceability_code', type: 'varchar', nullable: true, length: 32 })

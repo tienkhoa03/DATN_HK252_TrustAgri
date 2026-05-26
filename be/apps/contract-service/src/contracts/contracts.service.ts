@@ -508,24 +508,9 @@ export class ContractsService implements OnApplicationBootstrap {
     }
   }
 
-  /** Sinh mã trace cho farmer_trader contract: `TRC-<12 hex từ contract id>` (phân biệt với farm `TR-…`). */
+  /** Sinh mã trace cho farmer_trader contract: `LOT-<12 hex từ contract id>` (phân biệt với farm `TR-…`). */
   private buildContractTraceCode(contractId: string): string {
-    return `TRC-${contractId.replace(/-/g, '').slice(0, 12)}`;
-  }
-
-  /**
-   * Lookup contract theo mã traceability (public-trace) — dùng cho internal call từ farm-service.
-   * Trả về raw entity (đã denorm), KHÔNG check JWT (đã được internal-secret guard ở controller).
-   */
-  async findByTraceabilityCode(code: string): Promise<ContractEntity | null> {
-    return this.contractRepo.findOne({
-      where: { traceabilityCode: code },
-      withDeleted: true,
-    });
-  }
-
-  async findById(id: string): Promise<ContractEntity | null> {
-    return this.contractRepo.findOne({ where: { id }, withDeleted: true });
+    return `LOT-${contractId.replace(/-/g, '').slice(0, 12)}`;
   }
 
   /**
@@ -641,7 +626,7 @@ export class ContractsService implements OnApplicationBootstrap {
         await this.assertFarmHasNoOngoingContract(entity.farmId, entity.id);
       }
       entity.status = 'active';
-      // Sinh mã QR truy xuất công khai cho farmer_trader contract khi vừa active
+      // Sinh mã QR lô hàng truy xuất công khai cho farmer_trader contract khi vừa active
       if (entity.contractType === 'farmer_trader' && !entity.traceabilityCode) {
         entity.traceabilityCode = this.buildContractTraceCode(entity.id);
       }

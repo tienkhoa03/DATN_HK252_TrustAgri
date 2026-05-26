@@ -7,11 +7,15 @@ import {
   OnModuleInit,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import {
   CareLogDto,
+  ComplianceCertificateDto,
   ComplianceDto,
+  InternalContractRefDto,
   JwtPayload,
   ListResponse,
   SensorReadingDto,
@@ -19,6 +23,7 @@ import {
   resolveServiceUrl,
   SERVICE_URL_KEYS,
 } from '@trustagri/shared';
+import { ContractEntity } from './entities/contract.entity';
 import { ContractsService } from './contracts.service';
 
 const COMPLIANCE_CACHE_PREFIX = 'compliance:v1:';
@@ -32,6 +37,8 @@ export class ComplianceService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly config: ConfigService,
     private readonly contractsService: ContractsService,
+    @InjectRepository(ContractEntity)
+    private readonly contractRepo: Repository<ContractEntity>,
   ) {}
 
   onModuleInit(): void {
@@ -120,6 +127,96 @@ export class ComplianceService implements OnModuleInit, OnModuleDestroy {
 
     await this.saveToCache(cacheKey, dto);
     return dto;
+  }
+
+  /**
+   * Đọc snapshot compliance từ Redis cho farm — không tính lại, chỉ READ.
+   * Dùng bởi endpoint nội bộ /internal/farms/:farmId/active-compliance.
+   * Nếu cache miss → trả { status: 'pending' }. Nếu không có contract → 404.
+   */
+  async getActiveComplianceForFarm(farmId: string): Promise<ComplianceCertificateDto> {
+    const contract = await this.contractRepo.findOne({
+      where: { farmId, status: 'active' },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!contract) {
+      throw new NotFoundException('Không có hợp đồng active cho vườn này');
+    }
+
+    const cacheKey = `${COMPLIANCE_CACHE_PREFIX}${contract.id}`;
+    const cached = await this.getFromCache(cacheKey);
+
+    if (!cached) {
+      return { contractId: contract.id, status: 'pending' };
+    }
+
+    return {
+      contractId: cached.contractId,
+      standardCode: cached.standardCode,
+      totalSteps: cached.totalSteps,
+      completedSteps: cached.completedSteps,
+      deviationCount: cached.deviations.length,
+      complianceScore: cached.complianceScore,
+      lastComputedAt: cached.lastComputedAt,
+      status: 'verified',
+    };
+  }
+
+  async getContractRefByCode(code: string): Promise<InternalContractRefDto | null> {
+    const contract = await this.contractRepo.findOne({
+      where: { traceabilityCode: code },
+      relations: ['product'],
+      withDeleted: true,
+    });
+    if (!contract) return null;
+    return this.toContractRefDto(contract);
+  }
+
+  async getActiveContractRefForFarm(farmId: string): Promise<InternalContractRefDto | null> {
+    const contract = await this.contractRepo.findOne({
+      where: { farmId, contractType: 'farmer_trader' as const, status: 'active' as const },
+      relations: ['product'],
+      order: { createdAt: 'DESC' },
+    });
+    if (!contract) return null;
+    return this.toContractRefDto(contract);
+  }
+
+  async getComplianceCertificateByContractId(contractId: string): Promise<ComplianceCertificateDto> {
+    const contract = await this.contractRepo.findOne({ where: { id: contractId } });
+    if (!contract) throw new NotFoundException('Hợp đồng không tồn tại');
+    const cacheKey = `${COMPLIANCE_CACHE_PREFIX}${contractId}`;
+    const cached = await this.getFromCache(cacheKey);
+    if (!cached) return { contractId, status: 'pending' };
+    return {
+      contractId: cached.contractId,
+      standardCode: cached.standardCode,
+      totalSteps: cached.totalSteps,
+      completedSteps: cached.completedSteps,
+      deviationCount: cached.deviations.length,
+      complianceScore: cached.complianceScore,
+      lastComputedAt: cached.lastComputedAt,
+      status: 'verified',
+    };
+  }
+
+  private toContractRefDto(c: ContractEntity): InternalContractRefDto {
+    return {
+      id: c.id,
+      traceabilityCode: c.traceabilityCode,
+      contractType: c.contractType,
+      status: c.status,
+      farmId: c.farmId,
+      standardId: c.standardId,
+      standardName: c.standardName,
+      startDate: c.startDate,
+      endDate: c.endDate,
+      plantingDate: c.plantingDate,
+      productName: c.product?.name ?? null,
+      quantity: Number(c.quantity),
+      unit: c.unit,
+    };
   }
 
   private async getFromCache(key: string): Promise<ComplianceDto | null> {

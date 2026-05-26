@@ -2,6 +2,7 @@ import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Public } from '@trustagri/shared';
 import { SensorsService } from './sensors.service';
+import { RedisSensorService } from './services/redis-sensor.service';
 import { TraceabilityInternalGuard } from './guards/traceability-internal.guard';
 
 /**
@@ -13,7 +14,10 @@ import { TraceabilityInternalGuard } from './guards/traceability-internal.guard'
 @Public()
 @UseGuards(TraceabilityInternalGuard)
 export class TraceabilityMonitoringController {
-  constructor(private readonly sensorsService: SensorsService) {}
+  constructor(
+    private readonly sensorsService: SensorsService,
+    private readonly redisSensor: RedisSensorService,
+  ) {}
 
   /**
    * GET /api/v1/monitoring/traceability/farms/:farmId/sensor-chart
@@ -37,5 +41,24 @@ export class TraceabilityMonitoringController {
       fromDate.toISOString(),
       toDate.toISOString(),
     );
+  }
+
+  /**
+   * GET /api/v1/monitoring/traceability/farms/:farmId/current-environment
+   * Snapshot Redis mới nhất cho màn hình truy xuất công khai.
+   * Nếu Redis miss → trả [] (FE ẩn card, không hiện lỗi — NFR-A01).
+   */
+  @Get('farms/:farmId/current-environment')
+  @ApiOperation({ summary: 'Get current environment snapshot from Redis (internal only, no auth)' })
+  @ApiResponse({ status: 200, description: 'Array of latest sensor readings; empty if Redis miss' })
+  @ApiResponse({ status: 403, description: 'Forbidden - internal requests only' })
+  async getCurrentEnvironment(@Param('farmId') farmId: string) {
+    const readings = await this.redisSensor.getLatest(farmId);
+    return readings.map((r) => ({
+      sensorType: r.sensorType,
+      value: r.value,
+      recordedAt: r.recordedAt,
+      isImputed: r.isImputed,
+    }));
   }
 }

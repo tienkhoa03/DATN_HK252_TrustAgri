@@ -502,12 +502,14 @@ export const GuestTraceabilityScanResultScreen: React.FC<GuestTraceabilityScanRe
                   {data.contract.id.slice(0, 8)}…
                 </Text>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: spacing.sm }}>
-                <Text size="small" style={{ color: colors.text.secondary }}>Khối lượng cam kết</Text>
-                <Text size="small" style={{ fontWeight: fontWeight.semibold, color: colors.text.primary }}>
-                  {data.contract.quantity.toLocaleString('vi-VN')} {data.contract.unit}
-                </Text>
-              </div>
+              {data.contract.quantity !== undefined && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: spacing.sm }}>
+                  <Text size="small" style={{ color: colors.text.secondary }}>Khối lượng cam kết</Text>
+                  <Text size="small" style={{ fontWeight: fontWeight.semibold, color: colors.text.primary }}>
+                    {data.contract.quantity.toLocaleString('vi-VN')} {data.contract.unit ?? ''}
+                  </Text>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: spacing.sm }}>
                 <Text size="small" style={{ color: colors.text.secondary }}>Thời hạn canh tác</Text>
                 <Text size="small" style={{ fontWeight: fontWeight.semibold, color: colors.text.primary }}>
@@ -516,41 +518,6 @@ export const GuestTraceabilityScanResultScreen: React.FC<GuestTraceabilityScanRe
                   {new Date(data.contract.endDate).toLocaleDateString('vi-VN')}
                 </Text>
               </div>
-            </div>
-            <div style={{ marginTop: spacing.md, display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
-              {data.farmer && (data.farmer.name || data.farmer.phone) && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                  <span style={{ fontSize: '20px' }}>👨‍🌾</span>
-                  <div>
-                    <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Nông dân</Text>
-                    <Text size="small" style={{ fontWeight: fontWeight.semibold, color: colors.text.primary, margin: 0 }}>
-                      {data.farmer.name ?? 'Ẩn danh'}
-                    </Text>
-                  </div>
-                </div>
-              )}
-              {data.trader && (data.trader.name || data.trader.phone) && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                  <span style={{ fontSize: '20px' }}>🚚</span>
-                  <div>
-                    <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Thương lái</Text>
-                    <Text size="small" style={{ fontWeight: fontWeight.semibold, color: colors.text.primary, margin: 0 }}>
-                      {data.trader.name ?? 'Ẩn danh'}
-                    </Text>
-                  </div>
-                </div>
-              )}
-              {data.buyer && (data.buyer.name || data.buyer.phone) && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                  <span style={{ fontSize: '20px' }}>🏪</span>
-                  <div>
-                    <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Người mua</Text>
-                    <Text size="small" style={{ fontWeight: fontWeight.semibold, color: colors.text.primary, margin: 0 }}>
-                      {data.buyer.name ?? 'Ẩn danh'}
-                    </Text>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
