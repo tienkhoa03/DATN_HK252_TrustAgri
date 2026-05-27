@@ -24,7 +24,7 @@ import { useProfile } from '@/hooks/useProfile';
 import type { UserProfileDto, UserProfileUpdateDto } from '@/hooks/useProfile';
 import { primaryColors, functionalColors } from '@/design-system/tokens/colors';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
-import { authSessionAtom, currentRoleAtom } from '@/state/authAtoms';
+import { authSessionAtom, currentRoleAtom, availableRolesAtom } from '@/state/authAtoms';
 import * as authService from '@/services/authService';
 import { ApiError } from '@/api/errors';
 import { TraderProfileLayout } from './TraderProfileLayout';
@@ -49,6 +49,7 @@ export function ProfileScreen() {
   const setSession = useSetAtom(authSessionAtom);
   const navigate = useNavigate();
   const currentRole = useAtomValue(currentRoleAtom);
+  const availableRoles = useAtomValue(availableRolesAtom);
 
   // Edit form state
   const [form, setForm] = useState<Partial<UserProfileUpdateDto & {
@@ -381,14 +382,27 @@ export function ProfileScreen() {
 
         {/* ── Actions ─────────────────────────────────────────────────── */}
         <SectionCard title="Hành động" color={functionalColors.alertRed}>
-          <Box style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <ActionButton
-              label="Đăng xuất"
-              onClick={handleLogout}
-              variant="outline"
-              color={functionalColors.alertRed}
-              disabled={isSaving}
-            />
+          <Box style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {availableRoles.length > 1 && (
+              <Box style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <ActionButton
+                  label="🎭  Chuyển vai trò"
+                  onClick={() => navigate('/role-select')}
+                  variant="outline"
+                  color={primaryColors.zaloBlue}
+                  disabled={isSaving}
+                />
+              </Box>
+            )}
+            <Box style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <ActionButton
+                label="Đăng xuất"
+                onClick={handleLogout}
+                variant="outline"
+                color={functionalColors.alertRed}
+                disabled={isSaving}
+              />
+            </Box>
           </Box>
         </SectionCard>
 

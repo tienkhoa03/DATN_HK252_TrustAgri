@@ -62,7 +62,9 @@ export function LoginScreen() {
     try {
       const newSession = await authService.passwordLogin(username.trim(), password);
       setSession(newSession);
-      const target = ROLE_HOME_PATH[newSession.role] ?? '/guest';
+      const target = newSession.roles && newSession.roles.length > 1
+        ? '/role-select'
+        : ROLE_HOME_PATH[newSession.role] ?? '/guest';
       navigate(target, { replace: true });
     } catch (err) {
       const message = toVietnameseError(err);

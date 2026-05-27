@@ -153,6 +153,10 @@ const LoginScreen = lazy(() =>
   import('@/pages/LoginScreen').then((m) => ({ default: m.LoginScreen })),
 );
 
+const RoleSelectionScreen = lazy(() =>
+  import('@/pages/RoleSelectionScreen').then((m) => ({ default: m.RoleSelectionScreen })),
+);
+
 const DevScreenLauncher = lazy(() =>
   import('@/pages/index').then((m) => ({ default: m.default })),
 );
@@ -178,7 +182,10 @@ function RootEntry() {
 
     // 1) Already authenticated (rehydrated from sessionStorage) → role home.
     if (session) {
-      navigate(ROLE_HOME_PATH[role] ?? '/guest', { replace: true });
+      const target = session.roles && session.roles.length > 1
+        ? '/role-select'
+        : ROLE_HOME_PATH[session.role] ?? '/guest';
+      navigate(target, { replace: true });
       return;
     }
 
@@ -192,7 +199,10 @@ function RootEntry() {
     bootstrapAuthSession()
       .then((s) => {
         setSession(s);
-        navigate(ROLE_HOME_PATH[s.role] ?? '/guest', { replace: true });
+        const target = s.roles && s.roles.length > 1
+          ? '/role-select'
+          : ROLE_HOME_PATH[s.role] ?? '/guest';
+        navigate(target, { replace: true });
       })
       .catch((err) => {
         // RequirePasswordLoginError không xảy ra ở đây vì đã guard ở (2), nhưng safety fallback.
@@ -230,6 +240,7 @@ export function AppRoutes() {
 
         {/* ── Auth ──────────────────────────────────────────── */}
         <Route path="/login"                   element={<LoginScreen />} />
+        <Route path="/role-select"             element={<RoleSelectionScreen />} />
 
         {/* ── Trung tâm thông báo (shared, mọi role auth) ───── */}
         <Route path="/notifications"           element={<NotificationsScreen />} />

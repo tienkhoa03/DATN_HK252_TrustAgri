@@ -9,8 +9,8 @@
 import React, { useState } from 'react';
 import { Box, Text } from 'zmp-ui';
 import { useNavigate } from 'zmp-ui';
-import { useSetAtom } from 'jotai';
-import { authSessionAtom } from '@/state/authAtoms';
+import { useSetAtom, useAtomValue } from 'jotai';
+import { authSessionAtom, availableRolesAtom } from '@/state/authAtoms';
 import * as authService from '@/services/authService';
 import * as marketplaceService from '@/services/marketplaceService';
 import type { UserProfileDto, UserProfileUpdateDto } from '@/services/authService';
@@ -40,6 +40,7 @@ export function TraderProfileLayout({ profile, updateProfile, isSaving }: Trader
   const openSnackbar = useStableOpenSnackbar();
   const navigate = useNavigate();
   const setSession = useSetAtom(authSessionAtom);
+  const availableRoles = useAtomValue(availableRolesAtom);
 
   const [activeModal, setActiveModal] = useState<ModalId>(null);
   const [showPublicPreview, setShowPublicPreview] = useState(false);
@@ -291,6 +292,13 @@ export function TraderProfileLayout({ profile, updateProfile, isSaving }: Trader
           subLabel={`${trustScore?.count ?? 0} đánh giá`}
           onTap={() => setShowReviews(true)}
         />
+        {availableRoles.length > 1 && (
+          <MenuRow
+            icon="🎭"
+            label="Chuyển vai trò"
+            onTap={() => navigate('/role-select')}
+          />
+        )}
         <MenuRow
           icon="🚪"
           label="Đăng xuất"

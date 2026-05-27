@@ -21,6 +21,7 @@ import {
   AuthPasswordLoginDto,
   AuthLoginResponseDto,
   AuthVerifyResponseDto,
+  AuthSwitchRoleDto,
   UserProfileDto,
   UserProfileUpdateDto,
   UserPublicSummaryDto,
@@ -176,5 +177,22 @@ export class AuthController {
     @Body() dto: UserProfileUpdateDto,
   ): Promise<UserProfileDto> {
     return this.authService.updateMe(user.sub, dto);
+  }
+
+  /**
+   * POST /api/v1/auth/switch-role
+   * Phát hành JWT mới với active role được chỉ định. Role phải thuộc user.roles.
+   */
+  @Post('switch-role')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Switch active role and issue a new JWT' })
+  @ApiResponse({ status: 200, description: 'New JWT issued for the selected role' })
+  @ApiResponse({ status: 403, description: 'Role not in user.roles' })
+  switchRole(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: AuthSwitchRoleDto,
+  ): Promise<AuthLoginResponseDto> {
+    return this.authService.switchRole(user.sub, dto.role);
   }
 }

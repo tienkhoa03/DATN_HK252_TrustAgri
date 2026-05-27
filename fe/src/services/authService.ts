@@ -12,7 +12,7 @@
  */
 
 import apiClient from '@/api/client';
-import type { AuthSession } from '@/state/authAtoms';
+import type { AuthSession, UserRole } from '@/state/authAtoms';
 
 // ── DTO types (mirror design.md §4.1) ─────────────────────────────────────────
 
@@ -64,7 +64,8 @@ export async function passwordLogin(username: string, password: string): Promise
     accessToken: string;
     refreshToken: string;
     userId: string;
-    role: 'farmer' | 'trader' | 'buyer' | 'guest';
+    role: UserRole;
+    roles?: UserRole[];
     expiresAt: string;
   }>('/auth/password-login', { username, password });
 
@@ -73,6 +74,7 @@ export async function passwordLogin(username: string, password: string): Promise
     refreshToken: data.refreshToken,
     userId: data.userId,
     role: data.role,
+    roles: data.roles ?? [data.role],
     expiresAt: data.expiresAt,
   };
 }
@@ -89,7 +91,8 @@ export async function devLogin(secret: string, zaloId: string): Promise<AuthSess
     accessToken: string;
     refreshToken: string;
     userId: string;
-    role: 'farmer' | 'trader' | 'buyer' | 'guest';
+    role: UserRole;
+    roles?: UserRole[];
     expiresAt: string;
   }>('/auth/dev-login', { secret, zaloId });
 
@@ -98,6 +101,7 @@ export async function devLogin(secret: string, zaloId: string): Promise<AuthSess
     refreshToken: data.refreshToken,
     userId: data.userId,
     role: data.role,
+    roles: data.roles ?? [data.role],
     expiresAt: data.expiresAt,
   };
 }
@@ -110,7 +114,8 @@ export async function login(zaloAccessToken: string, phoneNumber?: string): Prom
     accessToken: string;
     refreshToken: string;
     userId: string;
-    role: 'farmer' | 'trader' | 'buyer' | 'guest';
+    role: UserRole;
+    roles?: UserRole[];
     expiresAt: string;
   }>('/auth/login', body);
 
@@ -119,6 +124,7 @@ export async function login(zaloAccessToken: string, phoneNumber?: string): Prom
     refreshToken: data.refreshToken,
     userId: data.userId,
     role: data.role,
+    roles: data.roles ?? [data.role],
     expiresAt: data.expiresAt,
   };
 }
@@ -193,6 +199,30 @@ export async function getUserById(
   } catch {
     return null;
   }
+}
+
+/**
+ * POST /api/v1/auth/switch-role
+ * Phát JWT mới với active role được chỉ định. Role phải thuộc user.roles.
+ */
+export async function switchRole(role: UserRole): Promise<AuthSession> {
+  const { data } = await apiClient.post<{
+    accessToken: string;
+    refreshToken: string;
+    userId: string;
+    role: UserRole;
+    roles: UserRole[];
+    expiresAt: string;
+  }>('/auth/switch-role', { role });
+
+  return {
+    accessToken: data.accessToken,
+    refreshToken: data.refreshToken,
+    userId: data.userId,
+    role: data.role,
+    roles: data.roles ?? [data.role],
+    expiresAt: data.expiresAt,
+  };
 }
 
 export async function uploadAvatar(blob: Blob): Promise<UserProfileDto> {

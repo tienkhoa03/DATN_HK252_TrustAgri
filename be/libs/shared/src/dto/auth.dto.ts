@@ -21,6 +21,7 @@ export interface AuthLoginResponseDto {
   refreshToken: string;
   userId: string;
   role: UserRole;
+  roles: UserRole[];
   expiresAt: string;
 }
 
@@ -40,6 +41,7 @@ export interface UserProfileDto {
   userId: string;
   zaloId: string;
   role: UserRole;
+  roles: UserRole[];
   displayName: string;
   phone?: string;
   email?: string;
@@ -215,6 +217,15 @@ export class UserProfileUpdateDto {
   @ValidateNested()
   @Type(() => BuyerProfileUpdateDto)
   buyerProfile?: BuyerProfileUpdateDto;
+}
+
+/**
+ * POST /api/v1/auth/switch-role — chuyển active role, phát JWT mới.
+ */
+export class AuthSwitchRoleDto {
+  @ApiProperty({ description: 'Role to switch to', enum: ['farmer', 'trader', 'buyer', 'guest', 'admin'] })
+  @IsIn(['farmer', 'trader', 'buyer', 'guest', 'admin'])
+  role: UserRole;
 }
 
 /**

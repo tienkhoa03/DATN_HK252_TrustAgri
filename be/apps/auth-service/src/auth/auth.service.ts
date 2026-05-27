@@ -8,6 +8,7 @@ import {
   HttpStatus,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import type { UserRole } from './entities/user.entity';
 import { timingSafeEqual, scrypt, randomBytes } from 'crypto';
 import { promisify } from 'util';
 
@@ -55,7 +56,7 @@ export class AuthService {
         zaloId: zaloUser.id,
         displayName: zaloUser.name,
         avatarUrl: zaloUser.picture?.data?.url ?? null,
-        role: 'guest',
+        roles: ['buyer'],
         phone: phoneNumber ?? null,
         email: null,
         traderProfile: null,
@@ -171,9 +172,13 @@ export class AuthService {
     return timingSafeEqual(bufA, bufB);
   }
 
-  /** Phát hành access/refresh JWT và lưu session Redis — dùng chung login() và devLogin(). */
-  private async issueSessionForUser(user: UserEntity): Promise<AuthLoginResponseDto> {
-    const payload: JwtPayload = { sub: user.userId, role: user.role };
+  /** Phát hành access/refresh JWT và lưu session Redis — dùng chung login(), devLogin(), và switchRole(). */
+  private async issueSessionForUser(user: UserEntity, requestedRole?: UserRole): Promise<AuthLoginResponseDto> {
+    const activeRole: UserRole = requestedRole && user.roles.includes(requestedRole)
+      ? requestedRole
+      : user.roles[0] ?? 'buyer';
+
+    const payload: JwtPayload = { sub: user.userId, role: activeRole };
     const accessToken = this.jwtService.sign(payload);
 
     const refreshExpiresIn = this.configService.get<string>(
@@ -191,7 +196,7 @@ export class AuthService {
     const ttlSeconds = decoded.exp - decoded.iat;
     await this.redisService.set(
       `session:${accessToken}`,
-      JSON.stringify({ userId: user.userId, role: user.role }),
+      JSON.stringify({ userId: user.userId, role: activeRole }),
       ttlSeconds,
     );
 
@@ -201,9 +206,21 @@ export class AuthService {
       accessToken,
       refreshToken,
       userId: user.userId,
-      role: user.role,
+      role: activeRole,
+      roles: user.roles,
       expiresAt,
     };
+  }
+
+  async switchRole(userId: string, newRole: UserRole): Promise<AuthLoginResponseDto> {
+    const user = await this.userRepo.findOne({ where: { userId } });
+    if (!user) {
+      throw new NotFoundException('Người dùng không tồn tại');
+    }
+    if (!user.roles.includes(newRole)) {
+      throw new ForbiddenException(`Role '${newRole}' không thuộc tài khoản này`);
+    }
+    return this.issueSessionForUser(user, newRole);
   }
 
   async verify(token: string): Promise<AuthVerifyResponseDto> {
@@ -286,7 +303,8 @@ export class AuthService {
     return {
       userId: user.userId,
       zaloId: user.zaloId,
-      role: user.role,
+      role: user.roles[0] ?? 'buyer',
+      roles: user.roles,
       displayName: user.displayName,
       phone: user.phone ?? undefined,
       email: user.email ?? undefined,

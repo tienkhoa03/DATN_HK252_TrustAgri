@@ -18,6 +18,10 @@ function safeParseAuthSession(raw: string | null): AuthSession | null {
     ) {
       return null;
     }
+    // Backwards compat: if roles missing, derive from role
+    if (!Array.isArray(parsed.roles)) {
+      parsed.roles = [parsed.role];
+    }
     return parsed;
   } catch {
     return null;
