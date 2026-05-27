@@ -8,6 +8,7 @@
 
 | Bạn cần... | Đọc |
 |------------|-----|
+| **Target file/folder cụ thể trong repo** (BE service domain, FE screen, service) | [`file-map.md`](./file-map.md) — đọc TRƯỚC khi Glob/Grep |
 | Hiểu **yêu cầu nghiệp vụ** (US/FR/NFR) | [`requirements.md`](./requirements.md) |
 | Hiểu **kiến trúc** + lý do quyết định | [`architecture.md`](./architecture.md) |
 | Hiểu **workflow** (auth, farm, monitoring, contract...) | [`business-logic.md`](./business-logic.md) |
@@ -20,6 +21,7 @@
 
 ## Files
 
+- **[file-map.md](file-map.md)** — **Granular index** mọi BE domain folder + FE screen/service + DTO chia sẻ. Bắt buộc tra trước khi Glob/Grep để target đúng file cần Read.
 - **[requirements.md](requirements.md)** — Catalog User Stories (US-*), Functional Requirements (FR-*), Non-Functional Requirements (NFR-*). Có Traceability matrix.
 - **[architecture.md](architecture.md)** — Layered + Microservices, data flows, ADR.
 - **[business-logic.md](business-logic.md)** — 8 workflows chính: auth, farm, care log, monitoring, contracts, traceability, notification, standards.

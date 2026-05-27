@@ -8,6 +8,7 @@ Tất cả mô tả chi tiết về dự án nằm trong [`.claude/docs/`](.clau
 
 | Cần... | Đọc |
 |--------|-----|
+| **Target file/folder cụ thể** (BE domain, FE screen, service, DTO) | [`.claude/docs/file-map.md`](.claude/docs/file-map.md) — **TRA TRƯỚC Glob/Grep** |
 | Yêu cầu nghiệp vụ (US/FR/NFR + traceability) | [`.claude/docs/requirements.md`](.claude/docs/requirements.md) |
 | Kiến trúc hệ thống + ADR | [`.claude/docs/architecture.md`](.claude/docs/architecture.md) |
 | Workflow nghiệp vụ chi tiết | [`.claude/docs/business-logic.md`](.claude/docs/business-logic.md) |

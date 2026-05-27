@@ -1,26 +1,44 @@
 # Rule: Context Loading Protocol
 
-**Mục tiêu:** Tiết kiệm token. KHÔNG re-explore toàn dự án mỗi prompt — đọc đúng doc tương ứng.
+**Mục tiêu:** Tiết kiệm token. KHÔNG re-explore toàn dự án mỗi prompt — đọc đúng file theo index.
 
-## Quy tắc
+## Thứ tự ưu tiên khi cần context
 
-1. **Mặc định** đã có CLAUDE.md trong context. Đừng đọc lại.
-2. **Trước khi làm task mới**, xác định loại công việc và đọc đúng doc:
+1. **CLAUDE.md** đã trong context — KHÔNG đọc lại.
+2. **[`.claude/docs/file-map.md`](../docs/file-map.md)** — index granular folder/file. **BẮT BUỘC tra trước Glob/Grep/ls.** Nếu task đụng tới folder/feature đã có entry → Read thẳng file đó.
+3. **Doc theo loại task** (chỉ đọc khi cần khái niệm/quy tắc, không phải mỗi prompt):
    - Câu hỏi nghiệp vụ → `.claude/docs/requirements.md` + `business-logic.md`.
-   - Code backend → `.claude/docs/tech-stack.md` (DB schema, lib) + `business-logic.md`.
-   - Code frontend → `.claude/docs/design-system.md` + `tech-stack.md` (FE phần) + `project-structure.md`.
+   - Code backend → `.claude/rules/10-backend.md` + `.claude/docs/tech-stack.md` (chỉ phần BE).
+   - Code frontend → `.claude/rules/20-frontend.md` + `.claude/docs/design-system.md` + `tech-stack.md` (phần FE).
    - Đổi kiến trúc → `.claude/docs/architecture.md`.
-   - Tra thuật ngữ → `.claude/docs/glossary.md`.
-3. **Specs gốc** (`/specs/**/design.md`, `tasks.md`) là source of truth chi tiết hơn docs — đọc khi docs không đủ. KHÔNG sửa specs.
-4. **Trace yêu cầu**: khi viết code mới, comment hoặc commit message ghi mã `FR-*`/`US-*`/`NFR-*` liên quan.
-5. **Đừng đọc lại file không cần thiết**. Nếu đã đọc trong cùng conversation, dùng lại context. Nếu doc đã đủ, đừng grep code.
+   - Tra thuật ngữ / mã US/FR/NFR → `.claude/docs/glossary.md`.
+   - Tra DB schema chi tiết → `postgres_database_design.md` / `influxdb_database_design.md` / `redis_database_design.md` ở root.
+4. **Specs gốc** (`/specs/**/requirements.md`, `design.md`, `tasks.md`) khi docs tóm tắt chưa đủ — KHÔNG sửa.
+5. **Source code** chỉ khi file-map + docs + specs vẫn chưa đủ → mới Glob/Grep.
+
+## Tối ưu token bắt buộc
+
+- **KHÔNG `ls` / `Glob '**/*'`** để khám phá folder đã có trong `file-map.md`. Đọc map → Read thẳng.
+- **KHÔNG đọc lại file đã đọc trong cùng conversation.** Dùng lại context.
+- **Sửa 1 feature BE:** mặc định Read tối đa 3 file: `<domain>.controller.ts`, `<domain>.service.ts`, DTO chia sẻ. Entity/module chỉ Read khi bạn sắp sửa nó.
+- **Sửa 1 screen FE:** Read screen file + service file tương ứng (map trong `file-map.md`). Đừng mở cả thư mục screens role.
+- **Đừng đọc cả file lớn** (`business-logic.md`, `tech-stack.md`, `postgres_database_design.md`) khi chỉ cần 1 section — dùng Grep với pattern cụ thể, hoặc Read kèm `offset`/`limit`.
+- **Plan files (`.claude/plan/*.md`)** chỉ đọc khi user gọi `/implementation-plan <slug>` hoặc hỏi trực tiếp về plan đó.
+
+## Cập nhật map khi khám phá ra điều mới
+
+Nếu trong lúc làm task bạn phải Grep/Glob ra file/folder **chưa có** trong `file-map.md` và thấy nó quan trọng → thêm 1 dòng vào map (Section tương ứng) trước khi kết thúc task. Đây là cách map tự bồi đắp, để conversation sau khỏi khám phá lại.
+
+## Trace yêu cầu
+
+Khi viết code mới, comment hoặc commit message ghi mã `FR-*`/`US-*`/`NFR-*` liên quan (tra `glossary.md` / `requirements.md`).
 
 ## Cấm
 
-- Tự tạo API/endpoint không có trong `/specs/**/design.md` (theo `.cursorrules`).
+- Tự tạo API/endpoint không có trong `/specs/backend-api-specification/design.md` (theo `.cursorrules`).
 - Mock/stub mà không khớp DTO trong `be/libs/shared/src/dto/`.
 - Hardcode màu / font / spacing — phải import từ `fe/src/design-system/tokens/`.
-- Dùng `react-router-dom` cho navigation chính (chỉ dùng cho dev screens). Routing chính là `zmp-ui` Router/Route.
+- Dùng `react-router-dom` cho navigation chính (chỉ dùng cho dev screens). Routing chính là `zmp-ui` Router/Route trong `fe/src/router/routes.tsx`.
 
 ## Khi conflict
 
