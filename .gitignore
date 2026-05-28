@@ -74,3 +74,10 @@ fe/.kiro
 
 # Keep visual baseline screenshots committed
 !fe/src/tests/visual/__screenshots__/
+
+# Project documentation and configuration
+/.claude/
+/.github/
+/docs/
+/specs/
+/CLAUDE.md
