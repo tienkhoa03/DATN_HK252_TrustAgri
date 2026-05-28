@@ -1,5 +1,7 @@
 # Project Structure — TrustAgri
 
+> **Lưu ý:** Đây là tổng quan layout + naming convention. Để tra đường dẫn cụ thể của 1 feature/screen/service, dùng [`file-map.md`](./file-map.md) — granular hơn và luôn được giữ đồng bộ với code.
+
 ## Root Directory Layout
 
 ```
@@ -108,32 +110,17 @@ fe/
 ├── src/
 │   ├── app.ts                   # Root App component (no JSX extension)
 │   │
-│   ├── screens/                 # Feature-based page structure
-│   │   ├── buyer/               # Buyer role screens
-│   │   │   ├── components/      # Buyer-specific sub-components
-│   │   │   ├── dashboard/       # Dashboard screen folder
-│   │   │   │   ├── BuyerDashboardScreen.tsx  # Main component
-│   │   │   │   └── index.ts     # Barrel export
-│   │   │   ├── marketplace/
-│   │   │   │   ├── BuyerMarketplaceScreen.tsx
-│   │   │   │   └── index.ts
-│   │   │   ├── post-buying-request/
-│   │   │   └── orders-proposals/
-│   │   │
-│   │   ├── farmer/              # Farmer role screens
-│   │   │   ├── dashboard/
-│   │   │   ├── farm-profile/
-│   │   │   ├── care-log/
-│   │   │   └── ...
-│   │   │
-│   │   ├── trader/              # Trader role screens
-│   │   │   ├── dashboard/
-│   │   │   ├── source-management/
-│   │   │   └── ...
-│   │   │
-│   │   └── guest/               # Public/unauthenticated screens
-│   │       ├── traceability/
-│   │       └── discover/
+│   ├── screens/                 # Feature-based page structure (chi tiết trong file-map.md)
+│   │   ├── farmer/              # dashboard, garden, trade, alerts, connections, profile
+│   │   ├── trader/              # dashboard, marketplace, library, standard-library,
+│   │   │                        # farm-monitoring, supply-monitor, trading-orders,
+│   │   │                        # transactions, contracts, connections, profile-news
+│   │   ├── buyer/               # dashboard, marketplace, product-detail, sourcing,
+│   │   │                        # post-buying-request, orders-proposals, transaction-history,
+│   │   │                        # digital-twin-monitor, live-monitor, profile-notification
+│   │   ├── guest/               # home-market-news, product-detail, traceability-scan
+│   │   └── shared/              # traceability, contracts, contract-change-requests,
+│   │                            # connections, notifications, news-feed, profile, standards
 │   │
 │   ├── components/              # Shared UI components (non-screen)
 │   │   ├── layout/              # Main layout wrapper
@@ -160,14 +147,18 @@ fe/
 │   │
 │   ├── hooks/                   # Custom React hooks
 │   │   ├── useAuth.ts           # Auth state + login/logout
-│   │   ├── useFarm.ts           # Farm query/mutation
-│   │   ├── useStableOpenSnackbar.ts  # Stable snackbar callback
-│   │   └── ...
+│   │   ├── useFarms.ts          # Farm query/mutation
+│   │   ├── useMonitoring.ts     # Sensor data hook
+│   │   ├── useStableOpenSnackbar.ts
+│   │   └── ...                  # useCarePlan, useDevices, useProfile, useStandards,
+│   │                            # useTraderReviews, useTrustScore
 │   │
 │   ├── state/                   # Jotai atoms (global state)
-│   │   ├── authAtom.ts          # Token, userId, role atom
-│   │   ├── uiAtom.ts            # Loading, snackbar state
-│   │   └── ...
+│   │   ├── authAtoms.ts         # Token, userId, currentRole
+│   │   ├── authSessionStorage.ts
+│   │   ├── monitoringAtoms.ts
+│   │   ├── notificationBadgeAtom.ts
+│   │   └── resetOnLogout.ts
 │   │
 │   ├── api/                     # HTTP client
 │   │   ├── axios.ts             # Axios instance + interceptors

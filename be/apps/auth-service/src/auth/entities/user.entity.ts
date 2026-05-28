@@ -17,12 +17,8 @@ export class UserEntity {
   @Column({ name: 'zalo_id', unique: true })
   zaloId: string;
 
-  @Column({
-    type: 'enum',
-    enum: ['farmer', 'trader', 'buyer', 'guest', 'admin'],
-    default: 'guest',
-  })
-  role: UserRole;
+  @Column({ type: 'simple-array', default: 'buyer' })
+  roles: UserRole[];
 
   @Column({ name: 'display_name' })
   displayName: string;

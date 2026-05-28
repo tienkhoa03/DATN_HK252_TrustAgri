@@ -9,6 +9,7 @@ export interface AuthSession {
   refreshToken: string;
   userId: string;
   role: UserRole;
+  roles: UserRole[];
   expiresAt: string; // ISO-8601
 }
 
@@ -18,6 +19,11 @@ export const authSessionAtom = atom<AuthSession | null>(null);
 /** Derived: current role (defaults to 'guest' when not logged in). */
 export const currentRoleAtom = atom<UserRole>(
   (get) => get(authSessionAtom)?.role ?? 'guest',
+);
+
+/** Derived: all roles assigned to the current user (defaults to ['buyer'] when not logged in). */
+export const availableRolesAtom = atom<UserRole[]>(
+  (get) => get(authSessionAtom)?.roles ?? ['buyer'],
 );
 
 /** Derived: access token string or empty string. */

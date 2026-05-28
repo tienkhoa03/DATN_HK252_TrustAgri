@@ -90,6 +90,14 @@ export const ENV = {
   API_BASE_URL: validateBaseUrl(rawBaseUrl),
 
   /**
+   * Base URL cho trang truy xuất nguồn gốc (mã QR encode vào đây).
+   * Dev laptop:  http://localhost:3000/trace
+   * Dev điện thoại: https://<ngrok-id>.ngrok-free.app/trace  (ngrok http 3000)
+   * Production:  https://trustagri.vn/trace
+   */
+  TRACE_BASE_URL: ((import.meta.env.VITE_TRACE_BASE_URL as string | undefined) ?? 'http://localhost:3000/trace').trim(),
+
+  /**
    * Đóng băng hợp đồng DTO/endpoint theo `specs/*-specification/design.md` (Phase 20.2).
    * Gửi kèm request qua header để gateway/observability phân biệt client.
    */

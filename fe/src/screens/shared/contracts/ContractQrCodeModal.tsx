@@ -8,8 +8,9 @@ import { QRCodeSVG as QRCode } from 'qrcode.react';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
+import { ENV } from '@/config/env';
 
-const BASE_TRACE_URL = 'https://trustagri.vn/trace';
+const BASE_TRACE_URL = ENV.TRACE_BASE_URL;
 
 interface Props {
   visible: boolean;

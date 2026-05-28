@@ -46,6 +46,7 @@ export async function bootstrapMockAuthSession(): Promise<{
     refreshToken: loginRes.refreshToken,
     userId: loginRes.userId,
     role: loginRes.role,
+    roles: [loginRes.role],
     expiresAt: loginRes.expiresAt,
   };
   const profile = await mockGetMe(loginRes.role);
