@@ -2,7 +2,7 @@
 
 > Nền tảng kết nối **Nông dân – Thương lái – Người mua** trên Zalo Mini App, kèm giám sát IoT thời gian thực và truy xuất nguồn gốc nông sản qua QR.
 
-TrustAgri là đồ án Capstone xây dựng một hệ sinh thái nông nghiệp số gồm: Zalo Mini App (frontend), 5 NestJS microservices (backend), persistence đa hệ (PostgreSQL + InfluxDB + Redis) và API Gateway Nginx. Mục tiêu: giúp nông dân có đầu ra ổn định, thương lái giám sát tuân thủ quy trình canh tác, người mua biết rõ nguồn gốc, và khách vãng lai có thể quét QR truy xuất ngay tại quầy.
+TrustAgri là đồ án xây dựng một hệ sinh thái nông nghiệp số gồm: Zalo Mini App (frontend), 5 NestJS microservices (backend), persistence đa hệ (PostgreSQL + InfluxDB + Redis) và API Gateway Nginx. Mục tiêu: giúp nông dân có đầu ra ổn định, thương lái giám sát tuân thủ quy trình canh tác, người mua biết rõ nguồn gốc, và khách vãng lai có thể truy xuất nguồn gốc nông sản.
 
 ---
 
