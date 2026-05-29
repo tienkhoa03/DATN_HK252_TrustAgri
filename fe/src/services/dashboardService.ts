@@ -24,6 +24,15 @@ export interface DashboardTraderDto {
   pendingConnections: number;
 }
 
+// FR-T02: xu hướng nhu cầu thị trường (GET /dashboard/trader/market-trends)
+export interface MarketTrendDto {
+  cropType: string;
+  demand: number;
+  supply: number;
+  buyerCount: number;
+  trend: 'up' | 'down' | 'stable';
+}
+
 export interface DashboardFarmerDto {
   periodFrom: string;
   periodTo: string;
@@ -131,6 +140,24 @@ function normalizeBuyer(raw: unknown): DashboardBuyerDto {
 export async function fetchTraderDashboard(): Promise<DashboardTraderDto> {
   const { data } = await apiClient.get<unknown>('/dashboard/trader');
   return normalizeTrader(data);
+}
+
+export async function fetchTraderMarketTrends(): Promise<MarketTrendDto[]> {
+  const { data } = await apiClient.get<unknown>('/dashboard/trader/market-trends');
+  if (!Array.isArray(data)) return [];
+  return data.map((row) => {
+    const r = row && typeof row === 'object' ? (row as Record<string, unknown>) : {};
+    const t = r.trend;
+    const trend: MarketTrendDto['trend'] =
+      t === 'up' || t === 'down' || t === 'stable' ? t : 'stable';
+    return {
+      cropType: str(r.cropType ?? r.crop_type),
+      demand: num(r.demand),
+      supply: num(r.supply),
+      buyerCount: num(r.buyerCount ?? r.buyer_count),
+      trend,
+    };
+  });
 }
 
 export async function fetchFarmerDashboard(): Promise<DashboardFarmerDto> {

@@ -633,6 +633,9 @@ export class ConnectionsService implements OnModuleInit {
       userId: row.user_id,
       zaloId: row.zalo_id,
       role: row.role as UserProfileDto['role'],
+      // Fix tối thiểu ngoài plan: UserProfileDto cần roles[] (multi-role). Discovery query
+      // chỉ select active role → suy ra roles từ role. Refine nếu cần select u.roles thực.
+      roles: [row.role as UserProfileDto['role']],
       displayName: row.display_name,
       phone: row.phone ?? undefined,
       email: row.email ?? undefined,

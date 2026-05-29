@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
+import { ForecastPayloadDto } from '@trustagri/shared';
 
 @Entity('forecasts')
 @Check(`"type" IN ('price', 'demand', 'weather')`)
@@ -40,7 +41,7 @@ export class ForecastEntity {
   type: 'price' | 'demand' | 'weather';
 
   @Column({ name: 'forecast_data', type: 'jsonb' })
-  forecastData: unknown;
+  forecastData: ForecastPayloadDto;
 
   @Column({ name: 'valid_from', type: 'timestamptz' })
   validFrom: Date;

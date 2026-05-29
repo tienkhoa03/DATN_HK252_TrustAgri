@@ -28,10 +28,12 @@ import { ConnectionEntity } from '../connections/entities/connection.entity';
 import { ProposalEntity } from '../proposals/entities/proposal.entity';
 import { ProductEntity } from '../products/entities/product.entity';
 import { ComplianceService } from '../contracts/compliance.service';
+import { MarketTrendDto } from './dto/market-trend.dto';
 
 const DASHBOARD_TTL_SEC = 120;
 const CACHE_PREFIX = {
   trader: 'dashboard:trader:',
+  traderMarketTrends: 'dashboard:trader:market-trends:',
   farmer: 'dashboard:farmer:',
   buyer: 'dashboard:buyer:',
 } as const;
@@ -157,6 +159,71 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
 
     await this.setCached(key, dto);
     return dto;
+  }
+
+  /**
+   * FR-T02: xu hướng nhu cầu thị trường. Cầu = sản lượng buyer cần (toàn thị trường, 30 ngày);
+   * cung = sản lượng trader đã hoàn tất giao (30 ngày). Trả top cropType theo cầu.
+   */
+  async getMarketTrendsForTrader(traderId: string): Promise<MarketTrendDto[]> {
+    const key = `${CACHE_PREFIX.traderMarketTrends}${traderId}`;
+    const cached = await this.getCached<MarketTrendDto[]>(key);
+    if (cached) return cached;
+
+    const { from, to } = this.defaultPeriod();
+
+    const demandRows = await this.buyingRequestRepo
+      .createQueryBuilder('br')
+      .select('br.cropType', 'cropType')
+      .addSelect('SUM(br.quantity)', 'demand')
+      .addSelect('COUNT(DISTINCT br.buyerId)', 'buyerCount')
+      .where('br.createdAt >= :from', { from })
+      .andWhere('br.createdAt <= :to', { to })
+      .groupBy('br.cropType')
+      .orderBy('SUM(br.quantity)', 'DESC')
+      .limit(10)
+      .getRawMany<{ cropType: string; demand: string; buyerCount: string }>();
+
+    const supplyRows = await this.orderRepo
+      .createQueryBuilder('o')
+      .innerJoin(
+        ProductEntity,
+        'p',
+        'p.id = o.productId AND p.deletedAt IS NULL',
+      )
+      .select('p.cropType', 'cropType')
+      .addSelect('SUM(o.quantity)', 'supply')
+      .where('o.traderId = :uid', { uid: traderId })
+      .andWhere('o.status = :st', { st: 'completed' })
+      .andWhere('o.createdAt >= :from', { from })
+      .andWhere('o.createdAt <= :to', { to })
+      .groupBy('p.cropType')
+      .getRawMany<{ cropType: string; supply: string }>();
+
+    const supplyByCrop = new Map<string, number>();
+    for (const row of supplyRows) {
+      supplyByCrop.set(row.cropType, Number(row.supply) || 0);
+    }
+
+    const trends: MarketTrendDto[] = demandRows.map((row) => {
+      const demand = Number(row.demand) || 0;
+      const supply = supplyByCrop.get(row.cropType) ?? 0;
+      let trend: MarketTrendDto['trend'] = 'stable';
+      // Lệch ≥ 10% mới coi là up/down để tránh nhiễu.
+      const threshold = Math.max(demand, supply) * 0.1;
+      if (demand - supply > threshold) trend = 'up';
+      else if (supply - demand > threshold) trend = 'down';
+      return {
+        cropType: row.cropType,
+        demand,
+        supply,
+        buyerCount: parseInt(row.buyerCount, 10) || 0,
+        trend,
+      };
+    });
+
+    await this.setCached(key, trends);
+    return trends;
   }
 
   async getFarmerDashboard(

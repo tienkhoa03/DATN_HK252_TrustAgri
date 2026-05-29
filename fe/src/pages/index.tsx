@@ -32,10 +32,7 @@ const BuyerMarketplaceScreenDemo = lazy(() =>
 const BuyerProductDetailScreenDemo = lazy(() => 
   import("../screens/buyer").then(m => ({ default: m.BuyerProductDetailScreenDemo }))
 );
-const BuyerDigitalTwinMonitorScreenDemo = lazy(() => 
-  import("../screens/buyer").then(m => ({ default: m.BuyerDigitalTwinMonitorScreenDemo }))
-);
-const BuyerOrdersProposalsScreenDemo = lazy(() => 
+const BuyerOrdersProposalsScreenDemo = lazy(() =>
   import("../screens/buyer").then(m => ({ default: m.BuyerOrdersProposalsScreenDemo }))
 );
 const BuyerPostBuyingRequestScreenDemo = lazy(() => 
@@ -134,14 +131,6 @@ function HomePage() {
     return (
       <Suspense fallback={<LoadingScreen />}>
         <BuyerProductDetailScreenDemo onBack={() => setActiveDemo(null)} />
-      </Suspense>
-    );
-  }
-
-  if (activeDemo === 'buyer-digital-twin-monitor') {
-    return (
-      <Suspense fallback={<LoadingScreen />}>
-        <BuyerDigitalTwinMonitorScreenDemo onBack={() => setActiveDemo(null)} />
       </Suspense>
     );
   }
@@ -290,13 +279,6 @@ function HomePage() {
               className="mb-2"
             >
               Chi tiết Sản phẩm và Đặt cọc
-            </Button>
-            <Button
-              fullWidth
-              onClick={() => setActiveDemo('buyer-digital-twin-monitor')}
-              className="mb-2"
-            >
-              Giám sát Bản sao số
             </Button>
             <Button
               fullWidth

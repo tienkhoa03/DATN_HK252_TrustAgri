@@ -21,6 +21,7 @@ import {
   updateNews,
   toNewsForecastViMessage,
   type ForecastDto,
+  type ForecastPayload,
   type NewsArticleDto,
 } from '../../../services/newsForecastService';
 import { getMe, updateMe } from '@/services/authService';
@@ -96,7 +97,7 @@ const DEFAULT_FORECAST_FIELDS: ForecastDataFields = {
   details: '',
 };
 
-function buildForecastData(type: 'price' | 'demand' | 'weather', fields: ForecastDataFields): unknown {
+function buildForecastData(type: 'price' | 'demand' | 'weather', fields: ForecastDataFields): ForecastPayload {
   if (type === 'price') {
     return {
       productLabel: fields.productLabel,

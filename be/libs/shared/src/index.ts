@@ -6,6 +6,7 @@ export * from './dto/care-plan.dto';
 export * from './dto/contract.dto';
 export * from './dto/monitoring.dto';
 export * from './dto/notification.dto';
+export * from './dto/forecast.dto';
 export * from './dto/iot-device.dto';
 export * from './dto/trader-review.dto';
 

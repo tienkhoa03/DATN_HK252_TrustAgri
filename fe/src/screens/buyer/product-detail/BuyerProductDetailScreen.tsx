@@ -6,8 +6,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Page, Text, useNavigate } from 'zmp-ui';
-import { useParams } from 'react-router-dom';
+import { Page, Text, useNavigate, useParams } from 'zmp-ui';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';

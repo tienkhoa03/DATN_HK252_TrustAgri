@@ -12,11 +12,22 @@ import {
 } from '@trustagri/shared';
 import { ForecastsService } from './forecasts.service';
 import { ForecastListQueryDto } from './dto/forecast-list-query.dto';
+import { PriceTrendDto, PriceTrendQueryDto } from './dto/price-trend.dto';
 
 @ApiTags('forecasts')
 @Controller('forecasts')
 export class ForecastsController {
   constructor(private readonly forecasts: ForecastsService) {}
+
+  @Public()
+  @Get('price-trends')
+  @ApiOperation({ summary: 'Aggregate public price chart by crop type (FR-G02, public)' })
+  @ApiResponse({ status: 200, description: 'Latest price series per crop type (no PII)' })
+  priceTrends(
+    @Query() query: PriceTrendQueryDto,
+  ): Promise<PriceTrendDto[]> {
+    return this.forecasts.aggregatePriceTrends(query.cropType, query.days);
+  }
 
   @Public()
   @Get()

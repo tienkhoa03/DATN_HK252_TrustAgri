@@ -9,6 +9,7 @@ import {
   Roles,
 } from '@trustagri/shared';
 import { DashboardService } from './dashboard.service';
+import { MarketTrendDto } from './dto/market-trend.dto';
 
 /**
  * GET /api/v1/dashboard/trader|farmer|buyer — tổng hợp dashboard theo vai trò (design.md §4.4.7).
@@ -27,6 +28,18 @@ export class DashboardController {
   @ApiResponse({ status: 403, description: 'Forbidden - trader role required' })
   getTrader(@CurrentUser() user: JwtPayload): Promise<DashboardTraderDto> {
     return this.dashboardService.getTraderDashboard(user);
+  }
+
+  @Get('trader/market-trends')
+  @Roles('trader')
+  @ApiOperation({ summary: 'Get market demand vs supply trends per crop (FR-T02)' })
+  @ApiResponse({ status: 200, description: 'Market trend list per crop type' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - trader role required' })
+  getTraderMarketTrends(
+    @CurrentUser() user: JwtPayload,
+  ): Promise<MarketTrendDto[]> {
+    return this.dashboardService.getMarketTrendsForTrader(user.sub);
   }
 
   @Get('farmer')

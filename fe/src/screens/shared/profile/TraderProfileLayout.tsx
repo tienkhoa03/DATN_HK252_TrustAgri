@@ -22,7 +22,13 @@ import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { useTrustScore } from '@/hooks/useTrustScore';
 import { useTraderReviews } from '@/hooks/useTraderReviews';
-import type { TrustScoreDto } from '@/services/traderReviewService';
+import {
+  updateTraderReview,
+  deleteTraderReview,
+  toReviewViMessage,
+  type TrustScoreDto,
+} from '@/services/traderReviewService';
+import { useQueryClient } from '@tanstack/react-query';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -895,6 +901,64 @@ function PublicPreviewModal({
 
 function ReviewsOverlay({ traderId, onClose }: { traderId: string; onClose: () => void }) {
   const { reviews, isLoading } = useTraderReviews(traderId);
+  const session = useAtomValue(authSessionAtom);
+  const currentUserId = session?.userId ?? '';
+  const queryClient = useQueryClient();
+  const openSnackbar = useStableOpenSnackbar();
+
+  // FR-U01: chỉ tác giả mới sửa/xóa được review của mình.
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editRating, setEditRating] = useState(0);
+  const [editComment, setEditComment] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const invalidateReviews = () => {
+    void queryClient.invalidateQueries({ queryKey: ['trader-reviews', traderId] });
+    void queryClient.invalidateQueries({ queryKey: ['trust-score', traderId] });
+  };
+
+  const startEdit = (id: string, rating: number, comment?: string) => {
+    setEditingId(id);
+    setEditRating(rating);
+    setEditComment(comment ?? '');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditRating(0);
+    setEditComment('');
+  };
+
+  const saveEdit = async (id: string) => {
+    if (editRating === 0) return;
+    setBusyId(id);
+    try {
+      await updateTraderReview(id, { rating: editRating, comment: editComment.trim() || undefined });
+      invalidateReviews();
+      cancelEdit();
+      openSnackbar({ type: 'success', text: 'Đã cập nhật đánh giá.', duration: 2500, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toReviewViMessage(err), duration: 3500, icon: true });
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Xóa đánh giá này?')) return;
+    setBusyId(id);
+    try {
+      await deleteTraderReview(id);
+      invalidateReviews();
+      if (editingId === id) cancelEdit();
+      openSnackbar({ type: 'success', text: 'Đã xóa đánh giá.', duration: 2500, icon: true });
+    } catch (err) {
+      openSnackbar({ type: 'error', text: toReviewViMessage(err), duration: 3500, icon: true });
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const formatDate = (iso: string) => {
     try {
@@ -969,35 +1033,137 @@ function ReviewsOverlay({ traderId, onClose }: { traderId: string; onClose: () =
           </Text>
         ) : (
           <Box style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm }}>
-            {reviews.map((r) => (
-              <Box
-                key={r.id}
-                style={{
-                  padding: spacing.sm,
-                  background: backgroundColors.secondary,
-                  borderRadius: 10,
-                }}
-              >
-                <Box style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
-                  <Text style={{ fontSize: fontSize.caption, fontWeight: fontWeight.semibold, color: textColors.primary }}>
-                    {r.buyerDisplayName ?? 'Người mua ẩn danh'}
-                  </Text>
-                  <Text style={{ fontSize: fontSize.small, color: textColors.secondary }}>
-                    {formatDate(r.createdAt)}
-                  </Text>
+            {reviews.map((r) => {
+              const isOwn = !!currentUserId && r.buyerId === currentUserId;
+              const isEditing = editingId === r.id;
+              const isBusy = busyId === r.id;
+              return (
+                <Box
+                  key={r.id}
+                  style={{
+                    padding: spacing.sm,
+                    background: backgroundColors.secondary,
+                    borderRadius: 10,
+                    border: isOwn ? `1.5px solid ${primaryColors.zaloBlue}40` : 'none',
+                  }}
+                >
+                  <Box style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
+                    <Text style={{ fontSize: fontSize.caption, fontWeight: fontWeight.semibold, color: textColors.primary }}>
+                      {isOwn ? 'Bạn' : r.buyerDisplayName ?? 'Người mua ẩn danh'}
+                    </Text>
+                    <Text style={{ fontSize: fontSize.small, color: textColors.secondary }}>
+                      {formatDate(r.createdAt)}
+                    </Text>
+                  </Box>
+
+                  {isEditing ? (
+                    <>
+                      <Box style={{ display: 'flex', gap: 2, marginBottom: spacing.xs }}>
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            aria-label={`${s} sao`}
+                            onClick={() => setEditRating(s)}
+                            style={{
+                              background: 'transparent', border: 'none', cursor: 'pointer', padding: 0,
+                              minWidth: 44, minHeight: 44, fontSize: 24,
+                              color: s <= editRating ? '#FACC15' : '#E5E7EB',
+                            }}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </Box>
+                      <textarea
+                        value={editComment}
+                        onChange={(e) => setEditComment(e.target.value)}
+                        maxLength={500}
+                        rows={3}
+                        placeholder="Nhận xét của bạn (tùy chọn)"
+                        style={{
+                          width: '100%', boxSizing: 'border-box', padding: '8px 10px',
+                          border: `1.5px solid ${backgroundColors.tertiary}`, borderRadius: 8,
+                          fontSize: fontSize.caption, color: textColors.primary, background: backgroundColors.primary,
+                          resize: 'none', marginBottom: spacing.xs, fontFamily: 'inherit',
+                        }}
+                      />
+                      <Box style={{ display: 'flex', gap: spacing.xs }}>
+                        <button
+                          type="button"
+                          onClick={() => void saveEdit(r.id)}
+                          disabled={editRating === 0 || isBusy}
+                          style={{
+                            flex: 1, minHeight: 40, borderRadius: 8, border: 'none',
+                            background: primaryColors.zaloBlue, color: '#fff',
+                            fontSize: fontSize.caption, fontWeight: fontWeight.semibold,
+                            cursor: editRating === 0 || isBusy ? 'not-allowed' : 'pointer',
+                            opacity: editRating === 0 || isBusy ? 0.5 : 1,
+                          }}
+                        >
+                          {isBusy ? 'Đang lưu…' : 'Lưu'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEdit}
+                          disabled={isBusy}
+                          style={{
+                            flex: 1, minHeight: 40, borderRadius: 8, border: 'none',
+                            background: backgroundColors.tertiary, color: textColors.secondary,
+                            fontSize: fontSize.caption, fontWeight: fontWeight.semibold, cursor: 'pointer',
+                          }}
+                        >
+                          Hủy
+                        </button>
+                      </Box>
+                    </>
+                  ) : (
+                    <>
+                      <Box style={{ display: 'flex', gap: 2, marginBottom: spacing.xs }}>
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Text key={s} style={{ fontSize: 14, color: s <= r.rating ? '#FACC15' : '#E5E7EB' }}>★</Text>
+                        ))}
+                      </Box>
+                      {r.comment && (
+                        <Text style={{ fontSize: fontSize.caption, color: textColors.secondary, lineHeight: 1.5 }}>
+                          {r.comment}
+                        </Text>
+                      )}
+                      {isOwn && (
+                        <Box style={{ display: 'flex', gap: spacing.sm, marginTop: spacing.xs }}>
+                          <button
+                            type="button"
+                            onClick={() => startEdit(r.id, r.rating, r.comment)}
+                            disabled={isBusy}
+                            style={{
+                              minHeight: 36, padding: `0 ${spacing.md}`, borderRadius: 8,
+                              background: 'transparent', border: `1px solid ${primaryColors.zaloBlue}`,
+                              color: primaryColors.zaloBlue, fontSize: fontSize.small,
+                              fontWeight: fontWeight.semibold, cursor: 'pointer',
+                            }}
+                          >
+                            Sửa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDelete(r.id)}
+                            disabled={isBusy}
+                            style={{
+                              minHeight: 36, padding: `0 ${spacing.md}`, borderRadius: 8,
+                              background: 'transparent', border: `1px solid ${functionalColors.alertRed}`,
+                              color: functionalColors.alertRed, fontSize: fontSize.small,
+                              fontWeight: fontWeight.semibold, cursor: 'pointer',
+                            }}
+                          >
+                            {isBusy ? 'Đang xóa…' : 'Xóa'}
+                          </button>
+                        </Box>
+                      )}
+                    </>
+                  )}
                 </Box>
-                <Box style={{ display: 'flex', gap: 2, marginBottom: spacing.xs }}>
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Text key={s} style={{ fontSize: 14, color: s <= r.rating ? '#FACC15' : '#E5E7EB' }}>★</Text>
-                  ))}
-                </Box>
-                {r.comment && (
-                  <Text style={{ fontSize: fontSize.caption, color: textColors.secondary, lineHeight: 1.5 }}>
-                    {r.comment}
-                  </Text>
-                )}
-              </Box>
-            ))}
+              );
+            })}
           </Box>
         )}
 

@@ -19,6 +19,8 @@ import {
   hasUserSigned,
   toContractViMessage,
   getContract,
+  listContractAuditLogs,
+  type ContractAuditLogDto,
 } from '@/services/contractService';
 import {
   listContractChangeRequests,
@@ -95,6 +97,33 @@ function formatDate(iso: string): string {
   }
 }
 
+function formatDateTime(iso: string): string {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  } catch {
+    return iso;
+  }
+}
+
+// Map actorUserId → nhãn vai trò dựa trên các bên của hợp đồng (audit log chỉ có id).
+function auditActorLabel(actorUserId: string, contract: ContractDto): string {
+  if (actorUserId === contract.partyFarmerId) {
+    return partyFarmerDisplay(contract) || 'Nông dân';
+  }
+  if (actorUserId === contract.partyTraderId) return 'Thương lái';
+  if (actorUserId === contract.partyBuyerId) {
+    return partyBuyerDisplay(contract) || 'Người mua';
+  }
+  return actorUserId ? `${actorUserId.slice(0, 8)}…` : 'Hệ thống';
+}
+
 type ActionDialog = 'cancel' | 'complete' | 'modify' | null;
 
 export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
@@ -110,6 +139,9 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
   const [contract, setContract] = useState<ContractDto>(initialContract);
   const [signing, setSigning] = useState(false);
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+
+  // Audit log (lịch sử thay đổi trạng thái từ hệ thống — FR-T06)
+  const [auditLogs, setAuditLogs] = useState<ContractAuditLogDto[]>([]);
 
   // Change request flow (cancel / complete / modify)
   const [changeRequests, setChangeRequests] = useState<ContractChangeRequestDto[]>([]);
@@ -154,9 +186,21 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
     }
   }, [initialContract.id, visible]);
 
+  // Lịch sử thay đổi trạng thái (audit log) — mọi role xem được (FR-T06)
+  const refreshAuditLogs = useCallback(async () => {
+    if (!visible) return;
+    try {
+      const logs = await listContractAuditLogs(initialContract.id);
+      setAuditLogs(logs);
+    } catch {
+      setAuditLogs([]);
+    }
+  }, [initialContract.id, visible]);
+
   useEffect(() => {
     void refreshChangeRequests();
-  }, [refreshChangeRequests]);
+    void refreshAuditLogs();
+  }, [refreshChangeRequests, refreshAuditLogs]);
 
   if (!visible) return null;
 
@@ -212,6 +256,7 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
       const fresh = await getContract(contract.id);
       setContract(fresh);
       await refreshChangeRequests();
+      void refreshAuditLogs();
       void queryClient.invalidateQueries({ queryKey: ['trader-contracts'] });
       setActionDialog(null);
       setActionReason('');
@@ -235,6 +280,7 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
       const fresh = await getContract(contract.id);
       setContract(fresh);
       await refreshChangeRequests();
+      void refreshAuditLogs();
       void queryClient.invalidateQueries({ queryKey: ['trader-contracts'] });
       openSnackbar({ type: 'success', text: 'Đã chấp nhận yêu cầu.', duration: 3000, icon: true });
     } catch (err) {
@@ -251,6 +297,7 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
       const fresh = await getContract(contract.id);
       setContract(fresh);
       await refreshChangeRequests();
+      void refreshAuditLogs();
       void queryClient.invalidateQueries({ queryKey: ['trader-contracts'] });
       openSnackbar({ type: 'success', text: 'Đã từ chối yêu cầu.', duration: 3000, icon: true });
     } catch (err) {
@@ -265,6 +312,7 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
     try {
       const updated = await signContract(contract.id);
       setContract(updated);
+      void refreshAuditLogs();
       onSigned?.(updated);
       const msg =
         updated.status === 'active'
@@ -901,6 +949,54 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
             </div>
           ))}
         </div>
+
+        {/* Lịch sử thay đổi trạng thái (audit log từ hệ thống) — FR-T06 */}
+        <Text.Title size="small" style={{ margin: `${spacing.lg} 0 ${spacing.md}` }}>
+          Lịch sử thay đổi
+        </Text.Title>
+        {auditLogs.length === 0 ? (
+          <Text size="xSmall" style={{ color: colors.text.secondary, fontSize: fontSize.caption }}>
+            Chưa có thay đổi trạng thái nào được ghi nhận.
+          </Text>
+        ) : (
+          <div>
+            {auditLogs.map((log) => (
+              <div
+                key={log.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: spacing.sm,
+                  padding: `${spacing.sm} 0`,
+                  borderBottom: `1px solid ${colors.background.tertiary}`,
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Text size="small" style={{ margin: 0, fontWeight: fontWeight.medium, fontSize: fontSize.caption }}>
+                    {log.previousStatus ? (
+                      <>
+                        <span style={{ color: colors.text.secondary }}>
+                          {contractStatusLabelVi(log.previousStatus as ContractDto['status'])}
+                        </span>
+                        {' → '}
+                      </>
+                    ) : null}
+                    <span style={{ color: colors.primary.zaloBlue, fontWeight: fontWeight.semibold }}>
+                      {contractStatusLabelVi(log.newStatus as ContractDto['status'])}
+                    </span>
+                  </Text>
+                  <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0, fontSize: fontSize.caption }}>
+                    bởi {auditActorLabel(log.actorUserId, contract)}
+                  </Text>
+                </div>
+                <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0, flexShrink: 0, fontSize: fontSize.caption }}>
+                  {formatDateTime(log.occurredAt)}
+                </Text>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {showQrModal && contract.traceabilityCode && (

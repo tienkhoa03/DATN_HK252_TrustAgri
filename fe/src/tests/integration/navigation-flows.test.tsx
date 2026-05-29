@@ -26,7 +26,6 @@ import { FarmerGardenMonitorScreen as FarmerProcessScreen } from '../../screens/
 
 import { BuyerMarketplaceScreen } from '../../screens/buyer';
 import { BuyerProductDetailScreen } from '../../screens/buyer';
-import { BuyerDigitalTwinMonitorScreen } from '../../screens/buyer';
 import { BuyerOrdersProposalsScreen } from '../../screens/buyer';
 import { BuyerPostBuyingRequestScreen } from '../../screens/buyer';
 import { BuyerProfileNotificationScreen } from '../../screens/buyer';
@@ -132,17 +131,10 @@ describe('Navigation Flows - 3-Click Rule Compliance', () => {
       expect(detailContainer).toBeInTheDocument();
     });
 
-    test('Path 3: Orders → Digital Twin Monitor → Details (3 clicks)', () => {
+    test('Path 3: Orders → Order details (navigation)', () => {
       // Click 1: Orders screen
       const { container: ordersContainer } = render(<BuyerOrdersProposalsScreen />);
       expect(ordersContainer).toBeInTheDocument();
-      
-      // Click 2: Select order to monitor
-      const { container: monitorContainer } = render(<BuyerDigitalTwinMonitorScreen orderId="1" />);
-      expect(monitorContainer).toBeInTheDocument();
-      
-      // Click 3: View detailed monitoring data
-      // Total: 3 clicks to monitor order
     });
 
     test('Path 4: Marketplace → Post Buying Request (2 clicks)', () => {

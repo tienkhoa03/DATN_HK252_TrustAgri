@@ -9,8 +9,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Page, Text, useNavigate, useParams } from 'zmp-ui';
-import { useLocation } from 'react-router-dom';
+import { Page, Text, useNavigate, useParams, useLocation } from 'zmp-ui';
 import { Icon } from '../../../design-system/components/Icon';
 import { Button } from '../../../design-system/components/Button';
 import { colors } from '../../../design-system/tokens/colors';

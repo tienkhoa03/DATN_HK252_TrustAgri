@@ -55,23 +55,62 @@ export interface NewsArticleUpdateDto {
   imageUrl?: string;
 }
 
+// ── forecastData chuẩn (mirror @trustagri/shared ForecastPayloadDto, FR-T12) ──
+
+export type ForecastTrend = 'up' | 'down' | 'stable';
+export type ForecastRiskLevel = 'low' | 'medium' | 'high';
+
+export interface ForecastSeriesItem {
+  day: string;
+  price?: number;
+  demand?: number;
+}
+
+export interface ForecastPayload {
+  productLabel?: string;
+  trend?: ForecastTrend;
+  changePercent?: number;
+  series?: ForecastSeriesItem[];
+  priceMin?: number;
+  priceMax?: number;
+  description?: string;
+  riskLevel?: ForecastRiskLevel;
+  details?: string;
+}
+
 export interface ForecastDto {
   id: string;
   traderId?: string;
   region: string;
   cropType: string;
   type: 'price' | 'demand' | 'weather';
-  forecastData: unknown;
+  forecastData: ForecastPayload;
   validFrom: string;
   validTo: string;
   createdAt: string;
+}
+
+// ── price-trends aggregate (FR-G02, GET /forecasts/price-trends, public) ──
+
+export interface PriceTrendPoint {
+  day: string;
+  price: number;
+}
+
+export interface PriceTrend {
+  cropType: string;
+  productLabel: string | null;
+  trend: ForecastTrend | null;
+  changePercent: number | null;
+  series: PriceTrendPoint[];
+  updatedAt: string;
 }
 
 export interface ForecastCreateDto {
   region: string;
   cropType: string;
   type: 'price' | 'demand' | 'weather';
-  forecastData: unknown;
+  forecastData: ForecastPayload;
   validFrom: string;
   validTo: string;
 }
@@ -80,7 +119,7 @@ export interface ForecastUpdateDto {
   region?: string;
   cropType?: string;
   type?: 'price' | 'demand' | 'weather';
-  forecastData?: unknown;
+  forecastData?: ForecastPayload;
   validFrom?: string;
   validTo?: string;
 }
@@ -131,7 +170,7 @@ export function mapForecastDto(raw: unknown): ForecastDto {
     region: str(r.region),
     cropType: str(r.cropType ?? r.crop_type),
     type: typeVal,
-    forecastData: r.forecastData ?? r.forecast_data,
+    forecastData: (r.forecastData ?? r.forecast_data ?? {}) as ForecastPayload,
     validFrom: str(r.validFrom ?? r.valid_from),
     validTo: str(r.validTo ?? r.valid_to),
     createdAt: str(r.createdAt ?? r.created_at),
@@ -254,6 +293,54 @@ export async function listForecasts(
 
   const { data } = await apiClient.get<unknown>('/forecasts', { params: q });
   return mapListResponse(data, mapForecastDto);
+}
+
+function mapPriceTrend(raw: unknown): PriceTrend {
+  const r = raw as Record<string, unknown>;
+  const t = r.trend;
+  const trend: ForecastTrend | null =
+    t === 'up' || t === 'down' || t === 'stable' ? t : null;
+  const seriesRaw = r.series;
+  const series: PriceTrendPoint[] = Array.isArray(seriesRaw)
+    ? seriesRaw
+        .map((row) => {
+          const s = row as Record<string, unknown>;
+          const day = str(s.day);
+          const price = typeof s.price === 'number' ? s.price : Number(s.price);
+          if (!day || Number.isNaN(price)) return null;
+          return { day, price };
+        })
+        .filter((x): x is PriceTrendPoint => x !== null)
+    : [];
+  return {
+    cropType: str(r.cropType ?? r.crop_type),
+    productLabel: (r.productLabel ?? r.product_label ?? null) as string | null,
+    trend,
+    changePercent:
+      typeof r.changePercent === 'number'
+        ? r.changePercent
+        : r.change_percent != null
+        ? Number(r.change_percent)
+        : null,
+    series,
+    updatedAt: str(r.updatedAt ?? r.updated_at),
+  };
+}
+
+export interface PriceTrendsParams {
+  cropType?: string;
+  days?: number;
+}
+
+export async function getPriceTrends(
+  params?: PriceTrendsParams,
+): Promise<PriceTrend[]> {
+  const q: Record<string, unknown> = {};
+  if (params?.cropType) q.cropType = params.cropType;
+  if (params?.days) q.days = params.days;
+
+  const { data } = await apiClient.get<unknown>('/forecasts/price-trends', { params: q });
+  return Array.isArray(data) ? data.map(mapPriceTrend) : [];
 }
 
 export async function createForecast(body: ForecastCreateDto): Promise<ForecastDto> {

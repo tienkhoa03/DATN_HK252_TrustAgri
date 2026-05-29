@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
-import { useLocation } from 'react-router-dom';
-import { useNavigate } from 'zmp-ui';
+import { useLocation, useNavigate } from 'zmp-ui';
 
 import { BottomNavigation, type NavigationItem } from '@/design-system/layouts';
 import { Icon } from '@/design-system/components/Icon';

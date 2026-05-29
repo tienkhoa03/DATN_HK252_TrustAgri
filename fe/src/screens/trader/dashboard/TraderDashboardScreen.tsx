@@ -15,8 +15,10 @@ import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
 import {
   fetchTraderDashboard,
+  fetchTraderMarketTrends,
   toDashboardViMessage,
   type DashboardTraderDto,
+  type MarketTrendDto,
 } from '@/services/dashboardService';
 import { getMe } from '@/services/authService';
 import { subscribeConnectionStatus } from '@/api/monitoringSocket';
@@ -93,6 +95,7 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
   const navigate = useNavigate();
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | '7days' | '30days'>('7days');
   const [data, setData] = useState<DashboardTraderDto | null>(null);
+  const [marketTrends, setMarketTrends] = useState<MarketTrendDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [traderName, setTraderName] = useState(traderNameProp ?? '');
@@ -104,6 +107,10 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
       let cancelled = false;
       setLoading(true);
       setError(null);
+      // Market trends (FR-T02) không block dashboard chính; lỗi → ẩn card.
+      fetchTraderMarketTrends()
+        .then((trends) => { if (!cancelled) setMarketTrends(trends); })
+        .catch(() => { if (!cancelled) setMarketTrends([]); });
       fetchTraderDashboard()
         .then((dto) => {
           if (!cancelled) {
@@ -538,6 +545,72 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
                       height={220}
                     />
                   </Suspense>
+                )}
+              </div>
+            </div>
+
+            {/* Xu hướng nhu cầu thị trường — FR-T02 */}
+            <div style={chartSectionStyles}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text.Title size="small" style={{ margin: 0 }}>
+                  Xu hướng nhu cầu thị trường
+                </Text.Title>
+                <Icon name="trending-up" size="md" color={colors.primary.zaloBlue} />
+              </div>
+              <Text size="xSmall" style={{ color: colors.text.secondary, margin: `${spacing.xs} 0 0` }}>
+                Cầu (người mua cần) so với cung (bạn đã giao) — 30 ngày
+              </Text>
+              <div style={{ marginTop: spacing.md }}>
+                {marketTrends.length === 0 ? (
+                  <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+                    Chưa có dữ liệu nhu cầu thị trường trong kỳ này.
+                  </Text>
+                ) : (
+                  marketTrends.map((t) => {
+                    const max = Math.max(t.demand, t.supply, 1);
+                    const trendColor =
+                      t.trend === 'up'
+                        ? colors.primary.agriGreen
+                        : t.trend === 'down'
+                        ? colors.functional.alertRed
+                        : colors.text.secondary;
+                    const trendLabel =
+                      t.trend === 'up' ? '📈 Cầu vượt cung' : t.trend === 'down' ? '📉 Cung vượt cầu' : '➡️ Cân bằng';
+                    return (
+                      <div key={t.cropType} style={{ marginBottom: spacing.md }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
+                          <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
+                            {t.cropType}
+                          </Text>
+                          <span style={{ fontSize: fontSize.small, fontWeight: fontWeight.medium, color: trendColor }}>
+                            {trendLabel}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginBottom: 2 }}>
+                          <div style={{ width: 36, flexShrink: 0 }}>
+                            <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Cầu</Text>
+                          </div>
+                          <div style={{ flex: 1, height: 10, backgroundColor: colors.background.secondary, borderRadius: 5 }}>
+                            <div style={{ width: `${(t.demand / max) * 100}%`, height: '100%', backgroundColor: colors.primary.zaloBlue, borderRadius: 5 }} />
+                          </div>
+                          <Text size="xSmall" style={{ margin: 0, minWidth: 56, textAlign: 'right' }}>
+                            {t.demand.toLocaleString('vi-VN')}
+                          </Text>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+                          <div style={{ width: 36, flexShrink: 0 }}>
+                            <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Cung</Text>
+                          </div>
+                          <div style={{ flex: 1, height: 10, backgroundColor: colors.background.secondary, borderRadius: 5 }}>
+                            <div style={{ width: `${(t.supply / max) * 100}%`, height: '100%', backgroundColor: colors.primary.agriGreen, borderRadius: 5 }} />
+                          </div>
+                          <Text size="xSmall" style={{ margin: 0, minWidth: 56, textAlign: 'right' }}>
+                            {t.supply.toLocaleString('vi-VN')}
+                          </Text>
+                        </div>
+                      </div>
+                    );
+                  })
                 )}
               </div>
             </div>

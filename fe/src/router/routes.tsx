@@ -1,6 +1,7 @@
 import React, { lazy, Suspense, useEffect, useRef } from 'react';
 import { Route, AnimationRoutes, useNavigate } from 'zmp-ui';
 import { Box, Spinner } from 'zmp-ui';
+// zmp-ui không re-export Outlet → giữ từ react-router-dom (chỉ dùng ở router infra).
 import { Outlet } from 'react-router-dom';
 import { useAtomValue, useSetAtom } from 'jotai';
 

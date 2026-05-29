@@ -1,5 +1,7 @@
-import { IsString, IsOptional, IsIn, Allow } from 'class-validator';
+import { IsString, IsOptional, IsIn, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ForecastPayloadDto } from './forecast.dto';
 
 /**
  * Thông báo trong app (design.md §4.2 NotificationDto)
@@ -94,7 +96,7 @@ export interface ForecastDto {
   region: string;
   cropType: string;
   type: 'price' | 'demand' | 'weather';
-  forecastData: unknown;
+  forecastData: ForecastPayloadDto;
   validFrom: string;
   validTo: string;
   createdAt: string;
@@ -113,9 +115,10 @@ export class ForecastCreateDto {
   @IsIn(['price', 'demand', 'weather'])
   type: 'price' | 'demand' | 'weather';
 
-  @ApiProperty({ description: 'Forecast data payload (structure depends on type)', example: { pricePerKg: 23500, confidence: 0.85 } })
-  @Allow()
-  forecastData: unknown;
+  @ApiProperty({ description: 'Forecast data payload (structure depends on type)', type: () => ForecastPayloadDto })
+  @ValidateNested()
+  @Type(() => ForecastPayloadDto)
+  forecastData: ForecastPayloadDto;
 
   @ApiProperty({ description: 'Forecast valid from (ISO 8601)', example: '2024-04-01T00:00:00Z' })
   @IsString()
@@ -142,10 +145,11 @@ export class ForecastUpdateDto {
   @IsIn(['price', 'demand', 'weather'])
   type?: 'price' | 'demand' | 'weather';
 
-  @ApiPropertyOptional({ description: 'Updated forecast data payload', example: { demandIndex: 1.2 } })
+  @ApiPropertyOptional({ description: 'Updated forecast data payload', type: () => ForecastPayloadDto })
   @IsOptional()
-  @Allow()
-  forecastData?: unknown;
+  @ValidateNested()
+  @Type(() => ForecastPayloadDto)
+  forecastData?: ForecastPayloadDto;
 
   @ApiPropertyOptional({ description: 'Valid from (ISO 8601)', example: '2024-05-01T00:00:00Z' })
   @IsOptional()

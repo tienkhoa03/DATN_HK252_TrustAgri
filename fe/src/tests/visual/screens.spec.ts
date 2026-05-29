@@ -206,21 +206,6 @@ test.describe('Buyer Screens - Visual Regression', () => {
     }
   });
   
-  test('Buyer Digital Twin Monitor Screen', async ({ page }) => {
-    await page.goto('/');
-    await page.waitForLoadState('networkidle');
-    
-    const twinLink = page.locator('text=/Digital Twin|Bản sao số|Monitor/i').first();
-    if (await twinLink.count() > 0) {
-      await twinLink.click();
-      await page.waitForLoadState('networkidle');
-      
-      await expect(page).toHaveScreenshot('buyer-digital-twin-monitor.png', {
-        fullPage: true,
-      });
-    }
-  });
-  
   test('Buyer Orders Proposals Screen', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');

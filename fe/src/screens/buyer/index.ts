@@ -1,6 +1,5 @@
 export { BuyerMarketplaceScreen, BuyerDiscoverScreen, BuyerMarketplaceScreenDemo } from './marketplace';
 export { BuyerProductDetailScreen, BuyerProductDetailScreenDemo } from './product-detail';
-export { BuyerDigitalTwinMonitorScreen, BuyerDigitalTwinMonitorScreenDemo } from './digital-twin-monitor';
 export { BuyerOrdersProposalsScreen, BuyerOrdersProposalsScreenDemo, BuyerOrdersScreen } from './orders-proposals';
 export { BuyerPostBuyingRequestScreen, BuyerPostBuyingRequestScreenDemo } from './post-buying-request';
 export { BuyerProfileNotificationScreen, BuyerProfileNotificationScreenDemo } from './profile-notification';

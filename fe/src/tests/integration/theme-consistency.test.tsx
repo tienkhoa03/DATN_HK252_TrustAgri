@@ -28,7 +28,6 @@ import { FarmerGardenMonitorScreen as FarmerProcessScreen } from '../../screens/
 
 import { BuyerMarketplaceScreen } from '../../screens/buyer';
 import { BuyerProductDetailScreen } from '../../screens/buyer';
-import { BuyerDigitalTwinMonitorScreen } from '../../screens/buyer';
 import { BuyerOrdersProposalsScreen } from '../../screens/buyer';
 import { BuyerPostBuyingRequestScreen } from '../../screens/buyer';
 import { BuyerProfileNotificationScreen } from '../../screens/buyer';
@@ -238,7 +237,6 @@ describe('Theme Consistency - Design System Integration', () => {
       const buyerScreens = [
         { name: 'Marketplace', component: <BuyerMarketplaceScreen /> },
         { name: 'Product Detail', component: <BuyerProductDetailScreen productId="1" /> },
-        { name: 'Digital Twin Monitor', component: <BuyerDigitalTwinMonitorScreen orderId="1" /> },
         { name: 'Orders Proposals', component: <BuyerOrdersProposalsScreen /> },
         { name: 'Post Buying Request', component: <BuyerPostBuyingRequestScreen /> },
         { name: 'Profile Notification', component: <BuyerProfileNotificationScreen /> },

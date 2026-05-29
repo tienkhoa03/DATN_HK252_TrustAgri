@@ -5,8 +5,7 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Page, Text, Spinner, useNavigate } from 'zmp-ui';
-import { useParams } from 'react-router-dom';
+import { Page, Text, Spinner, useNavigate, useParams } from 'zmp-ui';
 import { useAtomValue } from 'jotai';
 import { Icon } from '@/design-system/components/Icon';
 import { Chart } from '@/design-system/components/Chart';

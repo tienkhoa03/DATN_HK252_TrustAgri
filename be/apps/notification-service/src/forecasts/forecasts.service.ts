@@ -13,6 +13,7 @@ import {
 } from '@trustagri/shared';
 import { ForecastEntity } from './forecast.entity';
 import { ForecastListQueryDto } from './dto/forecast-list-query.dto';
+import { PriceTrendDto, PriceTrendPoint } from './dto/price-trend.dto';
 import { AuthClientService } from '../clients/auth-client.service';
 import { settledValue } from '../clients/settled.util';
 
@@ -68,6 +69,53 @@ export class ForecastsService {
       limit,
       total,
     };
+  }
+
+  /**
+   * FR-G02: aggregate biểu đồ giá công khai cho Guest. Lấy forecast `price` mới nhất
+   * theo từng cropType, trả series (cap `days` điểm gần nhất). KHÔNG trả PII thương lái.
+   */
+  async aggregatePriceTrends(
+    cropType?: string,
+    days = 7,
+  ): Promise<PriceTrendDto[]> {
+    const qb = this.repo
+      .createQueryBuilder('f')
+      .where('f.type = :type', { type: 'price' })
+      .orderBy('f.cropType', 'ASC')
+      .addOrderBy('f.validFrom', 'DESC');
+
+    if (cropType) {
+      qb.andWhere('f.cropType = :cropType', { cropType });
+    }
+
+    const rows = await qb.getMany();
+
+    // Giữ forecast mới nhất cho mỗi cropType (rows đã sort validFrom DESC).
+    const latestByCrop = new Map<string, ForecastEntity>();
+    for (const row of rows) {
+      if (!latestByCrop.has(row.cropType)) {
+        latestByCrop.set(row.cropType, row);
+      }
+    }
+
+    return [...latestByCrop.values()].map((e) => {
+      const fd = e.forecastData ?? {};
+      const rawSeries = Array.isArray(fd.series) ? fd.series : [];
+      const series: PriceTrendPoint[] = rawSeries
+        .filter((s) => typeof s?.price === 'number')
+        .map((s) => ({ day: String(s.day ?? ''), price: s.price as number }))
+        .slice(-days);
+
+      return {
+        cropType: e.cropType,
+        productLabel: fd.productLabel ?? null,
+        trend: fd.trend ?? null,
+        changePercent: fd.changePercent ?? null,
+        series,
+        updatedAt: (e.updatedAt ?? e.createdAt).toISOString(),
+      };
+    });
   }
 
   async create(

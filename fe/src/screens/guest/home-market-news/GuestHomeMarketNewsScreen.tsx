@@ -26,7 +26,7 @@ import {
   toMarketplaceViMessage,
 } from '../../../services/marketplaceService';
 import {
-  listForecasts,
+  getPriceTrends,
   listNews,
   toNewsForecastViMessage,
 } from '../../../services/newsForecastService';
@@ -83,42 +83,6 @@ const CROP_DEFAULT_LABELS: Record<string, string> = {
   mango: 'Xoài',
   durian: 'Sầu riêng',
 };
-
-function parseForecastToPriceData(
-  cropKey: string,
-  forecastData: unknown,
-): PriceData | null {
-  if (!forecastData || typeof forecastData !== 'object') return null;
-  const fd = forecastData as Record<string, unknown>;
-  const trendRaw = fd.trend;
-  const trend: 'up' | 'down' | 'stable' =
-    trendRaw === 'up' || trendRaw === 'down' || trendRaw === 'stable' ? trendRaw : 'stable';
-  const changePercent =
-    typeof fd.changePercent === 'number' ? fd.changePercent : 0;
-  const series = fd.series;
-  const productLabel =
-    typeof fd.productLabel === 'string' ? fd.productLabel : CROP_DEFAULT_LABELS[cropKey] ?? cropKey;
-  let data: { day: string; price: number }[] = [];
-  if (Array.isArray(series)) {
-    data = series
-      .map((row) => {
-        if (!row || typeof row !== 'object') return null;
-        const r = row as Record<string, unknown>;
-        const day = typeof r.day === 'string' ? r.day : '';
-        const price = typeof r.price === 'number' ? r.price : NaN;
-        if (!day || Number.isNaN(price)) return null;
-        return { day, price };
-      })
-      .filter((x): x is { day: string; price: number } => x !== null);
-  }
-  if (data.length === 0) return null;
-  return {
-    product: productLabel,
-    trend,
-    change: changePercent,
-    data,
-  };
-}
 
 /**
  * Guest Home & Market News Screen Component
@@ -185,9 +149,9 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
     setNewsAndForecastLoading(true);
     Promise.all([
       listNews({ page: 1, limit: 12 }),
-      listForecasts({ page: 1, limit: 20, region: 'mekong_delta', type: 'price' }),
+      getPriceTrends({ days: 7 }),
     ])
-      .then(([newsRes, fcRes]) => {
+      .then(([newsRes, trends]) => {
         if (cancelled) return;
         const slider: NewsItem[] = newsRes.items.map((a) => ({
           id: a.id,
@@ -199,10 +163,14 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
         setNewsItems(slider);
 
         const nextPrice: Record<string, PriceData> = {};
-        for (const f of fcRes.items) {
-          const key = f.cropType;
-          const parsed = parseForecastToPriceData(key, f.forecastData);
-          if (parsed) nextPrice[key] = parsed;
+        for (const t of trends) {
+          if (t.series.length === 0) continue;
+          nextPrice[t.cropType] = {
+            product: t.productLabel ?? CROP_DEFAULT_LABELS[t.cropType] ?? t.cropType,
+            trend: t.trend ?? 'stable',
+            change: t.changePercent ?? 0,
+            data: t.series,
+          };
         }
         setPriceData(nextPrice);
       })

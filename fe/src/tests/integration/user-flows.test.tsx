@@ -27,7 +27,6 @@ import { FarmerGardenMonitorScreen as FarmerProcessScreen } from '../../screens/
 // Buyer Screens
 import { BuyerMarketplaceScreen } from '../../screens/buyer';
 import { BuyerProductDetailScreen } from '../../screens/buyer';
-import { BuyerDigitalTwinMonitorScreen } from '../../screens/buyer';
 import { BuyerOrdersProposalsScreen } from '../../screens/buyer';
 import { BuyerPostBuyingRequestScreen } from '../../screens/buyer';
 import { BuyerProfileNotificationScreen } from '../../screens/buyer';
@@ -116,13 +115,6 @@ describe('Integration Tests - User Flows', () => {
       expect(container).toBeInTheDocument();
     });
 
-    test('Buyer can monitor digital twin after pre-order', () => {
-      const { container } = render(<BuyerDigitalTwinMonitorScreen orderId="1" />);
-      
-      // Verify digital twin monitor renders
-      expect(container).toBeInTheDocument();
-    });
-
     test('Buyer can manage orders and proposals', () => {
       const { container } = render(<BuyerOrdersProposalsScreen />);
       
@@ -144,18 +136,14 @@ describe('Integration Tests - User Flows', () => {
       expect(container).toBeInTheDocument();
     });
 
-    test('Buyer flow: Browse → Product Detail → Pre-order → Monitor', () => {
+    test('Buyer flow: Browse → Product Detail → Pre-order', () => {
       // Test complete buying flow
       const { container: marketplaceContainer } = render(<BuyerMarketplaceScreen />);
       expect(marketplaceContainer).toBeInTheDocument();
-      
+
       // Navigate to product detail
       const { container: detailContainer } = render(<BuyerProductDetailScreen productId="1" />);
       expect(detailContainer).toBeInTheDocument();
-      
-      // Navigate to digital twin monitoring
-      const { container: monitorContainer } = render(<BuyerDigitalTwinMonitorScreen orderId="1" />);
-      expect(monitorContainer).toBeInTheDocument();
     });
   });
 
@@ -270,7 +258,6 @@ describe('Integration Tests - User Flows', () => {
       const buyerScreens = [
         <BuyerMarketplaceScreen />,
         <BuyerProductDetailScreen productId="1" />,
-        <BuyerDigitalTwinMonitorScreen orderId="1" />,
         <BuyerOrdersProposalsScreen />,
         <BuyerPostBuyingRequestScreen />,
         <BuyerProfileNotificationScreen />,
