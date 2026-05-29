@@ -52,7 +52,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Login successful, returns JWT tokens' })
   @ApiResponse({ status: 401, description: 'Invalid Zalo access token' })
   login(@Body() dto: AuthLoginDto): Promise<AuthLoginResponseDto> {
-    return this.authService.login(dto.zaloAccessToken, dto.phoneNumber);
+    return this.authService.login(dto.zaloAccessToken, dto.phoneNumber, dto.phoneToken);
   }
 
   /**

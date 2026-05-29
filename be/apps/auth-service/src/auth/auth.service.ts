@@ -42,9 +42,25 @@ export class AuthService {
     private readonly redisService: RedisService,
   ) {}
 
-  async login(zaloAccessToken: string, phoneNumber?: string): Promise<AuthLoginResponseDto> {
+  async login(
+    zaloAccessToken: string,
+    phoneNumber?: string,
+    phoneToken?: string,
+  ): Promise<AuthLoginResponseDto> {
     // 1. Xác thực token với Zalo API
     const zaloUser = await this.zaloService.getUserInfo(zaloAccessToken);
+
+    // 1b. Số điện thoại: ưu tiên giá trị FE gửi sẵn (dev/staging); nếu không có thì
+    // giải mã `phoneToken` (code từ getPhoneNumber) qua Zalo /me/info (production). Fail-soft.
+    let resolvedPhone = phoneNumber?.trim() || null;
+    if (!resolvedPhone && phoneToken) {
+      resolvedPhone = await this.zaloService.getPhoneNumber(zaloAccessToken, phoneToken);
+    }
+
+    // Zalo chỉ trả `name`/`picture` khi user cấp quyền scope.userInfo — fallback an toàn
+    // vì cột display_name là NOT NULL.
+    const displayName = zaloUser.name?.trim() || 'Người dùng Zalo';
+    const avatarUrl = zaloUser.picture?.data?.url ?? null;
 
     // 2. Tìm hoặc tạo mới user
     let user = await this.userRepo.findOne({
@@ -54,23 +70,26 @@ export class AuthService {
     if (!user) {
       user = this.userRepo.create({
         zaloId: zaloUser.id,
-        displayName: zaloUser.name,
-        avatarUrl: zaloUser.picture?.data?.url ?? null,
+        displayName,
+        avatarUrl,
         roles: ['buyer'],
-        phone: phoneNumber ?? null,
+        phone: resolvedPhone,
         email: null,
         traderProfile: null,
         farmerProfile: null,
         buyerProfile: null,
       });
     } else {
-      user.displayName = zaloUser.name;
-      if (zaloUser.picture?.data?.url) {
-        user.avatarUrl = zaloUser.picture.data.url;
+      // Chỉ ghi đè khi Zalo thực sự trả dữ liệu — tránh xóa thông tin sẵn có bằng giá trị rỗng.
+      if (zaloUser.name?.trim()) {
+        user.displayName = zaloUser.name.trim();
+      }
+      if (avatarUrl) {
+        user.avatarUrl = avatarUrl;
       }
       // Cập nhật phone nếu chưa có hoặc người dùng cấp quyền mới
-      if (phoneNumber && (!user.phone || user.phone !== phoneNumber)) {
-        user.phone = phoneNumber;
+      if (resolvedPhone && user.phone !== resolvedPhone) {
+        user.phone = resolvedPhone;
       }
     }
 

@@ -90,11 +90,20 @@ export class AuthLoginDto {
   @IsString()
   zaloAccessToken: string;
 
-  /** Số điện thoại từ ZMP SDK (best-effort, FE gửi kèm nếu user đã cấp quyền) */
+  /** Số điện thoại từ ZMP SDK (best-effort, FE gửi kèm nếu user đã cấp quyền — dev/staging) */
   @ApiPropertyOptional({ description: 'Phone number from Zalo SDK (sent if user granted permission)', example: '0901234567' })
   @IsOptional()
   @IsString()
   phoneNumber?: string;
+
+  /**
+   * Token (code) từ getPhoneNumber() của ZMP SDK ở môi trường production.
+   * Server đổi code này lấy số thật qua Zalo /me/info (cần ZALO_APP_SECRET_KEY). Best-effort.
+   */
+  @ApiPropertyOptional({ description: 'Phone number token (code) from getPhoneNumber() — decoded server-side', example: 'phone_token_abc123' })
+  @IsOptional()
+  @IsString()
+  phoneToken?: string;
 }
 
 /**

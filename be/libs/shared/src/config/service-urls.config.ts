@@ -45,3 +45,10 @@ export const ZALO_GRAPH_ME_URL_DEFAULT =
 export function resolveZaloGraphMeUrl(raw?: string): string {
   return raw?.trim() || ZALO_GRAPH_ME_URL_DEFAULT;
 }
+
+/** Endpoint giải mã số điện thoại Zalo Mini App (header access_token + code + secret_key). */
+export const ZALO_GRAPH_PHONE_URL_DEFAULT = 'https://graph.zalo.me/v2.0/me/info';
+
+export function resolveZaloGraphPhoneUrl(raw?: string): string {
+  return raw?.trim() || ZALO_GRAPH_PHONE_URL_DEFAULT;
+}

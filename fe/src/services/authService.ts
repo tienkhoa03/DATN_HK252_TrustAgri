@@ -106,9 +106,14 @@ export async function devLogin(secret: string, zaloId: string): Promise<AuthSess
   };
 }
 
-export async function login(zaloAccessToken: string, phoneNumber?: string): Promise<AuthSession> {
+export async function login(
+  zaloAccessToken: string,
+  phoneNumber?: string,
+  phoneToken?: string,
+): Promise<AuthSession> {
   const body: Record<string, string> = { zaloAccessToken };
   if (phoneNumber) body.phoneNumber = phoneNumber;
+  if (phoneToken) body.phoneToken = phoneToken;
 
   const { data } = await apiClient.post<{
     accessToken: string;

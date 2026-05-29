@@ -31,19 +31,32 @@ export class RequirePasswordLoginError extends Error {
  *  - `RequirePasswordLoginError` khi mode='password' → caller redirect /login.
  *  - `Error` khác (mạng/zalo SDK) → caller hiển thị snackbar + giữ trạng thái chưa login.
  */
-/** Lấy số điện thoại từ ZMP SDK (best-effort, fail-soft). */
-async function tryGetPhoneNumber(): Promise<string | undefined> {
+/**
+ * Lấy số điện thoại từ ZMP SDK (best-effort, fail-soft).
+ *
+ * Production: getPhoneNumber() trả về một `token` (code) — server đổi lấy số thật qua
+ * Zalo /me/info (cần ZALO_APP_SECRET_KEY). Ta trả về `phoneToken`.
+ * Dev/staging: một số phiên bản ZMP trả thẳng `number`/`phoneNumber` — trả về `phoneNumber`.
+ */
+async function tryGetPhoneNumber(): Promise<{ phoneNumber?: string; phoneToken?: string }> {
   try {
     const { getPhoneNumber } = await import('zmp-sdk/apis');
-    // getPhoneNumber yêu cầu user cấp quyền; trả token hoặc plain number tuỳ phiên bản ZMP
-    const result = await getPhoneNumber({ success: () => {}, fail: () => {} });
-    // Một số phiên bản ZMP trả plain number trực tiếp (dev/staging)
-    const phone = (result as { phoneNumber?: string }).phoneNumber;
-    if (phone && /^\+?[0-9]{9,15}$/.test(phone)) return phone;
+    const result = (await getPhoneNumber({ success: () => {}, fail: () => {} })) as {
+      number?: string;
+      phoneNumber?: string;
+      token?: string;
+    };
+    const plain = result.phoneNumber ?? result.number;
+    if (plain && /^\+?[0-9]{9,15}$/.test(plain)) {
+      return { phoneNumber: plain };
+    }
+    if (result.token) {
+      return { phoneToken: result.token };
+    }
   } catch {
     // Không hỗ trợ hoặc user từ chối — bỏ qua
   }
-  return undefined;
+  return {};
 }
 
 export async function bootstrapAuthSession(): Promise<AuthSession> {
@@ -54,8 +67,8 @@ export async function bootstrapAuthSession(): Promise<AuthSession> {
         throw new Error('Không lấy được Zalo access token. Đảm bảo ứng dụng chạy trong Zalo Mini App.');
       }
       // Lấy phone best-effort (fail-soft — không block login nếu SDK không hỗ trợ)
-      const phoneNumber = await tryGetPhoneNumber();
-      return authService.login(zaloToken, phoneNumber);
+      const { phoneNumber, phoneToken } = await tryGetPhoneNumber();
+      return authService.login(zaloToken, phoneNumber, phoneToken);
     }
 
     case 'zalo-token': {
