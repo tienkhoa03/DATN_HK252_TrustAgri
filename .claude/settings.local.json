@@ -63,7 +63,8 @@
       "Bash(xargs grep -l \"FE_ORIGINS\\\\|CORS\\\\|production\\\\|deployment\")",
       "Bash(xargs grep -l \"CreateDateColumn\\\\|Index\\\\|Unique\")",
       "Bash(xargs grep -l \"sign\\\\|concurrent\\\\|race\")",
-      "Bash(xargs grep -l \"TraderReviewDto\")"
+      "Bash(xargs grep -l \"TraderReviewDto\")",
+      "Bash(grep -vE '/$')"
     ]
   }
 }

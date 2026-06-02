@@ -50,8 +50,8 @@
 
 | Nhóm | Service | Vai trò |
 |------|---------|---------|
-| **Core** | Auth Service | Zalo OAuth, JWT issue/verify, user profile. |
-| **Core** | Notification Service | Multi-channel send (Zalo ZNS/OA, email, SMS); event consumer. |
+| **Core** | Auth Service | Zalo OAuth (+phone-token decode), JWT issue/verify, multi-role switch, user profile. Dev/staging: password-login + dev-login (gated env). |
+| **Core** | Notification Service | In-app (DB) + Zalo ZNS; tiêu thụ event async qua Redis pub/sub. News + forecasts feed. |
 | **Domain** | Farm Service | Hồ sơ vườn, nhật ký, evidence, standards (VietGAP/GlobalGAP), traceability. |
 | **Domain** | Contract Service | Orders, proposals, contracts, connections, products marketplace. |
 | **Monitoring** | Monitoring Service | Sensor ingest, threshold alerts, WebSocket push, historical query. |
@@ -83,12 +83,14 @@ IoT Sensor → Gateway → Monitoring Service → InfluxDB (write)
                                           → Redis (latest state)
                                           → Threshold check
                                               ↓ vượt ngưỡng
-                                          Notification Service
-                                              ↓
-                                          Zalo notification + WS push
+                                          Redis pub/sub (alert.created) → Notification Service → Zalo ZNS + in-app
+                                          + WebSocket push (Socket.IO) về client
 ```
 
-### 3.3 Real-time push
+### 3.3 Async event bus (cross-service)
+- **Redis pub/sub:** producer monitoring/contract publish `alert.created` / `contract.changed` / `connection.requested`; consumer notification-service. Tách biệt khỏi HTTP đồng bộ (clients/).
+
+### 3.4 Real-time push
 - **WebSocket** (Socket.IO): `wss://.../monitoring/farms/:farmId` đẩy sensor data + alerts về client.
 - **Fallback:** REST GET history nếu WS lỗi.
 
