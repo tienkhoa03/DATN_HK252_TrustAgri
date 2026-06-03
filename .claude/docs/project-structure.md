@@ -6,16 +6,17 @@
 
 ```
 trustagri/
-├── be/                          # Backend monorepo (NestJS + Turbo)
-├── fe/                          # Frontend (Zalo Mini App)
-├── specs/                       # Business & technical specifications
+├── be/                          # Backend monorepo (NestJS + Turbo) — có docker-compose.yml + package.json riêng
+├── fe/                          # Frontend (Zalo Mini App) — package.json riêng
+├── specs/                       # Đặc tả gốc (backend-api-specification, frontend-ui-specification)
+├── docs/                        # Reference: postgres/influxdb/redis_database_design, apis, deploy, GAP_ANALYSIS, TODO
+├── scripts/                     # seed-influx.sh
+├── .github/                     # workflows/visual-regression.yml, copilot-instructions.md
+├── .claude/                     # Claude Code metadata (docs/, rules/, agents/, commands/, plan/)
 ├── CLAUDE.md                    # Project overview & conventions
-├── .claude/                     # Claude Code metadata
-│   └── docs/                    # This documentation suite
-├── .github/                     # GitHub Actions workflows
-├── docker-compose.yml           # Local dev databases
-└── package.json                 # Root workspace package
+└── README.md
 ```
+> Không có `package.json` / `docker-compose.yml` ở repo root — mỗi workspace (`be/`, `fe/`) tự quản. `npm run docker:up` chạy trong `be/`.
 
 ---
 
@@ -25,73 +26,36 @@ trustagri/
 ```
 be/
 ├── package.json                 # Workspace root (Turbo + npm workspaces)
-├── tsconfig.json                # TypeScript base config
+├── tsconfig.base.json           # TypeScript base config (shared)
 ├── turbo.json                   # Turbo pipeline config
+├── docker-compose.yml           # PostgreSQL + Redis + InfluxDB (local dev)
+├── nginx/                       # API Gateway config (routing 3001–3005)
 │
-├── apps/                        # Microservices
-│   ├── auth-service/            # Authentication & authorization
-│   │   ├── src/
-│   │   │   ├── auth/            # Auth controller, service, JWT strategy
-│   │   │   ├── main.ts          # Entry point (NestJS bootstrap)
-│   │   │   └── app.module.ts    # Service module wiring
-│   │   └── package.json
-│   │
-│   ├── farm-service/            # Farm profiles, care logs, evidence
-│   │   ├── src/
-│   │   │   ├── farms/           # Farm CRUD (controller, service, entity, DTO)
-│   │   │   ├── care-logs/       # Care log CRUD + sync
-│   │   │   ├── standards/       # Farming standards reference
-│   │   │   ├── app.module.ts    # Module wiring
-│   │   │   └── main.ts
-│   │   └── package.json
-│   │
-│   ├── contract-service/        # Orders, proposals, connections
-│   │   ├── src/
-│   │   │   ├── orders/          # Buying requests → orders lifecycle
-│   │   │   ├── proposals/       # Trader proposals to buyer
-│   │   │   ├── contracts/       # Contract lifecycle & audit log
-│   │   │   ├── connections/     # Farmer ↔ Trader marketplace
-│   │   │   ├── products/        # Product catalog
-│   │   │   ├── app.module.ts
-│   │   │   └── main.ts
-│   │   └── package.json
-│   │
-│   ├── monitoring-service/      # Sensor data, alerts, WebSocket
-│   │   ├── src/
-│   │   │   ├── sensors/         # Sensor readings (InfluxDB)
-│   │   │   ├── alerts/          # Threshold alerts
-│   │   │   ├── app.module.ts
-│   │   │   └── main.ts
-│   │   └── package.json
-│   │
-│   └── notification-service/    # Multi-channel notifications
-│       ├── src/
-│       │   ├── notifications/   # Email, SMS, Zalo
-│       │   ├── app.module.ts
-│       │   └── main.ts
-│       └── package.json
+├── apps/                        # 5 microservices — mỗi service: main.ts + app.module.ts + <domain>/ folders
+│   ├── auth-service/  (3001)    # auth (4 login modes, JWT, multi-role, profile), zalo.service, redis session
+│   ├── farm-service/  (3002)    # farms, care-logs (+sync), care-plans, standards, traceability, clients
+│   ├── contract-service/ (3003) # buying-requests, proposals, orders, contracts(+audit), contract-change-requests,
+│   │                            #   connections, products, trader-reviews, dashboard, clients
+│   ├── monitoring-service/(3004)# sensors (InfluxDB+traceability snapshot), devices, alerts, gateway (Socket.IO), clients
+│   └── notification-service/(3005)# notifications (in-app/Zalo ZNS), news, forecasts, clients
+│        # Mỗi <domain>/: <domain>.controller.ts · <domain>.service.ts · <domain>.module.ts · entities/ · dto/
+│        # Mỗi service cũng có: strategies/jwt.strategy.ts · health/ · migrations/ · clients/ (HTTP cross-service)
 │
-├── libs/                        # Shared code
-│   └── shared/                  # DTOs, interfaces, constants
-│       ├── src/
-│       │   ├── dto/             # Shared DTO interfaces
-│       │   ├── constants/       # Business constants
-│       │   └── index.ts         # Public export barrel
-│       └── package.json
+├── libs/shared/src/             # @trustagri/shared — prebuilt trước dev/build
+│   ├── dto/                     # DTO chia sẻ: auth, farm, care-plan, contract, monitoring, iot-device,
+│   │                            #   notification, forecast, trader-review, common
+│   ├── decorators/ guards/ filters/ interceptors/ logger/ middleware/ config/ bootstrap/ types/
+│   └── index.ts                 # Public export barrel
 │
-└── integration-tests/           # End-to-end test suite
-    ├── src/
-    │   ├── auth.spec.ts         # Auth flow tests
-    │   ├── farm.spec.ts         # Farm CRUD tests
-    │   └── ...
-    └── package.json
+└── integration-tests/src/*.spec.ts  # E2E tests hit nhiều service + DB thật
 ```
 
 ### Key Folders Explained
 
-- **apps/** — Independent microservices; each has own `package.json`, `tsconfig`, database migrations.
-- **libs/shared/** — Prebuilt before dev/start; exports DTOs, types, validation rules used across services.
+- **apps/** — Independent microservices; each has own `package.json`, `tsconfig`, database migrations. Port 3001–3005.
+- **libs/shared/** — Prebuilt before dev/start; exports DTOs, decorators, guards, filters, logger used across services.
 - **integration-tests/** — Full-stack tests hitting real services + databases.
+- **Chi tiết từng domain folder + endpoint:** xem [`file-map.md`](./file-map.md).
 
 ---
 
@@ -110,89 +74,62 @@ fe/
 ├── src/
 │   ├── app.ts                   # Root App component (no JSX extension)
 │   │
-│   ├── screens/                 # Feature-based page structure (chi tiết trong file-map.md)
+│   ├── pages/                   # Entry/bootstrap screens (KHÔNG phải legacy)
+│   │   ├── AppInitScreen.tsx    # Splash + auto-login theo VITE_AUTH_MODE
+│   │   ├── LoginScreen.tsx      # Form login (mode 'password')
+│   │   ├── RoleSelectionScreen.tsx # Chọn role khi user có nhiều role
+│   │   └── index*.tsx           # Dev hub (index / index-debug / index-step-by-step)
+│   │
+│   ├── screens/                 # Feature-based pages by role (chi tiết: file-map.md)
 │   │   ├── farmer/              # dashboard, garden, trade, alerts, connections, profile
 │   │   ├── trader/              # dashboard, marketplace, library, standard-library,
 │   │   │                        # farm-monitoring, supply-monitor, trading-orders,
-│   │   │                        # transactions, contracts, connections, profile-news
+│   │   │                        # transactions, connections, profile-news
 │   │   ├── buyer/               # dashboard, marketplace, product-detail, sourcing,
 │   │   │                        # post-buying-request, orders-proposals, transaction-history,
-│   │   │                        # digital-twin-monitor, live-monitor, profile-notification
+│   │   │                        # live-monitor, profile-notification, components
 │   │   ├── guest/               # home-market-news, product-detail, traceability-scan
 │   │   └── shared/              # traceability, contracts, contract-change-requests,
 │   │                            # connections, notifications, news-feed, profile, standards
 │   │
-│   ├── components/              # Shared UI components (non-screen)
-│   │   ├── layout/              # Main layout wrapper
-│   │   │   ├── Layout.tsx       # Root layout + ZMP Router setup
-│   │   │   └── Sidebar.tsx      # Navigation sidebar (if needed)
-│   │   ├── common/              # Generic components (Card, Modal, etc.)
-│   │   └── ...
+│   ├── components/              # Shared non-screen components
+│   │   │                        # layout, NotificationBell, ConnectionStatusBanner, TrustWebRouter,
+│   │   ├── ErrorBoundary/       #   ChunkErrorBoundary
+│   │   ├── RedirectTo/  buyer/  trader/   # role-scoped shared bits
+│   │   └── clock.tsx logo.tsx layout.tsx
 │   │
-│   ├── design-system/           # Zalo design tokens & primitives
-│   │   ├── components/          # Design-system components (Button, Input, etc.)
-│   │   │   └── Chart.tsx        # Reusable chart component
-│   │   ├── tokens/              # Design tokens (colors, spacing, typography)
-│   │   │   ├── colors.ts        # Color palette (Zalo Blue, Agri Green, etc.)
-│   │   │   ├── spacing.ts       # Margin/padding scale
-│   │   │   └── typography.ts    # Font sizes, weights, line heights
+│   ├── design-system/           # Custom tokens & primitives (trên nền zmp-ui)
+│   │   ├── components/          # Alert, Button, Card, Chart, DigitalTwinViewer, EmptyState,
+│   │   │                        #   Gauge, Icon, MapPicker, QRCode, SensorDisplay, SensorLineChart,
+│   │   │                        #   Sparkline, Timeline, DiffRow
+│   │   ├── layouts/             # ScreenLayout, Header, BottomNavigation, TabNavigation
+│   │   ├── tokens/              # colors.ts, spacing.ts, typography.ts, icons.ts, grid.ts
+│   │   ├── utils/               # theme/ThemeProvider, validators, errorHandling, spacing, grid
 │   │   └── index.ts
 │   │
-│   ├── services/                # Business logic & API layer
-│   │   ├── farmService.ts       # Farm CRUD API calls
-│   │   ├── authService.ts       # Auth flows (Zalo OAuth, login/logout)
-│   │   ├── dashboardService.ts  # Dashboard data fetching
-│   │   ├── notificationService.ts
-│   │   └── ...
+│   ├── services/                # API layer per domain (axios → map DTO → model). 1 file/feature.
+│   │                            #   auth, farm, careLog(+offlineQueue/autoSync), carePlan, standard,
+│   │                            #   traceability, monitoring, device, connection, contract(+changeRequest),
+│   │                            #   order, proposal, buyingRequest, marketplace, dashboard, traderReview,
+│   │                            #   notification(+navigation), newsForecast, evidenceUpload, mock(+mocks/)
 │   │
-│   ├── hooks/                   # Custom React hooks
-│   │   ├── useAuth.ts           # Auth state + login/logout
-│   │   ├── useFarms.ts          # Farm query/mutation
-│   │   ├── useMonitoring.ts     # Sensor data hook
-│   │   ├── useStableOpenSnackbar.ts
-│   │   └── ...                  # useCarePlan, useDevices, useProfile, useStandards,
-│   │                            # useTraderReviews, useTrustScore
+│   ├── hooks/                   # useAuth, useFarms, useCarePlan, useDevices, useMonitoring, useProfile,
+│   │                            #   useStandards, useTraderReviews, useTrustScore, useStableOpenSnackbar
 │   │
-│   ├── state/                   # Jotai atoms (global state)
-│   │   ├── authAtoms.ts         # Token, userId, currentRole
-│   │   ├── authSessionStorage.ts
-│   │   ├── monitoringAtoms.ts
-│   │   ├── notificationBadgeAtom.ts
-│   │   └── resetOnLogout.ts
+│   ├── state/                   # Jotai atoms: authAtoms, authSessionStorage, monitoringAtoms,
+│   │                            #   notificationBadgeAtom, resetOnLogout
 │   │
-│   ├── api/                     # HTTP client
-│   │   ├── axios.ts             # Axios instance + interceptors
-│   │   └── types.ts             # API response types
+│   ├── api/                     # client.ts (axios + auth interceptor), interceptors.ts, errors.ts,
+│   │                            #   monitoringSocket.ts (Socket.IO)
 │   │
-│   ├── router/                  # Routing setup (if separated from Layout)
-│   │   ├── routes.ts            # Route definitions
-│   │   └── guards.ts            # Role-based route guards
+│   ├── router/                  # routes.tsx (tổng route map), RoleGuard.tsx, RequireRole.tsx, roleHome.ts
+│   ├── navigation/              # RoleAppShell.tsx, RoleBottomNav.tsx, roleNavModel.ts (shell + bottom nav)
 │   │
-│   ├── config/                  # Environment & constants
-│   │   ├── env.ts               # Vite env vars
-│   │   ├── constants.ts         # App constants, endpoints
-│   │   └── ...
-│   │
-│   ├── utils/                   # Helper functions
-│   │   ├── formatters.ts        # Number, date, currency formatters
-│   │   ├── validators.ts        # Form validation
-│   │   └── ...
-│   │
-│   ├── css/                     # Global styles
-│   │   ├── index.css            # Global reset + utilities
-│   │   └── tailwind.css         # Tailwind directives
-│   │
-│   ├── pages/                   # Legacy: demo/reference (optional)
-│   │   └── index.tsx            # Dev hub screen (future: remove)
-│   │
-│   ├── tests/                   # Unit & E2E tests
-│   │   ├── unit/
-│   │   │   ├── services/        # Service unit tests
-│   │   │   └── hooks/           # Hook unit tests
-│   │   ├── e2e/                 # Playwright tests
-│   │   └── ...
-│   │
-│   └── static/                  # Static assets (icons, images)
+│   ├── config/env.ts            # Mọi VITE_ env (fail-fast): AUTH_MODE, API base, TRACE base, contract version
+│   ├── utils/                   # lazyLoad, uuid, cache, imageOptimization, performance, displayLabels
+│   ├── css/                     # app.scss, tailwind.scss
+│   ├── tests/                   # unit/, integration/, e2e/(+regression/), visual/, __mocks__/, setup.ts
+│   └── static/                  # Static assets (bg.svg, icons)
 │
 └── scripts/
     └── check-bundle-size.js     # Verify bundle < 20MB
@@ -200,12 +137,13 @@ fe/
 
 ### Key Folders Explained
 
-- **screens/** — Page-level components organized by role + feature. Each feature is a folder with kebab-case name, containing a PascalCase component.
-- **design-system/** — Zalo UI tokens and reusable primitives (not from `zmp-ui` but custom design-system components built on top).
-- **services/** — Business logic that wraps API calls and transforms data (MapToDTO, error handling).
-- **hooks/** — React hooks for common logic (auth, data fetching, UI state).
-- **state/** — Global state using Jotai atoms (minimal, focused on auth + session).
-- **api/** — Axios instance with interceptors (auth headers, error parsing, 401 handling).
+- **pages/** — Bootstrap + auth entry screens (AppInit/Login/RoleSelection) + dev hub; NOT legacy.
+- **screens/** — Page-level components by role + feature (kebab-case folder, PascalCase `*Screen.tsx`).
+- **design-system/** — Custom tokens + primitives built on top of `zmp-ui`. BẮT BUỘC import tokens, không hardcode.
+- **services/** — Wrap axios calls + transform DTO → model + error handling. Component không gọi axios trực tiếp.
+- **state/** — Global state via Jotai (auth/session/monitoring badge).
+- **api/** — Axios instance with interceptors (auth headers, error parsing, 401 → logout).
+- **Chi tiết file + ý nghĩa:** xem [`file-map.md`](./file-map.md).
 
 ---
 

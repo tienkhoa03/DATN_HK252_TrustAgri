@@ -4,7 +4,7 @@
 >
 > **Cách dùng:** Khi nhận task, tra bảng dưới → chỉ Read các file ghi rõ. Nếu task không khớp entry nào → mới Glob/Grep. Sau khi grep ra file mới quan trọng, **cập nhật map này**.
 >
-> **Trạng thái cập nhật:** 2026-05-27. Khi thêm/xóa folder cấp `screens/<role>/<feature>/` hoặc `apps/<service>/src/<domain>/`, cập nhật file này.
+> **Trạng thái cập nhật:** 2026-06-02. Khi thêm/xóa folder cấp `screens/<role>/<feature>/` hoặc `apps/<service>/src/<domain>/`, cập nhật file này.
 
 ---
 
@@ -46,9 +46,14 @@
 Cổng vào: `main.ts` (port 3001), `app.module.ts`.
 | Domain folder | Ý nghĩa |
 |---|---|
-| `auth/` | Zalo OAuth + JWT issue/refresh, login/logout/multi-role switching. Bao gồm `entities/`, `guards/`, `redis.service.ts` (session). FR-A01..A05. |
-| `migrations/` | TypeORM migrations cho users. |
-| `strategies/` | Passport JWT strategy. |
+| `auth/auth.controller.ts` | 4 cách login: `login` (Zalo accessToken + phoneNumber/phoneToken), `password-login` (gated `AUTH_PASSWORD_LOGIN_ENABLED`), `dev-login` (gated `AUTH_DEV_LOGIN_ENABLED`), + `verify`/`logout`/`me`/`switch-role`/`users/:id`. FR-A01..A05. |
+| `auth/auth.service.ts` | Logic login/JWT issue+refresh, multi-role switch, profile (`me`). |
+| `auth/zalo.service.ts` | Gọi Zalo OAuth (`getProfile`) + giải mã phoneToken qua `/me/info` (`ZALO_APP_SECRET_KEY`). |
+| `auth/redis.service.ts` | Session store + rate-limit dev-login theo IP. |
+| `auth/guards/` | `password-login-enabled`, `dev-login-enabled`, `dev-localhost` (chặn dev-login theo env/IP). |
+| `auth/entities/user.entity.ts` | User (roles[], zaloId, username/passwordHash cho password-login, trader/farmer/buyer profile). |
+| `migrations/` | TypeORM migrations cho users (vd `add-roles-array`). |
+| `strategies/jwt.strategy.ts` | Passport JWT strategy. |
 | `health/` | `@nestjs/terminus` healthcheck. |
 
 ### Service: `be/apps/farm-service/src/`
@@ -94,11 +99,13 @@ Cổng vào: `main.ts` (port 3004), `app.module.ts`.
 Cổng vào: `main.ts` (port 3005), `app.module.ts`.
 | Domain folder | Ý nghĩa |
 |---|---|
-| `notifications/` | Multi-channel notification (in-app, Zalo OA, email). FR-N01..N02. |
+| `notifications/` | In-app (DB) + Zalo ZNS (`zns-adapter.service.ts`). Tiêu thụ event async qua **Redis pub/sub** (`redis-event-consumer.service.ts`, channels `alert.created` / `contract.changed` / `connection.requested`). `farm-lookup.service.ts` resolve user. FR-N01..N02. |
 | `news/` | News feed CRUD. FR-N03. |
 | `forecasts/` | Weather/market forecast feed. FR-N04. |
-| `clients/` | HTTP clients sang auth (resolve user channel). |
+| `clients/` | HTTP clients sang auth/farm (resolve user/farm). |
 | `strategies/` | JWT strategy. |
+
+> **Async events (Redis pub/sub):** producer là `alerts/services/alert-publisher.service.ts` (monitoring), `contract-change-requests/services/contract-event-publisher.service.ts` + `connections/services/connection-publisher.service.ts` (contract); consumer là notification-service. Đây là kênh cross-service KHÔNG đồng bộ (khác HTTP `clients/`).
 
 > **Quy luật chung mọi domain folder BE:** `<domain>.controller.ts` (thin router) · `<domain>.service.ts` (logic) · `<domain>.module.ts` (wiring) · `entities/` (TypeORM) · `dto/` (validate). Để hiểu API endpoint của 1 domain → đọc `*.controller.ts`. Để hiểu logic → đọc `*.service.ts`.
 
@@ -110,13 +117,17 @@ Cổng vào: `main.ts` (port 3005), `app.module.ts`.
 | Path | Ý nghĩa |
 |------|---------|
 | `app.ts` | Root component bootstrap. |
+| `pages/AppInitScreen.tsx` | Splash/bootstrap — chạy auth theme theo `VITE_AUTH_MODE` (auto-login zalo/dev, hoặc hiện LoginScreen). |
+| `pages/LoginScreen.tsx` · `RoleSelectionScreen.tsx` | Form login (mode `password`) + chọn role khi user có nhiều role. |
+| `pages/index.tsx` · `index-debug.tsx` · `index-step-by-step.tsx` | Dev hub screens (chỉ dev). |
 | `router/routes.tsx` | **Tổng route map** — biết screen nào ở path nào, role gì. |
 | `router/RoleGuard.tsx` · `RequireRole.tsx` · `roleHome.ts` | Role-based routing guards + home redirect. |
 | `navigation/RoleAppShell.tsx` · `RoleBottomNav.tsx` · `roleNavModel.ts` | App shell + bottom nav theo role. |
 | `api/client.ts` | Axios instance + auth interceptor. |
 | `api/interceptors.ts` · `errors.ts` | 401 → logout, error envelope parser. |
 | `api/monitoringSocket.ts` | Socket.IO client cho realtime sensor. |
-| `config/env.ts` | Vite env vars (API base, TRACE base, mock flag). |
+| `config/env.ts` | **Mọi Vite env** đọc tại đây (fail-fast). 4 `VITE_AUTH_MODE`: `zalo-oauth`/`zalo-token`/`dev-seeded`/`password`. Còn API base, TRACE base, contract version. |
+| `utils/` | `lazyLoad.tsx`, `uuid.ts`, `cache.ts`, `imageOptimization.ts`, `performance.ts`, `displayLabels.ts`. |
 
 ### Design system (`fe/src/design-system/`)
 | Path | Ý nghĩa |
@@ -128,7 +139,7 @@ Cổng vào: `main.ts` (port 3005), `app.module.ts`.
 ### Services (`fe/src/services/`) — API layer per domain
 | File | Ý nghĩa |
 |------|---------|
-| `authService.ts` + `authStrategy.ts` + `mockAuthBootstrap.ts` + `zaloAccessToken.ts` | Auth flow (Zalo OAuth, JWT, multi-role switching). |
+| `authService.ts` + `authStrategy.ts` + `mockAuthBootstrap.ts` + `zaloAccessToken.ts` | Auth flow per `VITE_AUTH_MODE`: `authStrategy.ts` chọn endpoint (login / password-login / dev-login), `zaloAccessToken.ts` lấy token + getPhoneNumber từ zmp-sdk, multi-role switch. |
 | `farmService.ts` + `farmsCache.ts` | Farm CRUD + cache. |
 | `careLogService.ts` + `careLogOfflineQueue.ts` + `careLogAutoSync.ts` | Care log CRUD + offline IndexedDB queue + sync. |
 | `carePlanService.ts` | Care plan. |
@@ -175,8 +186,7 @@ Cổng vào: `main.ts` (port 3005), `app.module.ts`.
 | `farm-monitoring/` | `TraderFarmMonitoringScreen` (+ `components/`) | Theo dõi sensor farm đã kết nối. |
 | `supply-monitor/` | `TraderSupplyMonitorScreen` | Theo dõi nguồn cung. |
 | `trading-orders/` | `TraderTradingOrdersScreen` | Quản lý lệnh. |
-| `transactions/` | `TraderTransactionsScreen` (+ `components/`, `flows/`) | Giao dịch + flow ký contract. |
-| `contracts/` | (đang trống — contracts dùng shared) | — |
+| `transactions/` | `TraderTransactionsScreen` (+ `components/`: `ContractDetailModal`, `CreateFarmerContractModal`, `SelectConnectionModal`, `RequestCard`, `StatusTabbedList`; `flows/`: `FarmerFlowPanel`, `BuyerFlowPanel`) | Giao dịch + flow ký contract (farmer & buyer). Contract dùng screen ở `shared/contracts`. |
 | `connections/` | `TraderConnectionDetailScreen` | Chi tiết kết nối farmer. |
 | `profile-news/` | `TraderProfileNewsScreen` | Hồ sơ trader + news. |
 
@@ -190,8 +200,7 @@ Cổng vào: `main.ts` (port 3005), `app.module.ts`.
 | `post-buying-request/` | `BuyerPostBuyingRequestScreen` | Đăng yêu cầu mua. |
 | `orders-proposals/` | `BuyerOrdersProposalsScreen` + `BuyerOrdersScreen` (+ `components/`) | Order + proposal tabs. |
 | `transaction-history/` | `BuyerTransactionHistoryScreen` | Lịch sử giao dịch. |
-| `digital-twin-monitor/` | `BuyerDigitalTwinMonitorScreen` | Digital twin view. |
-| `live-monitor/` | `BuyerLiveMonitorScreen` / `Detail` (+ `components/`) | Live sensor monitor. |
+| `live-monitor/` | `BuyerLiveMonitorScreen` / `Detail` (+ `components/`: `SemanticSensorCard`, `FarmActionTimeline`) | Live sensor monitor (thay digital-twin cũ). |
 | `profile-notification/` | `BuyerProfileNotificationScreen` | Hồ sơ + notification settings. |
 | `components/` | Shared buyer-only components. | |
 
@@ -219,7 +228,7 @@ Cổng vào: `main.ts` (port 3005), `app.module.ts`.
 
 ---
 
-## 3) Specs & Database design (root)
+## 3) Specs & Database design
 
 | File | Khi nào đọc |
 |---|---|
@@ -228,12 +237,13 @@ Cổng vào: `main.ts` (port 3005), `app.module.ts`.
 | `specs/backend-api-specification/tasks.md` | Roadmap BE (tham khảo). |
 | `specs/frontend-ui-specification/design.md` | Wireframe + interaction. |
 | `specs/frontend-ui-specification/requirements.md` | US frontend. |
-| `apis.md` | Quick reference API list (root). |
-| `postgres_database_design.md` | Schema chi tiết PostgreSQL (users/farms/contracts...). |
-| `influxdb_database_design.md` | Time-series schema sensor. |
-| `redis_database_design.md` | Cache/session keys. |
-| `seed_influxdb.md` | Hướng dẫn seed Influx. |
-| `deploy_instruction.md` | Hướng dẫn deploy. |
+| `docs/apis.md` | Quick reference API list (root `docs/`, không phải `.claude/docs`). |
+| `docs/postgres_database_design.md` | Schema chi tiết PostgreSQL (users/farms/contracts...). |
+| `docs/influxdb_database_design.md` · `docs/seed_influxdb.md` | Time-series schema sensor + hướng dẫn seed. |
+| `docs/redis_database_design.md` | Cache/session keys. |
+| `docs/web_socket_problem.md` | Ghi chú vấn đề WebSocket monitoring. |
+| `docs/deploy_instruction.md` · `docs/deploy_instruction_railway.md` | Hướng dẫn deploy (chung + Railway). |
+| `docs/GAP_ANALYSIS.md` · `docs/TODO.md` · `docs/todo_plan.md` | Gap analysis + backlog. |
 
 ---
 

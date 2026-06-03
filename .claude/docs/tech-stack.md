@@ -211,9 +211,10 @@ queryKey: ['contracts', farmId, { status: 'active' }]
 #### Axios
 **Instance setup:**
 ```typescript
+// fe/src/api/client.ts — ENV từ config/env.ts, KHÔNG đọc import.meta.env trực tiếp
 const axiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'https://api.trustagri.vn/api/v1',
-  timeout: 10000,
+  baseURL: ENV.API_BASE_URL,           // VITE_API_BASE_URL (mặc định http://localhost:3000/api/v1)
+  timeout: ENV.REQUEST_TIMEOUT_MS,     // 15s
 });
 
 // Auth interceptor
@@ -356,12 +357,24 @@ INFLUXDB_URL=http://localhost:8086
 INFLUXDB_ORG=trustagri
 INFLUXDB_BUCKET=sensor_readings
 INFLUXDB_TOKEN=<secret>
+# Zalo OAuth + phone-token decode (auth-service)
+ZALO_APP_SECRET_KEY=<secret>            # giải mã phoneToken qua Zalo /me/info
+# Login modes phụ (mặc định tắt — chỉ dev/staging)
+AUTH_DEV_LOGIN_ENABLED=false            # bật POST /auth/dev-login
+DEV_LOGIN_SECRET=<≥16 chars>            # bí mật dev-login (khớp FE VITE_DEV_LOGIN_SECRET)
+DEV_LOGIN_ALLOW_IPS=                    # IP ngoài localhost được phép dev-login (CSV)
+AUTH_PASSWORD_LOGIN_ENABLED=false       # bật POST /auth/password-login
 ```
 
-### Frontend `.env.local`
+### Frontend `.env.local` (mọi var đọc qua `fe/src/config/env.ts`, fail-fast)
 ```
-VITE_API_URL=http://localhost:3000/api/v1
-VITE_ZMP_ID=<zalo_app_id>
+VITE_API_BASE_URL=http://localhost:3000/api/v1   # phải HTTPS nếu không local
+VITE_TRACE_BASE_URL=http://localhost:3000/trace  # base QR truy xuất
+VITE_API_CONTRACT_VERSION=5.0
+VITE_AUTH_MODE=zalo-oauth                         # zalo-oauth | zalo-token | dev-seeded | password
+VITE_ZALO_API_KEY=<token>                         # bắt buộc khi mode=zalo-token
+VITE_DEV_LOGIN_SECRET=<≥16 chars>                 # bắt buộc khi mode=dev-seeded
+VITE_DEV_LOGIN_ZALO_ID=zalo_dev_farmer_001        # bắt buộc khi mode=dev-seeded
 ```
 
 ---

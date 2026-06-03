@@ -6,40 +6,46 @@
 
 **Actors:** User (via ZMP client), Auth Service, API Gateway
 
-**Flow:**
+**4 login modes** (FE chọn qua `VITE_AUTH_MODE`, BE có endpoint tương ứng):
+
+| Mode | Endpoint | Khi dùng | Gate env (BE) |
+|---|---|---|---|
+| `zalo-oauth` (default) | `POST /auth/login` | Chạy trong Zalo Mini App: zmp-sdk `getAccessToken` + `getPhoneNumber` | — |
+| `zalo-token` | `POST /auth/login` | Test ngoài Mini App với access token thật (`VITE_ZALO_API_KEY`) | — |
+| `dev-seeded` | `POST /auth/dev-login` | Dev local: user giả seed sẵn DB (`be/scripts/seed-dev-users.sql`) | `AUTH_DEV_LOGIN_ENABLED`, `DEV_LOGIN_SECRET`, localhost/`DEV_LOGIN_ALLOW_IPS` |
+| `password` | `POST /auth/password-login` | Form username/password (user có `password_hash` seed sẵn) | `AUTH_PASSWORD_LOGIN_ENABLED` |
+
+**Flow (`zalo-oauth`):**
 
 ```
-1. User taps "Login with Zalo" in ZMP client
-   → ZMP SDK calls Zalo OAuth → receives Zalo code
+1. AppInitScreen auto-bootstrap (mode zalo/dev → KHÔNG hiện LoginScreen).
+   zmp-sdk getAccessToken → zaloAccessToken; getPhoneNumber → phoneToken (prod) / phoneNumber (dev).
 
-2. Frontend sends: POST /api/v1/auth/login
-   Payload: { zaloCode, zaloState }
+2. Frontend: POST /api/v1/auth/login
+   Body: AuthLoginDto { zaloAccessToken, phoneNumber?, phoneToken? }
 
-3. Auth Service calls Zalo API with code
-   → Zalo returns accessToken + user profile (id, name, phone)
+3. Auth Service → zalo.service: getProfile(zaloAccessToken).
+   phoneToken (nếu có) → giải mã số thật qua Zalo /me/info (cần ZALO_APP_SECRET_KEY). Best-effort.
 
-4. Auth Service creates/updates user in DB
-   - If first login: creates user with default role = 'guest'
-   - Updates lastLogin timestamp
+4. Auth Service create/update user trong DB (zaloId là khóa).
+   - First login: tạo user, roles mặc định theo cấu hình; cập nhật lastLogin.
 
-5. Auth Service returns: { token (JWT), refreshToken, userId, role }
+5. Response AuthLoginResponseDto { accessToken, refreshToken, userId, role, roles[], expiresAt }.
+   Session lưu Redis (redis.service).
 
-6. Frontend stores token in Jotai authAtom
-   - Sets Authorization header for all future requests
+6. Frontend lưu token vào Jotai authAtoms + set Authorization header.
+   - Nếu user có nhiều role (roles.length > 1) → RoleSelectionScreen → POST /auth/switch-role phát JWT role mới.
 
-7. API Gateway intercepts requests
-   → Calls Auth Service /verify endpoint with token
-   → Caches result in Redis (60s TTL)
-   → Routes to appropriate service if valid
+7. Mỗi request: JwtAuthGuard verify JWT + check session Redis (POST /auth/verify).
 
-8. When logout: Frontend clears token
-   → Auth Service invalidates session in Redis
+8. Logout: clear token (FE) + invalidate session Redis (POST /auth/logout).
 ```
 
 **Error Handling:**
-- Invalid Zalo code → 400 Bad Request
-- User not found (edge case) → auto-create with guest role
-- Expired token → Gateway returns 401, frontend redirects to login
+- Invalid Zalo token / credentials → 401 Unauthorized.
+- Login mode bị tắt → 403 (Password/DevLoginEnabled guard).
+- `switch-role` với role không thuộc `user.roles` → 403.
+- Expired/invalid token → 401, FE clear session + redirect login.
 
 ---
 

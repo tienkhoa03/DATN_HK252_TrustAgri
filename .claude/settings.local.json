@@ -99,7 +99,9 @@
       "Bash(git reset --hard *)",
       "Bash(git clean -fdx*)",
       "PowerShell(Remove-Item -Recurse -Force C:\\*)",
-      "PowerShell(Remove-Item -Recurse -Force ~*)"
+      "PowerShell(Remove-Item -Recurse -Force ~*)",
+      "Bash(xargs grep -l \"TraderReviewDto\")",
+      "Bash(grep -vE '/$')"
     ]
   }
 }
