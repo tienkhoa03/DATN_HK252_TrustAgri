@@ -47,6 +47,7 @@ import {
 import { getUserById } from '@/services/authService';
 import { buyingRequestBuyerDisplay, farmDisplayLabel } from '@/utils/displayLabels';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { useKeyboardInset, scrollIntoViewOnFocus } from '@/hooks/useKeyboardInset';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -65,7 +66,8 @@ const STANDARD_OPTIONS = [
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  padding: spacing.sm,
+  minHeight: '44px',
+  padding: `${spacing.sm} ${spacing.md}`,
   border: `1px solid ${colors.background.tertiary}`,
   borderRadius: '6px',
   fontSize: fontSize.body,
@@ -148,18 +150,20 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, farms, isEditing, on
   const [stock, setStock] = useState(initial?.stockQuantity?.toString() ?? '');
   const [description, setDescription] = useState(initial?.description ?? '');
   const [farmId, setFarmId] = useState(initial?.farmId ?? '');
+  const keyboardInset = useKeyboardInset();
 
   return (
     <div
       style={{
         position: 'fixed',
         top: 0, left: 0, right: 0,
-        bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+        bottom: keyboardInset > 0 ? keyboardInset : 'calc(64px + env(safe-area-inset-bottom, 0px))',
         backgroundColor: 'rgba(0,0,0,0.4)',
         zIndex: 2000,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-end',
+        transition: 'bottom 0.15s ease-out',
       }}
     >
       <div
@@ -167,7 +171,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, farms, isEditing, on
           backgroundColor: colors.background.primary,
           borderRadius: '16px 16px 0 0',
           padding: spacing.md,
-          maxHeight: '85vh',
+          maxHeight: keyboardInset > 0 ? `calc(100vh - ${keyboardInset + 24}px)` : '85vh',
           overflowY: 'auto',
         }}
       >
@@ -181,7 +185,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, farms, isEditing, on
         </div>
 
         <label style={labelStyle}>Tên sản phẩm *</label>
-        <input style={inputStyle} placeholder="Ví dụ: Sầu riêng Monthong" value={name} onChange={(e) => setName(e.target.value)} />
+        <input style={inputStyle} placeholder="Ví dụ: Sầu riêng Monthong" value={name} enterKeyHint="next" onFocus={scrollIntoViewOnFocus} onChange={(e) => setName(e.target.value)} />
 
         <label style={labelStyle}>Loại cây trồng *</label>
         <select style={{ ...inputStyle }} value={cropType} onChange={(e) => setCropType(e.target.value)}>
@@ -220,19 +224,19 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, farms, isEditing, on
         <div style={{ display: 'flex', gap: spacing.sm }}>
           <div style={{ flex: 2 }}>
             <label style={labelStyle}>Giá (VNĐ) *</label>
-            <input style={inputStyle} type="number" placeholder="VD: 120000" value={price} onChange={(e) => setPrice(e.target.value)} />
+            <input style={inputStyle} type="number" inputMode="numeric" enterKeyHint="next" onFocus={scrollIntoViewOnFocus} placeholder="VD: 120000" value={price} onChange={(e) => setPrice(e.target.value)} />
           </div>
           <div style={{ flex: 1 }}>
             <label style={labelStyle}>Đơn vị</label>
-            <input style={inputStyle} placeholder="kg" value={unit} onChange={(e) => setUnit(e.target.value)} />
+            <input style={inputStyle} placeholder="kg" enterKeyHint="next" onFocus={scrollIntoViewOnFocus} value={unit} onChange={(e) => setUnit(e.target.value)} />
           </div>
         </div>
 
         <label style={labelStyle}>Tồn kho (kg)</label>
-        <input style={inputStyle} type="number" placeholder="VD: 500" value={stock} onChange={(e) => setStock(e.target.value)} />
+        <input style={inputStyle} type="number" inputMode="numeric" enterKeyHint="next" onFocus={scrollIntoViewOnFocus} placeholder="VD: 500" value={stock} onChange={(e) => setStock(e.target.value)} />
 
         <label style={labelStyle}>Mô tả</label>
-        <textarea style={{ ...inputStyle, height: '80px', resize: 'none' }} placeholder="Mô tả chất lượng, đặc điểm nổi bật..." value={description} onChange={(e) => setDescription(e.target.value)} />
+        <textarea style={{ ...inputStyle, height: '80px', resize: 'none' }} placeholder="Mô tả chất lượng, đặc điểm nổi bật..." value={description} onFocus={scrollIntoViewOnFocus} onChange={(e) => setDescription(e.target.value)} />
 
         <div style={{ display: 'flex', gap: spacing.sm }}>
           <button style={{ flex: 1, padding: spacing.md, backgroundColor: colors.background.secondary, border: 'none', borderRadius: '8px', fontSize: fontSize.body, cursor: 'pointer', minHeight: 44 }} onClick={onCancel}>
@@ -369,6 +373,7 @@ const BuyingRequestDetailModal: React.FC<DetailModalProps> = ({ req, buyerName, 
 export const MarketplaceFeedPanel: React.FC = () => {
   const openSnackbar = useStableOpenSnackbar();
   const session = useAtomValue(authSessionAtom);
+  const keyboardInset = useKeyboardInset();
   const [subTab, setSubTab] = useState<FeedSubTab>('my-products');
 
   // Products
@@ -804,10 +809,13 @@ export const MarketplaceFeedPanel: React.FC = () => {
         <div style={{ marginBottom: spacing.md }}>
           <div style={{ display: 'flex', gap: spacing.sm, alignItems: 'center', marginBottom: spacing.xs }}>
             <input
+              type="search"
+              inputMode="search"
+              enterKeyHint="search"
               placeholder="Tìm theo tên nông sản..."
               value={brFilters.keyword}
               onChange={(e) => setBrFilters((prev) => ({ ...prev, keyword: e.target.value }))}
-              style={{ flex: 1, padding: spacing.sm, border: `1px solid ${colors.background.tertiary}`, borderRadius: 8, fontSize: fontSize.body, boxSizing: 'border-box' as const, minHeight: 44 }}
+              style={{ flex: 1, minWidth: 0, padding: spacing.sm, border: `1px solid ${colors.background.tertiary}`, borderRadius: 8, fontSize: fontSize.body, boxSizing: 'border-box' as const, minHeight: 44 }}
             />
             <button
               type="button"
@@ -827,6 +835,7 @@ export const MarketplaceFeedPanel: React.FC = () => {
                   <label style={labelStyle}>Giá min (₫/đơn vị)</label>
                   <input
                     type="number"
+                    inputMode="numeric"
                     placeholder="VD: 50000"
                     value={brFilters.minPrice}
                     onChange={(e) => setBrFilters((prev) => ({ ...prev, minPrice: e.target.value }))}
@@ -837,6 +846,7 @@ export const MarketplaceFeedPanel: React.FC = () => {
                   <label style={labelStyle}>Giá max (₫/đơn vị)</label>
                   <input
                     type="number"
+                    inputMode="numeric"
                     placeholder="VD: 200000"
                     value={brFilters.maxPrice}
                     onChange={(e) => setBrFilters((prev) => ({ ...prev, maxPrice: e.target.value }))}
@@ -1029,8 +1039,8 @@ export const MarketplaceFeedPanel: React.FC = () => {
 
       {/* Proposal form modal */}
       {proposingFor && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))', backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }} onClick={() => setProposingFor(null)}>
-          <div style={{ backgroundColor: colors.background.primary, borderRadius: '16px 16px 0 0', padding: spacing.md, maxHeight: '75vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: keyboardInset > 0 ? keyboardInset : 'calc(64px + env(safe-area-inset-bottom, 0px))', backgroundColor: 'rgba(0,0,0,0.4)', zIndex: 2000, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', transition: 'bottom 0.15s ease-out' }} onClick={() => setProposingFor(null)}>
+          <div style={{ backgroundColor: colors.background.primary, borderRadius: '16px 16px 0 0', padding: spacing.md, maxHeight: keyboardInset > 0 ? `calc(100vh - ${keyboardInset + 24}px)` : '75vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
               <Text.Title size="small" style={{ margin: 0 }}>Gửi đề xuất giá</Text.Title>
               <button style={{ background: 'none', border: 'none', cursor: 'pointer', minWidth: 44, minHeight: 44 }} onClick={() => setProposingFor(null)} aria-label="Đóng">
@@ -1067,10 +1077,10 @@ export const MarketplaceFeedPanel: React.FC = () => {
             </select>
 
             <label style={labelStyle}>Giá đề xuất (₫/{proposingFor.unit}) *</label>
-            <input style={inputStyle} type="number" placeholder={`VD: ${proposingFor.expectedPrice ?? 50000}`} value={proposalPrice} onChange={(e) => setProposalPrice(e.target.value)} />
+            <input style={inputStyle} type="number" inputMode="numeric" enterKeyHint="next" onFocus={scrollIntoViewOnFocus} placeholder={`VD: ${proposingFor.expectedPrice ?? 50000}`} value={proposalPrice} onChange={(e) => setProposalPrice(e.target.value)} />
 
             <label style={labelStyle}>Ghi chú (tùy chọn)</label>
-            <textarea style={{ ...inputStyle, height: '72px', resize: 'none' }} placeholder="Thêm thông tin về chất lượng, nguồn gốc, thời gian giao hàng..." value={proposalNote} onChange={(e) => setProposalNote(e.target.value)} />
+            <textarea style={{ ...inputStyle, height: '72px', resize: 'none' }} placeholder="Thêm thông tin về chất lượng, nguồn gốc, thời gian giao hàng..." value={proposalNote} onFocus={scrollIntoViewOnFocus} onChange={(e) => setProposalNote(e.target.value)} />
 
             <div style={{ display: 'flex', gap: spacing.sm }}>
               <button style={{ flex: 1, padding: spacing.md, backgroundColor: colors.background.secondary, border: 'none', borderRadius: 8, fontSize: fontSize.body, cursor: 'pointer', minHeight: 44 }} onClick={() => setProposingFor(null)}>

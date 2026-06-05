@@ -11,6 +11,7 @@ import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { scrollIntoViewOnFocus } from '@/hooks/useKeyboardInset';
 import {
   createBuyingRequest,
   toBuyingRequestViMessage,
@@ -97,6 +98,8 @@ function renderStep1(
           type="text"
           style={inputStyles}
           placeholder="Ví dụ: Thanh long, Xoài..."
+          enterKeyHint="next"
+          onFocus={scrollIntoViewOnFocus}
           value={state.cropType}
           onChange={(e) => setState((s) => ({ ...s, cropType: e.target.value }))}
         />
@@ -106,6 +109,9 @@ function renderStep1(
         <label style={labelStyles}>Số lượng *</label>
         <input
           type="number"
+          inputMode="decimal"
+          enterKeyHint="next"
+          onFocus={scrollIntoViewOnFocus}
           style={inputStyles}
           placeholder="0"
           min={0}
@@ -215,6 +221,7 @@ function renderStep2(
           placeholder="Chi tiết về chất lượng, số lượng từng đợt, thời gian nhận hàng..."
           value={state.notes}
           maxLength={2000}
+          onFocus={scrollIntoViewOnFocus}
           onChange={(e) => setState((s) => ({ ...s, notes: e.target.value }))}
         />
       </div>
@@ -232,6 +239,9 @@ function renderStep3(
         <label style={labelStyles}>Giá kỳ vọng (VNĐ/kg) *</label>
         <input
           type="number"
+          inputMode="numeric"
+          enterKeyHint="next"
+          onFocus={scrollIntoViewOnFocus}
           style={inputStyles}
           placeholder="0"
           min={0}
@@ -244,6 +254,9 @@ function renderStep3(
         <label style={labelStyles}>Tiền cọc (VNĐ)</label>
         <input
           type="number"
+          inputMode="numeric"
+          enterKeyHint="next"
+          onFocus={scrollIntoViewOnFocus}
           style={inputStyles}
           placeholder="0"
           min={0}

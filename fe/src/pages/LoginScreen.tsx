@@ -118,6 +118,8 @@ export function LoginScreen() {
             style={inputStyle}
             autoCapitalize="none"
             autoCorrect="off"
+            autoComplete="username"
+            enterKeyHint="next"
           />
           <input
             type="password"
@@ -129,6 +131,8 @@ export function LoginScreen() {
             }}
             disabled={submitting}
             style={{ ...inputStyle, marginBottom: 16 }}
+            autoComplete="current-password"
+            enterKeyHint="done"
           />
 
           <button
@@ -167,10 +171,11 @@ export function LoginScreen() {
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
+  minHeight: 44,
   padding: '12px 14px',
   borderRadius: 10,
   border: '1.5px solid #E5E7EB',
-  fontSize: 15,
+  fontSize: 16,
   outline: 'none',
   marginBottom: 12,
   boxSizing: 'border-box',

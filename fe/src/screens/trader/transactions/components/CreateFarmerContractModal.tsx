@@ -13,6 +13,7 @@ import {
 } from '@/services/contractService';
 import { listStandards, type StandardDto } from '@/services/standardService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { useKeyboardInset, scrollIntoViewOnFocus } from '@/hooks/useKeyboardInset';
 import { farmDisplayLabel, userDisplayLabel } from '@/utils/displayLabels';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
@@ -58,6 +59,7 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
 }) => {
   const openSnackbar = useStableOpenSnackbar();
   const session = useAtomValue(authSessionAtom);
+  const keyboardInset = useKeyboardInset();
 
   const [farmId, setFarmId] = useState(initialFarmId ?? '');
   const [standardId, setStandardId] = useState('');
@@ -275,6 +277,8 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
             <input
               type="number"
               inputMode="decimal"
+              enterKeyHint="next"
+              onFocus={scrollIntoViewOnFocus}
               value={quantity}
               onChange={(e) => setQuantity(e.target.value)}
               placeholder="0"
@@ -298,6 +302,8 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
           <input
             type="number"
             inputMode="numeric"
+            enterKeyHint="next"
+            onFocus={scrollIntoViewOnFocus}
             value={totalPrice}
             onChange={(e) => setTotalPrice(e.target.value)}
             placeholder="0"
@@ -311,6 +317,8 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
           <input
             type="number"
             inputMode="numeric"
+            enterKeyHint="next"
+            onFocus={scrollIntoViewOnFocus}
             value={deposit}
             onChange={(e) => setDeposit(e.target.value)}
             placeholder="Để trống nếu không đặt cọc"
@@ -343,6 +351,7 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
           <textarea
             value={terms}
             onChange={(e) => setTerms(e.target.value)}
+            onFocus={scrollIntoViewOnFocus}
             placeholder="Mô tả điều khoản, yêu cầu chất lượng, phương thức giao hàng..."
             rows={4}
             style={{
@@ -368,19 +377,20 @@ export const CreateFarmerContractModal: React.FC<CreateFarmerContractModalProps>
         </div>
       </div>
 
-      {/* Sticky submit — nằm phía trên bottom nav (64px) */}
+      {/* Sticky submit — nằm phía trên bottom nav (64px), nâng lên trên bàn phím khi mở */}
       <div
         style={{
           position: 'fixed',
-          bottom: BOTTOM_NAV_CLEARANCE,
+          bottom: keyboardInset > 0 ? keyboardInset : BOTTOM_NAV_CLEARANCE,
           left: 0,
           right: 0,
           padding: spacing.md,
-          paddingBottom: `calc(${spacing.md} + env(safe-area-inset-bottom, 0px))`,
+          paddingBottom: keyboardInset > 0 ? spacing.md : `calc(${spacing.md} + env(safe-area-inset-bottom, 0px))`,
           backgroundColor: colors.background.primary,
           borderTop: `1px solid ${colors.background.secondary}`,
           boxShadow: '0 -4px 12px rgba(0,0,0,0.08)',
           zIndex: 1001,
+          transition: 'bottom 0.15s ease-out',
         }}
       >
         <button

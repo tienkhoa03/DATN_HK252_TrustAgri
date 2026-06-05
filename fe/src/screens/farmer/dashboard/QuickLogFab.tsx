@@ -7,6 +7,7 @@ import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { useKeyboardInset, scrollIntoViewOnFocus } from '@/hooks/useKeyboardInset';
 import {
   createCareLogWithEvidence,
   MAX_EVIDENCE_PHOTOS,
@@ -43,6 +44,7 @@ export const QuickLogFab: React.FC<QuickLogFabProps> = ({ farmId, onSuccess }) =
   const [photos, setPhotos] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openSnackbar = useStableOpenSnackbar();
+  const keyboardInset = useKeyboardInset();
 
   const resetForm = () => {
     setStep(1);
@@ -150,10 +152,12 @@ export const QuickLogFab: React.FC<QuickLogFabProps> = ({ farmId, onSuccess }) =
           style={{
             position: 'fixed',
             top: 0, left: 0, right: 0,
-            bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+            // Khi bàn phím mở (iOS): nâng đáy sheet lên trên bàn phím; nếu không, đặt trên bottom nav.
+            bottom: keyboardInset > 0 ? keyboardInset : 'calc(64px + env(safe-area-inset-bottom, 0px))',
             zIndex: 1100,
             backgroundColor: 'rgba(0,0,0,0.45)',
             display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+            transition: 'bottom 0.15s ease-out',
           }}
           onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
         >
@@ -161,7 +165,8 @@ export const QuickLogFab: React.FC<QuickLogFabProps> = ({ farmId, onSuccess }) =
             backgroundColor: colors.background.primary,
             borderRadius: '16px 16px 0 0',
             padding: `${spacing.md} ${spacing.md} ${spacing.xl}`,
-            maxHeight: '75vh',
+            // Giới hạn chiều cao để luôn nằm gọn phía trên bàn phím, phần dư sẽ cuộn.
+            maxHeight: keyboardInset > 0 ? `calc(100vh - ${keyboardInset + 24}px)` : '75vh',
             overflowY: 'auto',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
@@ -241,6 +246,8 @@ export const QuickLogFab: React.FC<QuickLogFabProps> = ({ farmId, onSuccess }) =
                   <textarea
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
+                    onFocus={scrollIntoViewOnFocus}
+                    enterKeyHint="done"
                     rows={4}
                     placeholder="Nhập ghi chú về công việc vừa thực hiện…"
                     style={{

@@ -1,3 +1,70 @@
+/* ─────────────────────────────────────────────────────────────────────────
+ * Mobile hardening cho Zalo Mini App (chạy trên WebView điện thoại thật)
+ * Mục tiêu: chữ không tràn ra ngoài màn hình nhỏ (320–360px), cuộn mượt,
+ *           không zoom ngoài ý muốn, an toàn vùng tai thỏ / home indicator.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  max-width: 100%;
+  /* Ngăn nội dung đẩy tràn ngang → không bao giờ "lọt chữ ra khỏi màn hình" */
+  overflow-x: hidden;
+  /* Khóa cỡ chữ tự động (iOS xoay ngang / Android), giữ layout ổn định */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* Bỏ highlight xám khi chạm trên Android */
+  -webkit-tap-highlight-color: transparent;
+  /* Tránh "bounce" kéo lố gây cảm giác giật khi cuộn tới biên */
+  overscroll-behavior-y: none;
+}
+
+#app {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* Văn bản người dùng (tên vườn, địa chỉ, mã hợp đồng, tên nông sản…) dài
+ * sẽ tự xuống dòng thay vì tràn / đẩy layout ra ngoài viewport. */
+p,
+span,
+div,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+label,
+a,
+button,
+li,
+td,
+th,
+input,
+textarea {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* Media không bao giờ rộng quá khung chứa trên màn nhỏ */
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+/* Cuộn theo quán tính (momentum) trên iOS cho mọi vùng cuộn */
+.screen-layout-content,
+[style*="overflow-y: auto"],
+[style*="overflowY"] {
+  -webkit-overflow-scrolling: touch;
+}
+
 .page {
   padding: 16px 16px 96px 16px;
 }
@@ -11,4 +78,21 @@
 
 .zaui-list-item {
   cursor: pointer;
+}
+
+/* Tiện ích: cắt chữ 1 dòng kèm dấu "…" (dùng cho tên/tiêu đề trong hàng flex).
+ * Bắt buộc đi kèm min-width:0 ở cha flex để ellipsis hoạt động. */
+.truncate-1 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Cắt chữ tối đa 2 dòng (mô tả, ghi chú ngắn) */
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }

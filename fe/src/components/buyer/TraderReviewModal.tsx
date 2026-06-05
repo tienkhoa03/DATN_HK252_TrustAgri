@@ -4,6 +4,7 @@ import { primaryColors, backgroundColors, textColors } from '@/design-system/tok
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { useKeyboardInset, scrollIntoViewOnFocus } from '@/hooks/useKeyboardInset';
 import { createTraderReview, toReviewViMessage } from '@/services/traderReviewService';
 
 export interface TraderReviewModalProps {
@@ -25,6 +26,7 @@ export function TraderReviewModal({
   onSuccess,
 }: TraderReviewModalProps) {
   const openSnackbar = useStableOpenSnackbar();
+  const keyboardInset = useKeyboardInset();
   const [rating, setRating] = useState(0);
   const [hovered, setHovered] = useState(0);
   const [comment, setComment] = useState('');
@@ -53,12 +55,16 @@ export function TraderReviewModal({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 300,
+        // Trên bottom nav (zIndex 1000) để không bị thanh điều hướng đè lên modal.
+        zIndex: 1100,
         background: 'rgba(0,0,0,0.5)',
         display: 'flex',
-        alignItems: 'center',
+        // Khi bàn phím mở: dồn dialog lên sát mép bàn phím; nếu không: căn giữa.
+        alignItems: keyboardInset > 0 ? 'flex-end' : 'center',
         justifyContent: 'center',
         padding: spacing.md,
+        paddingBottom: keyboardInset > 0 ? keyboardInset + 16 : spacing.md,
+        transition: 'padding-bottom 0.15s ease-out',
       }}
       onClick={onClose}
     >
@@ -69,6 +75,8 @@ export function TraderReviewModal({
           padding: spacing.md,
           width: '100%',
           maxWidth: 360,
+          maxHeight: keyboardInset > 0 ? `calc(100vh - ${keyboardInset + 32}px)` : 'calc(100vh - 32px)',
+          overflowY: 'auto',
           boxShadow: '0 8px 32px rgba(0,0,0,0.22)',
         }}
         onClick={(e) => e.stopPropagation()}
@@ -126,6 +134,7 @@ export function TraderReviewModal({
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
+          onFocus={scrollIntoViewOnFocus}
           maxLength={500}
           placeholder="Nhận xét của bạn (tùy chọn)"
           rows={4}

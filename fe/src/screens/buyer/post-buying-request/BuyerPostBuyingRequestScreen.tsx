@@ -18,6 +18,7 @@ import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { useKeyboardInset, scrollIntoViewOnFocus } from '@/hooks/useKeyboardInset';
 import {
   listBuyingRequests,
   createBuyingRequest,
@@ -291,6 +292,7 @@ const RequestCard: React.FC<RequestCardProps> = ({ request, onEdit, onCancel, ca
 
 export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreenProps> = () => {
   const openSnackbar = useStableOpenSnackbar();
+  const keyboardInset = useKeyboardInset();
 
   // View state
   const [viewMode, setViewMode] = useState<ViewMode>('list');
@@ -477,6 +479,7 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
+    minHeight: '44px',
     padding: spacing.md,
     backgroundColor: colors.background.secondary,
     border: `1px solid ${colors.background.tertiary}`,
@@ -650,6 +653,9 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
             <div style={{ display: 'flex', gap: spacing.sm, marginBottom: spacing.md }}>
               <input
                 type="number"
+                inputMode="decimal"
+                enterKeyHint="next"
+                onFocus={scrollIntoViewOnFocus}
                 style={{ ...inputStyle, flex: 1 }}
                 placeholder="Nhập số lượng"
                 value={formData.quantity}
@@ -670,6 +676,9 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
             <label style={labelStyle}>Giá kỳ vọng (VNĐ/{formData.unit})</label>
             <input
               type="number"
+              inputMode="numeric"
+              enterKeyHint="next"
+              onFocus={scrollIntoViewOnFocus}
               style={{ ...inputStyle, marginBottom: spacing.md }}
               placeholder="VD: 120000"
               value={formData.expectedPrice}
@@ -681,6 +690,9 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
             <label style={labelStyle}>Tiền cọc sẵn sàng (VNĐ, không bắt buộc)</label>
             <input
               type="number"
+              inputMode="numeric"
+              enterKeyHint="next"
+              onFocus={scrollIntoViewOnFocus}
               style={inputStyle}
               placeholder="VD: 5000000"
               value={formData.depositOffered}
@@ -720,6 +732,7 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
               style={{ ...inputStyle, minHeight: '100px', resize: 'vertical' }}
               placeholder="Ví dụ: kích cỡ, độ chín, nguồn gốc mong muốn, thời điểm nhận hàng..."
               value={formData.description}
+              onFocus={scrollIntoViewOnFocus}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               maxLength={2000}
             />
@@ -832,11 +845,11 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
         {renderStep()}
       </div>
 
-      {/* Navigation buttons (above bottom nav bar) */}
+      {/* Navigation buttons (above bottom nav bar) — nâng lên trên bàn phím khi mở */}
       <div
         style={{
           position: 'fixed',
-          bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+          bottom: keyboardInset > 0 ? keyboardInset : 'calc(64px + env(safe-area-inset-bottom, 0px))',
           left: 0,
           right: 0,
           padding: spacing.md,
@@ -845,6 +858,7 @@ export const BuyerPostBuyingRequestScreen: React.FC<BuyerPostBuyingRequestScreen
           display: 'flex',
           gap: spacing.sm,
           zIndex: 950,
+          transition: 'bottom 0.15s ease-out',
         }}
       >
         {currentStep > 1 && (

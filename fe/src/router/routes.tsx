@@ -158,9 +158,12 @@ const RoleSelectionScreen = lazy(() =>
   import('@/pages/RoleSelectionScreen').then((m) => ({ default: m.RoleSelectionScreen })),
 );
 
-const DevScreenLauncher = lazy(() =>
-  import('@/pages/index').then((m) => ({ default: m.default })),
-);
+// Dev/QA screen launcher (kèm các màn *.demo / *.example mà nó import).
+// Build production (import.meta.env.PROD) loại bỏ hoàn toàn nhánh này khỏi bundle
+// thật — không lọt code demo/QA ra app người dùng cuối.
+const DevScreenLauncher = import.meta.env.PROD
+  ? null
+  : lazy(() => import('@/pages/index').then((m) => ({ default: m.default })));
 
 // ─── Shared loading skeleton ─────────────────────────────────────────────────
 
@@ -312,8 +315,12 @@ export function AppRoutes() {
           <Route path="news" element={<RedirectTo to="/trader/market?tab=news" />} />
         </Route>
 
-        {/* ── Dev / QA launcher (non-production) ────────────── */}
-        <Route path="/dev/screens"             element={<DevScreenLauncher />} />
+        {/* ── Dev / QA launcher — bản dev hiện màn launcher; bản production chuyển
+            hướng về trang chủ (DevScreenLauncher = null nên import bị loại khỏi bundle). ── */}
+        <Route
+          path="/dev/screens"
+          element={DevScreenLauncher ? <DevScreenLauncher /> : <RedirectTo to="/" />}
+        />
         </AnimationRoutes>
       </Suspense>
     </ChunkErrorBoundary>

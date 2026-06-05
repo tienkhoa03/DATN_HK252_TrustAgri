@@ -10,6 +10,7 @@ import { Page } from 'zmp-ui';
 import { BuyerHeader } from '../components/BuyerHeader';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
+import { useKeyboardInset } from '@/hooks/useKeyboardInset';
 import { SourcingListPanel } from './panels/SourcingListPanel';
 import { SourcingInboxPanel } from './panels/SourcingInboxPanel';
 import { CreateBuyingRequestStepper } from './components/CreateBuyingRequestStepper';
@@ -18,6 +19,7 @@ import { CreateBuyingRequestStepper } from './components/CreateBuyingRequestStep
 export const BuyerSourcingScreen: React.FC = () => {
   const [selectedRequestId, setSelectedRequestId] = useState<string | null>(null);
   const [showCreateStepper, setShowCreateStepper] = useState(false);
+  const keyboardInset = useKeyboardInset();
 
   // Read URL query params on mount
   useEffect(() => {
@@ -58,21 +60,22 @@ export const BuyerSourcingScreen: React.FC = () => {
             style={{
               position: 'fixed',
               top: 0, left: 0, right: 0,
-              bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+              bottom: keyboardInset > 0 ? keyboardInset : 'calc(64px + env(safe-area-inset-bottom, 0px))',
               backgroundColor: 'rgba(0,0,0,0.45)',
               zIndex: 900,
             }}
             onClick={() => setShowCreateStepper(false)}
           />
 
-          {/* Slide-up sheet */}
+          {/* Slide-up sheet — khi bàn phím mở: nâng đáy lên trên bàn phím & kéo đỉnh
+              lên gần mép trên để còn đủ chỗ cho ô nhập + nút Tiếp theo/Hoàn tất. */}
           <div
             style={{
               position: 'fixed',
-              bottom: 'calc(64px + env(safe-area-inset-bottom, 0px))',
+              bottom: keyboardInset > 0 ? keyboardInset : 'calc(64px + env(safe-area-inset-bottom, 0px))',
               left: 0,
               right: 0,
-              top: '10vh',
+              top: keyboardInset > 0 ? 'env(safe-area-inset-top, 8px)' : '10vh',
               backgroundColor: colors.background.primary,
               borderTopLeftRadius: '16px',
               borderTopRightRadius: '16px',
@@ -81,6 +84,7 @@ export const BuyerSourcingScreen: React.FC = () => {
               flexDirection: 'column',
               overflow: 'hidden',
               boxShadow: '0 -4px 24px rgba(0,0,0,0.18)',
+              transition: 'bottom 0.15s ease-out, top 0.15s ease-out',
             }}
           >
             {/* Drag handle */}

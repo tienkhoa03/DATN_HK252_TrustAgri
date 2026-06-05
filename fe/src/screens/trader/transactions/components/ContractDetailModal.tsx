@@ -774,18 +774,20 @@ export const ContractDetailModal: React.FC<ContractDetailModalProps> = ({
               </label>
               <input
                 type="number"
+                inputMode="decimal"
                 value={modifyQuantity}
                 onChange={(e) => setModifyQuantity(e.target.value)}
-                style={{ width: '100%', boxSizing: 'border-box', padding: spacing.sm, marginBottom: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 6 }}
+                style={{ width: '100%', minHeight: 44, fontSize: fontSize.body, boxSizing: 'border-box', padding: spacing.sm, marginBottom: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 6 }}
               />
               <label style={{ display: 'block', fontSize: fontSize.caption, color: colors.text.secondary, marginBottom: 4 }}>
                 Tổng giá trị (VNĐ)
               </label>
               <input
                 type="number"
+                inputMode="numeric"
                 value={modifyTotalPrice}
                 onChange={(e) => setModifyTotalPrice(e.target.value)}
-                style={{ width: '100%', boxSizing: 'border-box', padding: spacing.sm, marginBottom: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 6 }}
+                style={{ width: '100%', minHeight: 44, fontSize: fontSize.body, boxSizing: 'border-box', padding: spacing.sm, marginBottom: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 6 }}
               />
               <label style={{ display: 'block', fontSize: fontSize.caption, color: colors.text.secondary, marginBottom: 4 }}>
                 Đến ngày
