@@ -17,6 +17,7 @@ import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
 import { CROP_LABELS } from '@/services/marketplaceService';
 import { listStandards, type StandardDto } from '@/services/standardService';
+import { VIETNAM_PROVINCES } from '@/config/provinces';
 
 const CROP_OPTIONS: { value: string; label: string }[] = Object.entries(CROP_LABELS).map(
   ([value, label]) => ({ value, label }),
@@ -146,11 +147,14 @@ const FarmCard: React.FC<FarmCardProps> = ({ farm, isLocked, standardOptions, on
               </select>
 
               <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Tỉnh/Thành</label>
-              <input
+              <select
                 value={form.location?.province ?? ''}
                 onChange={(e) => setForm((p) => ({ ...p, location: { ...(p.location ?? farm.location), province: e.target.value } }))}
-                style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, boxSizing: 'border-box' }}
-              />
+                style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, minHeight: 44 }}
+              >
+                <option value="">— Chọn tỉnh/thành —</option>
+                {VIETNAM_PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
 
               <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Xã/Phường</label>
               <input
@@ -268,7 +272,10 @@ const CreateFarmForm: React.FC<CreateFarmFormProps> = ({ standardOptions, onCanc
       </select>
 
       <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Tỉnh/Thành</label>
-      <input value={form.location.province} onChange={(e) => setForm((p) => ({ ...p, location: { ...p.location, province: e.target.value } }))} style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, boxSizing: 'border-box' }} />
+      <select value={form.location.province} onChange={(e) => setForm((p) => ({ ...p, location: { ...p.location, province: e.target.value } }))} style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, minHeight: 44 }}>
+        <option value="">— Chọn tỉnh/thành —</option>
+        {VIETNAM_PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
+      </select>
 
       <label style={{ display: 'block', fontSize: fontSize.small, color: colors.text.secondary, marginBottom: spacing.xs }}>Xã/Phường</label>
       <input value={form.location.district} onChange={(e) => setForm((p) => ({ ...p, location: { ...p.location, district: e.target.value } }))} style={{ width: '100%', padding: spacing.sm, border: `1px solid ${colors.background.secondary}`, borderRadius: 8, fontSize: fontSize.caption, marginBottom: spacing.sm, boxSizing: 'border-box' }} />

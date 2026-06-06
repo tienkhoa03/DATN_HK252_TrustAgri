@@ -15,6 +15,7 @@ import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import {
   listProducts,
   standardLabel,
+  cropLabel,
   cropEmoji,
   toMarketplaceViMessage,
   type ProductDto,
@@ -400,7 +401,7 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
                   {product.name}
                 </Text.Title>
                 <Text size="small" style={{ color: colors.text.secondary, margin: 0, fontSize: '11px' }}>
-                  {product.cropType}
+                  {cropLabel(product.cropType)}
                 </Text>
 
                 <div style={priceStyles}>

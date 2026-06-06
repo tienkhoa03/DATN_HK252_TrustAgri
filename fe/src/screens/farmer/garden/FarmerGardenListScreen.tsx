@@ -145,8 +145,8 @@ const FarmCard: React.FC<FarmCardProps> = ({ item, onSelect }) => {
             borderRadius: 6,
             fontSize: fontSize.caption,
             fontWeight: fontWeight.semibold,
-            whiteSpace: 'nowrap',
             maxWidth: '42%',
+            wordBreak: 'break-word',
             textAlign: 'right',
             lineHeight: 1.3,
           }}

@@ -484,7 +484,6 @@ export const BuyerProfileNotificationScreen: React.FC<BuyerProfileNotificationSc
           {profile?.phone && (
             <div style={{ ...userIdStyles, marginBottom: 4 }}>{profile.phone}</div>
           )}
-          <div style={userIdStyles}>ID: {buyerId}</div>
           {profile?.buyerProfile?.organizationName && (
             <div
               style={{

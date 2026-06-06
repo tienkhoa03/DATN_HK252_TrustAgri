@@ -64,6 +64,11 @@ const CROP_TYPE_LABELS: Record<string, string> = {
   lychee: 'Vải',
   banana: 'Chuối',
   rambutan: 'Chôm chôm',
+  vegetable: 'Rau củ',
+  rice: 'Lúa',
+  fruit: 'Trái cây',
+  herb: 'Dược liệu',
+  other: 'Khác',
 };
 
 const CROP_FILTER_OPTIONS = [

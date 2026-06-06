@@ -13,6 +13,7 @@ import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import {
   getProduct,
+  cropLabel,
   cropEmoji,
   toMarketplaceViMessage,
   type ProductDto,
@@ -289,7 +290,7 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
               {product.price.toLocaleString('vi-VN')} VNĐ/{product.unit}
             </div>
             <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-              {product.cropType}
+              {cropLabel(product.cropType)}
             </Text>
           </div>
 

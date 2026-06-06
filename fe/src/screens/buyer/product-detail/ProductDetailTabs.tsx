@@ -12,7 +12,7 @@ import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
 import { useTrustScore } from '@/hooks/useTrustScore';
-import { standardLabel } from '../../../services/marketplaceService';
+import { standardLabel, cropLabel } from '../../../services/marketplaceService';
 import type { ProductDto } from '../../../services/marketplaceService';
 import { useNavigate } from 'zmp-ui';
 
@@ -105,7 +105,7 @@ export const ProductDetailTabs: React.FC<ProductDetailTabsProps> = ({ product })
         {product.cropType && (
           <div>
             <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>Loại</Text>
-            <Text size="small" style={{ fontWeight: fontWeight.medium, margin: 0 }}>{product.cropType}</Text>
+            <Text size="small" style={{ fontWeight: fontWeight.medium, margin: 0 }}>{cropLabel(product.cropType)}</Text>
           </div>
         )}
       </div>

@@ -113,7 +113,7 @@ function normalizeFarmer(raw: unknown): DashboardFarmerDto {
   return {
     periodFrom: str(o.periodFrom ?? o.period_from),
     periodTo: str(o.periodTo ?? o.period_to),
-    complianceScore: num(o.complianceScore ?? o.compliance_score),
+    complianceScore: Math.round(num(o.complianceScore ?? o.compliance_score) * 100),
     recentAlerts: num(o.recentAlerts ?? o.recent_alerts),
     activeContracts: num(o.activeContracts ?? o.active_contracts),
     careLogCount: num(o.careLogCount ?? o.care_log_count),

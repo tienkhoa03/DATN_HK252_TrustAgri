@@ -38,7 +38,6 @@ export const FarmerProfileScreen: React.FC = () => {
 
   const displayName = profile?.displayName ?? session?.userId ?? 'Nông dân';
   const phone = profile?.phone ?? '—';
-  const zaloId = profile?.zaloId ?? '—';
   const lastLogin = profile?.lastLogin
     ? new Date(profile.lastLogin).toLocaleString('vi-VN')
     : '—';
@@ -79,7 +78,6 @@ export const FarmerProfileScreen: React.FC = () => {
           {/* Info rows */}
           {[
             { label: 'Số điện thoại', value: phone },
-            { label: 'Zalo ID', value: zaloId },
             { label: 'Đăng nhập lần cuối', value: lastLogin },
           ].map(({ label, value }) => (
             <div key={label} style={{

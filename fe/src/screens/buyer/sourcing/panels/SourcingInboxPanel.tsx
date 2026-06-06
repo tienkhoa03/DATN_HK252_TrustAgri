@@ -15,6 +15,7 @@ import {
   toBuyingRequestViMessage,
   type BuyingRequestDto,
 } from '@/services/buyingRequestService';
+import { cropLabel } from '@/services/marketplaceService';
 import {
   listProposals,
   acceptProposal,
@@ -152,7 +153,7 @@ export const SourcingInboxPanel: React.FC<SourcingInboxPanelProps> = ({
               Yêu cầu mua
             </Text>
             <Text style={{ fontSize: fontSize.body, fontWeight: fontWeight.semibold, margin: 0 }}>
-              {request.cropType}
+              {cropLabel(request.cropType)}
             </Text>
             <Text style={{ fontSize: fontSize.caption, color: colors.text.secondary, margin: 0 }}>
               {request.quantity.toLocaleString('vi-VN')} {request.unit}

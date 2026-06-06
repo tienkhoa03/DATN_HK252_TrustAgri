@@ -27,6 +27,7 @@ import {
 import { getMe, updateMe } from '@/services/authService';
 import type { UserProfileDto } from '@/services/authService';
 import { ApiError } from '@/api/errors';
+import { cropLabel } from '@/services/marketplaceService';
 
 export interface TraderProfileNewsScreenProps {
   /** Giữ tương thích ví dụ / tích hợp sau (hồ sơ mock hiện dùng companyName). */
@@ -1226,7 +1227,7 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.sm }}>
                     <div>
                       <Text.Title size="small" style={{ margin: 0, marginBottom: '4px' }}>
-                        {f.cropType} · {f.region}
+                        {cropLabel(f.cropType)} · {f.region}
                       </Text.Title>
                       <span
                         style={{

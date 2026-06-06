@@ -4,11 +4,10 @@
  * Widget tóm tắt trên trang chủ người mua — GET /api/v1/dashboard/buyer.
  */
 
-import React, { useEffect, useMemo, useState, lazy, Suspense } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Text, useNavigate } from 'zmp-ui';
-import type { ChartDataPoint } from '../../../design-system/components/Chart';
 import { Icon } from '../../../design-system/components/Icon';
-import { colors, chartPalette } from '../../../design-system/tokens/colors';
+import { colors } from '../../../design-system/tokens/colors';
 import { ConnectionStatusBanner } from '@/components/ConnectionStatusBanner';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontWeight } from '../../../design-system/tokens/typography';
@@ -23,27 +22,6 @@ function formatDateSafe(iso: string, fallback = '—'): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? fallback : d.toLocaleDateString('vi-VN');
 }
-
-const LazyChart = lazy(() =>
-  import('../../../design-system/components/Chart').then((m) => ({ default: m.Chart })),
-);
-
-const ChartFallback: React.FC = () => (
-  <div
-    style={{
-      height: 200,
-      borderRadius: 8,
-      backgroundColor: colors.background.secondary,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}
-  >
-    <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-      Đang tải biểu đồ…
-    </Text>
-  </div>
-);
 
 export const BuyerDashboardScreen: React.FC = () => {
   const openSnackbar = useStableOpenSnackbar();
@@ -76,16 +54,6 @@ export const BuyerDashboardScreen: React.FC = () => {
       cancelled = true;
     };
   }, [openSnackbar]);
-
-  const barData: ChartDataPoint[] = useMemo(() => {
-    if (!data) return [];
-    return [
-      { label: 'Nhu cầu mở', value: data.openBuyingRequests },
-      { label: 'Đề xuất chờ', value: data.pendingProposals },
-      { label: 'Hợp đồng', value: data.activeContracts },
-      { label: 'Đơn hoàn tất', value: data.completedOrders },
-    ];
-  }, [data]);
 
   if (loading) {
     return (
@@ -256,38 +224,6 @@ export const BuyerDashboardScreen: React.FC = () => {
         </div>
       )}
 
-      <div
-        style={{
-          backgroundColor: colors.background.primary,
-          borderRadius: 12,
-          padding: spacing.sm,
-          border: `1px solid ${colors.background.secondary}`,
-        }}
-      >
-        <Text
-          size="small"
-          style={{
-            color: colors.text.secondary,
-            margin: `0 0 ${spacing.xs}`,
-            fontWeight: fontWeight.medium,
-          }}
-        >
-          So sánh nhanh (khối số)
-        </Text>
-        <Suspense fallback={<ChartFallback />}>
-          <LazyChart
-            type="bar"
-            data={barData}
-            xAxis={{ label: 'Chỉ số' }}
-            yAxis={{ label: 'Số lượng' }}
-            colors={[colors.primary.zaloBlue, colors.functional.warningYellow, colors.primary.agriGreen, chartPalette[4]]}
-            showGrid
-            showLegend={false}
-            width={328}
-            height={200}
-          />
-        </Suspense>
-      </div>
     </div>
   );
 };

@@ -280,8 +280,6 @@ export function ProfileScreen() {
               <InfoRow label="Tên hiển thị" value={profile.displayName} />
               <InfoRow label="Số điện thoại" value={profile.phone ?? '—'} />
               <InfoRow label="Email" value={profile.email ?? '—'} />
-              <InfoRow label="Zalo ID" value={profile.zaloId} mono />
-              <InfoRow label="User ID" value={profile.userId} mono />
               <InfoRow label="Ngày tham gia" value={formatDate(profile.createdAt)} />
               <InfoRow label="Đăng nhập gần nhất" value={formatDateTime(profile.lastLogin)} isLast />
             </>

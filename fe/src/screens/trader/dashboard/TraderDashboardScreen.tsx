@@ -23,14 +23,12 @@ import {
 import { getMe } from '@/services/authService';
 import { subscribeConnectionStatus } from '@/api/monitoringSocket';
 import { orderStatusLabel, type OrderDto } from '@/services/orderService';
+import { cropLabel } from '@/services/marketplaceService';
 
 const LazyChart = lazy(() =>
   import('../../../design-system/components/Chart').then((m) => ({ default: m.Chart })),
 );
 
-const LazySparkline = lazy(() =>
-  import('../../../design-system/components/Sparkline').then((m) => ({ default: m.Sparkline })),
-);
 
 export interface TraderDashboardScreenProps {
   traderName?: string;
@@ -184,12 +182,6 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
     return data.topCrops.map((c) => ({ label: c.cropType, value: c.volume }));
   }, [data]);
 
-  // Last 7 data points of demandTrend for sparkline
-  const sparkline7 = useMemo(() => {
-    if (!data) return [];
-    return data.demandTrend.slice(-7).map((d) => d.requestCount);
-  }, [data]);
-
   const headerStyles: React.CSSProperties = {
     padding: spacing.md,
     backgroundColor: colors.background.primary,
@@ -313,14 +305,6 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
                     Đơn từ người mua — chờ xác nhận
                   </Text>
                 </div>
-                <Suspense fallback={<div style={{ width: 80, height: 32 }} />}>
-                  <LazySparkline
-                    data={sparkline7}
-                    width={80}
-                    height={32}
-                    color={colors.primary.zaloBlue}
-                  />
-                </Suspense>
               </div>
 
               {/* Card 2: Yêu cầu kết nối mới */}
@@ -353,14 +337,6 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
                     Nông dân đang chờ phản hồi
                   </Text>
                 </div>
-                <Suspense fallback={<div style={{ width: 80, height: 32 }} />}>
-                  <LazySparkline
-                    data={sparkline7}
-                    width={80}
-                    height={32}
-                    color={colors.primary.agriGreen}
-                  />
-                </Suspense>
               </div>
 
               {/* Card 3: Hợp đồng đang chạy */}
@@ -393,9 +369,6 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
                     Vùng trồng đang theo dõi
                   </Text>
                 </div>
-                <Suspense fallback={<div style={{ width: 80, height: 32 }} />}>
-                  <LazySparkline data={[]} width={80} height={32} />
-                </Suspense>
               </div>
             </div>
 
@@ -580,7 +553,7 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
                       <div key={t.cropType} style={{ marginBottom: spacing.md }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
                           <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
-                            {t.cropType}
+                            {cropLabel(t.cropType)}
                           </Text>
                           <span style={{ fontSize: fontSize.small, fontWeight: fontWeight.medium, color: trendColor }}>
                             {trendLabel}

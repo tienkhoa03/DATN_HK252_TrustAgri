@@ -25,6 +25,7 @@ import {
   type ForecastDto,
 } from '@/services/newsForecastService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { cropLabel } from '@/services/marketplaceService';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -414,7 +415,7 @@ export const MarketplaceNewsPanel: React.FC = () => {
           <div key={f.id} style={cardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.sm }}>
               <div>
-                <Text.Title size="small" style={{ margin: 0, marginBottom: 4 }}>{f.cropType} · {f.region}</Text.Title>
+                <Text.Title size="small" style={{ margin: 0, marginBottom: 4 }}>{cropLabel(f.cropType)} · {f.region}</Text.Title>
                 <span style={{ display: 'inline-block', padding: `2px ${spacing.sm}`, backgroundColor: typeBg, color: typeColor, borderRadius: 4, fontSize: fontSize.small, fontWeight: fontWeight.medium }}>{typeViLabel}</span>
               </div>
               <button type="button" style={{ ...outlineBtn, flexShrink: 0 }} onClick={() => startEditForecast(f)}>Sửa</button>

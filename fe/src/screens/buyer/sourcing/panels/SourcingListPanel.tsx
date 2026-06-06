@@ -15,6 +15,7 @@ import {
   toBuyingRequestViMessage,
   type BuyingRequestDto,
 } from '@/services/buyingRequestService';
+import { cropLabel } from '@/services/marketplaceService';
 
 export interface BuyingRequest extends BuyingRequestDto {
   proposalCount?: number;
@@ -181,7 +182,7 @@ export const SourcingListPanel: React.FC<SourcingListPanelProps> = ({
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.xs }}>
               <div style={{ flex: 1 }}>
                 <Text style={{ fontSize: fontSize.body, fontWeight: fontWeight.semibold, margin: 0 }}>
-                  {req.cropType}
+                  {cropLabel(req.cropType)}
                 </Text>
                 <Text style={{ fontSize: fontSize.caption, color: colors.text.secondary, margin: 0 }}>
                   {req.quantity.toLocaleString('vi-VN')} {req.unit} • {formatDate(req.createdAt)}

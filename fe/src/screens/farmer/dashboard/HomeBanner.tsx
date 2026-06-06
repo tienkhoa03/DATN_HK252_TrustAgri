@@ -43,6 +43,13 @@ export const HomeBanner: React.FC<HomeBannerProps> = ({
           ctaLabel: 'Xem cách xử lý',
         };
       case 'contract-pending':
+        return {
+          bg: `${colors.functional.warningYellow}18`,
+          border: colors.functional.warningYellow,
+          emoji: '📋',
+          text: `Bạn có ${pendingCount} hợp đồng đang hoạt động`,
+          ctaLabel: 'Xem ngay',
+        };
       case 'connection-request':
         return {
           bg: `${colors.functional.warningYellow}18`,
