@@ -26,6 +26,7 @@ import {
 } from '@/services/connectionService';
 import { listFarms, type FarmDto } from '@/services/farmService';
 import { CROP_LABELS } from '@/services/marketplaceService';
+import { VIETNAM_PROVINCES } from '@/config/provinces';
 import { useAtomValue } from 'jotai';
 import { authSessionAtom } from '@/state/authAtoms';
 
@@ -50,7 +51,7 @@ interface ConnectionInfo {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const REGION_OPTIONS = ['all', 'Hà Nội', 'TP.HCM', 'Đồng Nai', 'Lâm Đồng', 'An Giang', 'Cần Thơ'];
+const REGION_OPTIONS = ['all', ...VIETNAM_PROVINCES];
 
 const CONNECTION_STATUS_FILTER_OPTIONS: { value: TraderConnectionFilter; label: string }[] = [
   { value: 'all', label: 'Tất cả trạng thái' },
@@ -645,6 +646,19 @@ const TraderBrowser: React.FC<TraderBrowserProps> = ({ selectedFarm, onBack }) =
           />
 
           <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 4 }}>
+            Tỉnh / Thành phố:
+          </Text>
+          <select
+            style={{ ...selectStyle, marginBottom: spacing.sm }}
+            value={region}
+            onChange={(e) => setRegion(e.target.value)}
+          >
+            {REGION_OPTIONS.map((r) => (
+              <option key={r} value={r}>{r === 'all' ? 'Tất cả tỉnh' : r}</option>
+            ))}
+          </select>
+
+          <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 4 }}>
             Trạng thái kết nối:
           </Text>
           <select
@@ -675,39 +689,6 @@ const TraderBrowser: React.FC<TraderBrowserProps> = ({ selectedFarm, onBack }) =
           >
             Tìm kiếm
           </button>
-        </div>
-
-        {/* Region chips */}
-        <div
-          style={{
-            display: 'flex',
-            gap: spacing.xs,
-            overflowX: 'auto',
-            paddingBottom: spacing.sm,
-            marginBottom: spacing.sm,
-          }}
-        >
-          {REGION_OPTIONS.map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setRegion(r)}
-              style={{
-                padding: `${spacing.xs} ${spacing.sm}`,
-                borderRadius: 20,
-                border: `1px solid ${region === r ? colors.primary.zaloBlue : colors.background.secondary}`,
-                backgroundColor: region === r ? `${colors.primary.zaloBlue}18` : colors.background.secondary,
-                color: region === r ? colors.primary.zaloBlue : colors.text.secondary,
-                fontSize: fontSize.small,
-                fontWeight: region === r ? fontWeight.semibold : fontWeight.regular,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                minHeight: 44,
-              }}
-            >
-              {r === 'all' ? 'Tất cả' : r}
-            </button>
-          ))}
         </div>
 
         {/* Loading */}

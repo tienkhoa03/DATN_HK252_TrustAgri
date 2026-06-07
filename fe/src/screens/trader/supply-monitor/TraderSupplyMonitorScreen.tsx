@@ -20,6 +20,7 @@ import { SensorDisplay } from '../../../design-system/components/SensorDisplay';
 import { colors } from '../../../design-system/tokens/colors';
 import { spacing } from '../../../design-system/tokens/spacing';
 import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
+import { VIETNAM_PROVINCES } from '@/config/provinces';
 import { getFarm, listFarms } from '@/services/farmService';
 import type { FarmDto } from '@/services/farmService';
 import { ApiError } from '@/api/errors';
@@ -76,15 +77,7 @@ const CROP_FILTER_OPTIONS = [
   ...Object.entries(CROP_TYPE_LABELS).map(([value, label]) => ({ value, label })),
 ];
 
-const REGION_OPTIONS = [
-  'all',
-  'Tiền Giang',
-  'Bến Tre',
-  'Đồng Tháp',
-  'Long An',
-  'Hà Giang',
-  'Hưng Yên',
-];
+const REGION_OPTIONS = ['all', ...VIETNAM_PROVINCES];
 
 function cropLabel(cropType: string): string {
   return CROP_TYPE_LABELS[cropType] ?? cropType;

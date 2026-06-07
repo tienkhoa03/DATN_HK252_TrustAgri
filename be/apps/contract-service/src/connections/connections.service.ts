@@ -123,7 +123,7 @@ export class ConnectionsService implements OnModuleInit {
     const limit = query.limit ?? 20;
     const offset = (page - 1) * limit;
 
-    const conditions: string[] = ["u.role = 'trader'"];
+    const conditions: string[] = ["string_to_array(u.roles, ',') @> ARRAY['trader']"];
     const params: unknown[] = [];
     let idx = 1;
 
@@ -164,7 +164,7 @@ export class ConnectionsService implements OnModuleInit {
     const countParams = [...params];
     const [rows, countRows] = await Promise.all([
       this.dataSource.query<RawUserRow[]>(
-        `SELECT u.user_id, u.zalo_id, u.role, u.display_name, u.phone, u.email,
+        `SELECT u.user_id, u.zalo_id, 'trader'::text AS role, u.display_name, u.phone, u.email,
                 u.avatar_url, u.trader_profile, u.farmer_profile, u.buyer_profile,
                 u.created_at, u.last_login,
                 tr.avg_rating
@@ -200,7 +200,7 @@ export class ConnectionsService implements OnModuleInit {
     const limit = query.limit ?? 20;
     const offset = (page - 1) * limit;
 
-    const conditions: string[] = ["u.role = 'farmer'"];
+    const conditions: string[] = ["string_to_array(u.roles, ',') @> ARRAY['farmer']"];
     const params: unknown[] = [];
     let idx = 1;
 
@@ -221,7 +221,7 @@ export class ConnectionsService implements OnModuleInit {
     const countParams = [...params];
     const [rows, countRows] = await Promise.all([
       this.dataSource.query<RawUserRow[]>(
-        `SELECT DISTINCT u.user_id, u.zalo_id, u.role, u.display_name, u.phone, u.email,
+        `SELECT DISTINCT u.user_id, u.zalo_id, 'farmer'::text AS role, u.display_name, u.phone, u.email,
                 u.avatar_url, u.trader_profile, u.farmer_profile, u.buyer_profile,
                 u.created_at, u.last_login
          FROM users u ${joinClause}

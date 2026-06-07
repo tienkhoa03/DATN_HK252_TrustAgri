@@ -18,6 +18,7 @@ import { Icon } from '@/design-system/components/Icon';
 import { colors } from '@/design-system/tokens/colors';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
+import { VIETNAM_PROVINCES } from '@/config/provinces';
 import { listFarms } from '@/services/farmService';
 import type { FarmDto } from '@/services/farmService';
 import { listStandards, type StandardDto } from '@/services/standardService';
@@ -71,12 +72,7 @@ const CROP_FILTER_OPTIONS = [
 
 const REGION_OPTIONS = [
   { value: 'all', label: 'Tất cả tỉnh' },
-  { value: 'Tiền Giang', label: 'Tiền Giang' },
-  { value: 'Bến Tre', label: 'Bến Tre' },
-  { value: 'Đồng Tháp', label: 'Đồng Tháp' },
-  { value: 'Long An', label: 'Long An' },
-  { value: 'Hà Giang', label: 'Hà Giang' },
-  { value: 'Hưng Yên', label: 'Hưng Yên' },
+  ...VIETNAM_PROVINCES.map((p) => ({ value: p, label: p })),
 ];
 
 const CERTIFICATION_OPTIONS = [
