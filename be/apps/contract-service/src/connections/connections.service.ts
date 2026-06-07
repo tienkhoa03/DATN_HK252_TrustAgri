@@ -328,16 +328,17 @@ export class ConnectionsService implements OnModuleInit {
     }
 
     // Kiểm tra người nhận tồn tại và có vai trò hợp lệ
-    const toUserRows = await this.dataSource.query<{ user_id: string; role: string }[]>(
-      `SELECT user_id, role FROM users WHERE user_id = $1`,
+    const toUserRows = await this.dataSource.query<{ user_id: string; roles: string }[]>(
+      `SELECT user_id, roles FROM users WHERE user_id = $1`,
       [dto.toUserId],
     );
     if (!toUserRows?.length) {
       throw new NotFoundException('Người dùng đích không tồn tại');
     }
-    const toRole = toUserRows[0].role as 'farmer' | 'trader';
+    const userRoles = (toUserRows[0].roles ?? '').split(',').map((r) => r.trim());
+    const toRole = (userRoles.includes('farmer') ? 'farmer' : userRoles.includes('trader') ? 'trader' : null) as 'farmer' | 'trader' | null;
 
-    if (toRole !== 'farmer' && toRole !== 'trader') {
+    if (toRole == null) {
       throw new BadRequestException(
         'Chỉ có thể kết nối với nông dân hoặc thương lái',
       );

@@ -402,7 +402,18 @@ export class ContractsService implements OnApplicationBootstrap {
 
     const saved = await this.contractRepo.save(entity);
     await this.contractAudit.logStatusChange(saved.id, null, saved.status, user.sub);
-    return this.toDto(saved);
+
+    const createdDto = this.toDto(saved);
+    // FR-C04: thông báo các bên biết có hợp đồng mới chờ ký
+    await this.contractPublisher
+      ?.publishContractChanged({ contract: createdDto })
+      .catch((err) =>
+        this.logger.warn(
+          `publishContractChanged after create failed: ${(err as Error).message}`,
+        ),
+      );
+
+    return createdDto;
   }
 
   /** Gọi Auth Service lấy displayName + phone; Farm Service lấy farmName + standardName — ghi vào INSERT. */
@@ -688,7 +699,17 @@ export class ContractsService implements OnApplicationBootstrap {
         );
     }
 
-    return this.toDto(saved);
+    const dto = this.toDto(saved);
+    // FR-C04: thông báo các bên về trạng thái ký (một bên ký hoặc cả hai đã ký)
+    await this.contractPublisher
+      ?.publishContractChanged({ contract: dto })
+      .catch((err) =>
+        this.logger.warn(
+          `publishContractChanged after sign failed: ${(err as Error).message}`,
+        ),
+      );
+
+    return dto;
   }
 
   /**

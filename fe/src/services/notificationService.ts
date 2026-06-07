@@ -13,7 +13,7 @@ import { ApiError } from '@/api/errors';
 
 export interface NotificationDto {
   id: string;
-  type: 'alert' | 'contract' | 'connection' | 'system';
+  type: 'alert' | 'contract' | 'connection' | 'system' | 'process';
   title: string;
   body: string;
   severity?: 'info' | 'warning' | 'danger';
@@ -34,6 +34,7 @@ export interface ListNotificationsParams {
   page?: number;
   limit?: number;
   unreadOnly?: boolean;
+  type?: NotificationDto['type'];
 }
 
 type NotifCtx = 'list' | 'read' | 'readAll' | 'badge';
@@ -97,6 +98,7 @@ export async function listNotifications(
   if (params.page != null) q.page = params.page;
   if (params.limit != null) q.limit = params.limit;
   if (params.unreadOnly === true) q.unreadOnly = true;
+  if (params.type) q.type = params.type;
 
   const { data } = await apiClient.get<ListResponse<Record<string, unknown>>>('/notifications', {
     params: q,

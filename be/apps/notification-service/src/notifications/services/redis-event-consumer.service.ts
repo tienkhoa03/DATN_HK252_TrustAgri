@@ -10,9 +10,12 @@ import { AlertDto, ConnectionDto } from '@trustagri/shared';
 import {
   ContractChangedEventPayload,
   NotificationsService,
+  ProcessEventPayload,
   REDIS_CHANNEL_ALERT_CREATED,
   REDIS_CHANNEL_CONNECTION_REQUESTED,
+  REDIS_CHANNEL_CONNECTION_UPDATED,
   REDIS_CHANNEL_CONTRACT_CHANGED,
+  REDIS_CHANNEL_PROCESS_EVENT,
 } from '../notifications.service';
 
 /**
@@ -81,6 +84,8 @@ export class RedisEventConsumerService
       REDIS_CHANNEL_ALERT_CREATED,
       REDIS_CHANNEL_CONTRACT_CHANGED,
       REDIS_CHANNEL_CONNECTION_REQUESTED,
+      REDIS_CHANNEL_CONNECTION_UPDATED,
+      REDIS_CHANNEL_PROCESS_EVENT,
     );
 
     sub.on('message', (channel, message) => {
@@ -92,7 +97,7 @@ export class RedisEventConsumerService
     });
 
     this.logger.log(
-      `Subscribed to ${REDIS_CHANNEL_ALERT_CREATED}, ${REDIS_CHANNEL_CONTRACT_CHANGED}, ${REDIS_CHANNEL_CONNECTION_REQUESTED}`,
+      `Subscribed to ${REDIS_CHANNEL_ALERT_CREATED}, ${REDIS_CHANNEL_CONTRACT_CHANGED}, ${REDIS_CHANNEL_CONNECTION_REQUESTED}, ${REDIS_CHANNEL_CONNECTION_UPDATED}, ${REDIS_CHANNEL_PROCESS_EVENT}`,
     );
   }
 
@@ -117,6 +122,14 @@ export class RedisEventConsumerService
     }
     if (channel === REDIS_CHANNEL_CONNECTION_REQUESTED) {
       await this.notifications.handleConnectionRequested(parsed as ConnectionDto);
+      return;
+    }
+    if (channel === REDIS_CHANNEL_CONNECTION_UPDATED) {
+      await this.notifications.handleConnectionUpdated(parsed as ConnectionDto);
+      return;
+    }
+    if (channel === REDIS_CHANNEL_PROCESS_EVENT) {
+      await this.notifications.handleProcessEvent(parsed as ProcessEventPayload);
       return;
     }
   }

@@ -59,6 +59,7 @@ const notificationTypeConfig: Record<
   contract: { icon: 'book', color: colors.primary.zaloBlue },
   connection: { icon: 'users', color: colors.primary.agriGreen },
   system: { icon: 'info', color: colors.text.secondary },
+  process: { icon: 'info', color: colors.functional.warningYellow },
 };
 
 function severityAccent(severity: NotificationDto['severity']): string | undefined {

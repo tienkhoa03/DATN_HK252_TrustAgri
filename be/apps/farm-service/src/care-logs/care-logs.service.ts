@@ -24,6 +24,7 @@ import { ListCareLogsQueryDto } from './dto/list-care-logs-query.dto';
 import { SyncCareLogsDto } from './dto/sync-care-logs.dto';
 import { AuthClientService } from '../clients/auth-client.service';
 import { settledValue } from '../clients/settled.util';
+import { ProcessEventPublisherService } from '../clients/process-event-publisher.service';
 
 // Cột không được phép sửa sau khi đã tạo (đóng dấu)
 const IMMUTABLE_FIELDS = ['action', 'performedAt', 'farmId'] as const;
@@ -48,6 +49,7 @@ export class CareLogsService {
     private readonly stepRepo: Repository<StandardStepEntity>,
     private readonly authClient: AuthClientService,
     private readonly dataSource: DataSource,
+    private readonly processPublisher: ProcessEventPublisherService,
   ) {}
 
   async listCareLogs(
@@ -123,6 +125,25 @@ export class CareLogsService {
       where: { id: saved.id },
       relations: ['evidences'],
     });
+
+    if (deviation) {
+      void this.processPublisher
+        .publishProcessEvent({
+          kind: 'compliance_violation',
+          userId,
+          farmId,
+          title: 'Cảnh báo tuân thủ quy trình',
+          body: `Nhật ký chăm sóc vừa ghi không đúng thứ tự quy trình tiêu chuẩn.`,
+          linkTo: `/farms/${farmId}/care-logs`,
+          severity: 'warning',
+        })
+        .catch((err) =>
+          this.logger.warn(
+            `publishProcessEvent compliance_violation failed: ${(err as Error).message}`,
+          ),
+        );
+    }
+
     return this.toDto(withEvidence!);
   }
 

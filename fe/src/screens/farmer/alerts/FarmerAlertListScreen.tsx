@@ -318,6 +318,7 @@ export const FarmerAlertListScreen: React.FC<FarmerAlertListScreenProps> = ({
   // ── Filter state ──────────────────────────────────────────────────────────
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all');
+  const [filterOpen, setFilterOpen] = useState(false);
 
   // ── Data state ────────────────────────────────────────────────────────────
   const [alerts, setAlerts] = useState<AlertDto[]>([]);
@@ -479,19 +480,18 @@ export const FarmerAlertListScreen: React.FC<FarmerAlertListScreenProps> = ({
           )}
         </div>
 
-        {/* Nút tải lại */}
+        {/* Nút lọc */}
         <button
-          onClick={loadAlerts}
-          disabled={isLoading}
+          onClick={() => setFilterOpen((v) => !v)}
           style={{
-            width: 40, height: 40, borderRadius: '50%', backgroundColor: 'transparent',
-            border: 'none', cursor: isLoading ? 'default' : 'pointer',
+            width: 40, height: 40, borderRadius: '50%', backgroundColor: filterOpen || severityFilter !== 'all' ? `${colors.primary.zaloBlue}10` : 'transparent',
+            border: `1px solid ${filterOpen || severityFilter !== 'all' ? colors.primary.zaloBlue : 'transparent'}`,
+            cursor: 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-            opacity: isLoading ? 0.4 : 1,
           }}
-          aria-label="Tải lại danh sách cảnh báo"
+          aria-label="Bộ lọc"
         >
-          <Icon name="filter" size="md" color={colors.text.secondary} />
+          <Icon name="filter" size="md" color={filterOpen || severityFilter !== 'all' ? colors.primary.zaloBlue : colors.text.secondary} />
         </button>
       </div>
 
@@ -530,53 +530,55 @@ export const FarmerAlertListScreen: React.FC<FarmerAlertListScreenProps> = ({
           ))}
         </div>
 
-        {/* ── Severity chips ─────────────────────────────────────────────── */}
-        <div style={{
-          display: 'flex',
-          gap: spacing.xs,
-          padding: `${spacing.sm} ${spacing.md}`,
-          backgroundColor: colors.background.primary,
-          borderBottom: `1px solid ${colors.background.secondary}`,
-          alignItems: 'center',
-        }}>
-          {([
-            { key: 'all', label: 'Tất cả', color: undefined },
-            { key: 'danger', label: 'Nguy hiểm', color: colors.functional.alertRed },
-            { key: 'warning', label: 'Cảnh báo', color: colors.functional.warningYellow },
-          ] as const).map(({ key, label, color }) => (
-            <button
-              key={key}
-              onClick={() => setSeverityFilter(key)}
-              style={{
-                padding: `${spacing.xs} ${spacing.sm}`,
-                borderRadius: 99,
-                border: `1px solid ${severityFilter === key ? (color ?? colors.primary.zaloBlue) : colors.background.secondary}`,
-                backgroundColor: severityFilter === key
-                  ? `${(color ?? colors.primary.zaloBlue)}18`
-                  : colors.background.primary,
-                color: severityFilter === key
-                  ? (color ?? colors.primary.zaloBlue)
-                  : colors.text.secondary,
+        {/* ── Severity chips — hiện khi nhấn icon lọc ──────────────────── */}
+        {filterOpen && (
+          <div style={{
+            display: 'flex',
+            gap: spacing.xs,
+            padding: `${spacing.sm} ${spacing.md}`,
+            backgroundColor: colors.background.primary,
+            borderBottom: `1px solid ${colors.background.secondary}`,
+            alignItems: 'center',
+          }}>
+            {([
+              { key: 'all', label: 'Tất cả', color: undefined },
+              { key: 'danger', label: 'Nguy hiểm', color: colors.functional.alertRed },
+              { key: 'warning', label: 'Cảnh báo', color: colors.functional.warningYellow },
+            ] as const).map(({ key, label, color }) => (
+              <button
+                key={key}
+                onClick={() => setSeverityFilter(key)}
+                style={{
+                  padding: `${spacing.xs} ${spacing.sm}`,
+                  borderRadius: 99,
+                  border: `1px solid ${severityFilter === key ? (color ?? colors.primary.zaloBlue) : colors.background.secondary}`,
+                  backgroundColor: severityFilter === key
+                    ? `${(color ?? colors.primary.zaloBlue)}18`
+                    : colors.background.primary,
+                  color: severityFilter === key
+                    ? (color ?? colors.primary.zaloBlue)
+                    : colors.text.secondary,
+                  fontSize: fontSize.small,
+                  fontWeight: severityFilter === key ? fontWeight.semibold : fontWeight.regular,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.18s',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+            {!isLoading && (
+              <span style={{
+                marginLeft: 'auto',
                 fontSize: fontSize.small,
-                fontWeight: severityFilter === key ? fontWeight.semibold : fontWeight.regular,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.18s',
-              }}
-            >
-              {label}
-            </button>
-          ))}
-          {!isLoading && (
-            <span style={{
-              marginLeft: 'auto',
-              fontSize: fontSize.small,
-              color: colors.text.secondary,
-            }}>
-              {total} kết quả
-            </span>
-          )}
-        </div>
+                color: colors.text.secondary,
+              }}>
+                {total} kết quả
+              </span>
+            )}
+          </div>
+        )}
 
         {/* ── Alert list ────────────────────────────────────────────────── */}
         <div style={{ padding: `${spacing.sm} ${spacing.md} 0` }}>

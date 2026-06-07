@@ -226,6 +226,8 @@ export const MarketplaceSupplyPanel: React.FC = () => {
   // Standard lookup: id → StandardDto (cho hiển thị tên thay vì UUID)
   const [standardsById, setStandardsById] = useState<Record<string, StandardDto>>({});
 
+  const [filterOpen, setFilterOpen] = useState(false);
+
   const inFlightRef = useRef(false);
   const loadedKeyRef = useRef<string | null>(null);
   const warnedRef = useRef(false);
@@ -494,66 +496,86 @@ export const MarketplaceSupplyPanel: React.FC = () => {
     <div style={{ padding: spacing.md, paddingBottom: 80 }}>
       {/* Filters */}
       <div style={{ padding: spacing.md, backgroundColor: colors.background.secondary, borderRadius: 10, marginBottom: spacing.md }}>
-        <Text size="small" style={{ fontWeight: fontWeight.semibold, marginBottom: spacing.sm }}>Tìm kiếm vườn</Text>
-
-        {/* Search input with suggestions */}
-        <div style={{ position: 'relative', marginBottom: spacing.sm }}>
-          <input
-            value={searchKeyword}
-            onChange={(e) => setSearchKeyword(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { setSuggestions([]); handleSearch(); } }}
-            placeholder="Nhập tên vườn…"
-            style={{ width: '100%', padding: `${spacing.sm} ${spacing.md}`, borderRadius: 10, border: `1px solid ${colors.background.tertiary}`, fontSize: fontSize.body, boxSizing: 'border-box' }}
-          />
-          {(isSuggestLoading || suggestions.length > 0) && searchKeyword.trim() && (
-            <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, backgroundColor: colors.background.primary, border: `1px solid ${colors.background.tertiary}`, borderRadius: 10, boxShadow: '0 8px 20px rgba(0,0,0,0.12)', zIndex: 10, overflow: 'hidden' }}>
-              {isSuggestLoading ? (
-                <div style={{ padding: spacing.md, display: 'flex', alignItems: 'center', gap: spacing.sm }}>
-                  <Spinner />
-                  <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>Đang gợi ý…</Text>
-                </div>
-              ) : (
-                suggestions.map((f) => (
-                  <button key={f.id} type="button" style={{ width: '100%', textAlign: 'left', padding: `${spacing.sm} ${spacing.md}`, background: 'transparent', border: 'none', cursor: 'pointer' }}
-                    onClick={() => {
-                      const kw = f.name;
-                      setSearchKeyword(kw);
-                      setSuggestions([]);
-                      loadedKeyRef.current = null;
-                      void doSearch({ cropType: filter.cropType, region: filter.region, certification: filter.certification, keyword: kw });
-                    }}>
-                    <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>{f.name}</Text>
-                    <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>{f.location?.province ? `${f.location.province} • ${cropLabel(f.cropType)}` : cropLabel(f.cropType)}</Text>
-                  </button>
-                ))
-              )}
-            </div>
-          )}
+        {/* Search row + filter icon */}
+        <div style={{ display: 'flex', gap: spacing.sm, alignItems: 'flex-start', marginBottom: spacing.sm }}>
+          <div style={{ flex: 1, position: 'relative' }}>
+            <input
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { setSuggestions([]); handleSearch(); } }}
+              placeholder="Nhập tên vườn…"
+              style={{ width: '100%', padding: `${spacing.sm} ${spacing.md}`, borderRadius: 10, border: `1px solid ${colors.background.tertiary}`, fontSize: fontSize.body, boxSizing: 'border-box' }}
+            />
+            {(isSuggestLoading || suggestions.length > 0) && searchKeyword.trim() && (
+              <div style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, backgroundColor: colors.background.primary, border: `1px solid ${colors.background.tertiary}`, borderRadius: 10, boxShadow: '0 8px 20px rgba(0,0,0,0.12)', zIndex: 10, overflow: 'hidden' }}>
+                {isSuggestLoading ? (
+                  <div style={{ padding: spacing.md, display: 'flex', alignItems: 'center', gap: spacing.sm }}>
+                    <Spinner />
+                    <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>Đang gợi ý…</Text>
+                  </div>
+                ) : (
+                  suggestions.map((f) => (
+                    <button key={f.id} type="button" style={{ width: '100%', textAlign: 'left', padding: `${spacing.sm} ${spacing.md}`, background: 'transparent', border: 'none', cursor: 'pointer' }}
+                      onClick={() => {
+                        const kw = f.name;
+                        setSearchKeyword(kw);
+                        setSuggestions([]);
+                        loadedKeyRef.current = null;
+                        void doSearch({ cropType: filter.cropType, region: filter.region, certification: filter.certification, keyword: kw });
+                      }}>
+                      <Text size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>{f.name}</Text>
+                      <Text size="xSmall" style={{ margin: 0, color: colors.text.secondary }}>{f.location?.province ? `${f.location.province} • ${cropLabel(f.cropType)}` : cropLabel(f.cropType)}</Text>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+          {/* Filter toggle button */}
+          {(() => {
+            const hasActiveFilters = filter.cropType !== 'all' || filter.region !== 'all' || filter.certification !== 'all' || filter.connectionStatus !== 'all';
+            return (
+              <button
+                type="button"
+                style={{ padding: spacing.sm, border: `1px solid ${hasActiveFilters ? colors.primary.zaloBlue : colors.background.tertiary}`, borderRadius: 10, backgroundColor: hasActiveFilters ? `${colors.primary.zaloBlue}10` : colors.background.primary, color: hasActiveFilters ? colors.primary.zaloBlue : colors.text.secondary, cursor: 'pointer', minHeight: 44, minWidth: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, fontSize: fontSize.caption, flexShrink: 0 }}
+                onClick={() => setFilterOpen((v) => !v)}
+                aria-label="Bộ lọc"
+              >
+                <Icon name="filter" size="sm" color={hasActiveFilters ? colors.primary.zaloBlue : colors.text.secondary} />
+                Lọc
+              </button>
+            );
+          })()}
         </div>
 
-        <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 4 }}>Loại nông sản:</Text>
-        <select style={selectStyle} value={filter.cropType} onChange={(e) => setFilter((prev) => ({ ...prev, cropType: e.target.value }))}>
-          {CROP_FILTER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        {/* Collapsible filter options */}
+        {filterOpen && (
+          <div>
+            <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 4 }}>Loại nông sản:</Text>
+            <select style={selectStyle} value={filter.cropType} onChange={(e) => setFilter((prev) => ({ ...prev, cropType: e.target.value }))}>
+              {CROP_FILTER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
 
-        <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 4 }}>Tỉnh / Thành phố:</Text>
-        <select style={selectStyle} value={filter.region} onChange={(e) => setFilter((prev) => ({ ...prev, region: e.target.value }))}>
-          {REGION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+            <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 4 }}>Tỉnh / Thành phố:</Text>
+            <select style={selectStyle} value={filter.region} onChange={(e) => setFilter((prev) => ({ ...prev, region: e.target.value }))}>
+              {REGION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
 
-        <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 4 }}>Tiêu chuẩn:</Text>
-        <select style={selectStyle} value={filter.certification} onChange={(e) => setFilter((prev) => ({ ...prev, certification: e.target.value }))}>
-          {CERTIFICATION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+            <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 4 }}>Tiêu chuẩn:</Text>
+            <select style={selectStyle} value={filter.certification} onChange={(e) => setFilter((prev) => ({ ...prev, certification: e.target.value }))}>
+              {CERTIFICATION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
 
-        <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 4 }}>Trạng thái kết nối:</Text>
-        <select
-          style={{ ...selectStyle, marginBottom: spacing.md }}
-          value={filter.connectionStatus}
-          onChange={(e) => setFilter((prev) => ({ ...prev, connectionStatus: e.target.value as FarmConnectionFilter }))}
-        >
-          {CONNECTION_STATUS_FILTER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+            <Text size="xSmall" style={{ color: colors.text.secondary, marginBottom: 4 }}>Trạng thái kết nối:</Text>
+            <select
+              style={{ ...selectStyle, marginBottom: spacing.sm }}
+              value={filter.connectionStatus}
+              onChange={(e) => setFilter((prev) => ({ ...prev, connectionStatus: e.target.value as FarmConnectionFilter }))}
+            >
+              {CONNECTION_STATUS_FILTER_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+        )}
 
         <button
           type="button"

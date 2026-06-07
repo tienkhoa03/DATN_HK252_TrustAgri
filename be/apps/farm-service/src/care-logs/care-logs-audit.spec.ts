@@ -7,6 +7,7 @@ import { CareAuditLogEntity } from './entities/care-audit-log.entity';
 import { FarmEntity } from '../farms/entities/farm.entity';
 import { StandardStepEntity } from '../standards/entities/standard-step.entity';
 import { AuthClientService } from '../clients/auth-client.service';
+import { ProcessEventPublisherService } from '../clients/process-event-publisher.service';
 
 function mockRepo<T>(): jest.Mocked<Repository<T>> {
   return {
@@ -42,6 +43,10 @@ function mockAuthClient(): AuthClientService {
   return { getUserSnapshot: jest.fn().mockResolvedValue(null) } as unknown as AuthClientService;
 }
 
+function mockProcessPublisher(): ProcessEventPublisherService {
+  return { publishProcessEvent: jest.fn().mockResolvedValue(undefined) } as unknown as ProcessEventPublisherService;
+}
+
 function buildService() {
   const careLogRepo = mockRepo<CareLogEntity>();
   const evidenceRepo = mockRepo<EvidenceEntity>();
@@ -50,6 +55,7 @@ function buildService() {
   const stepRepo = mockRepo<StandardStepEntity>();
   const authClient = mockAuthClient();
   const dataSource = mockDataSource();
+  const processPublisher = mockProcessPublisher();
 
   const svc = new CareLogsService(
     careLogRepo,
@@ -59,6 +65,7 @@ function buildService() {
     stepRepo,
     authClient,
     dataSource,
+    processPublisher,
   );
 
   return { svc, careLogRepo, farmRepo, auditRepo, dataSource };

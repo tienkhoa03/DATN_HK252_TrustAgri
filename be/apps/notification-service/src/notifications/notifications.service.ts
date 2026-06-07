@@ -27,6 +27,18 @@ export interface ContractChangedEventPayload {
 export const REDIS_CHANNEL_ALERT_CREATED = 'alert.created';
 export const REDIS_CHANNEL_CONTRACT_CHANGED = 'contract.changed';
 export const REDIS_CHANNEL_CONNECTION_REQUESTED = 'connection.requested';
+export const REDIS_CHANNEL_CONNECTION_UPDATED = 'connection.updated';
+export const REDIS_CHANNEL_PROCESS_EVENT = 'process.event';
+
+export interface ProcessEventPayload {
+  kind: 'careplan_due' | 'compliance_violation';
+  userId: string;
+  farmId?: string;
+  title: string;
+  body: string;
+  linkTo?: string;
+  severity: 'info' | 'warning' | 'danger';
+}
 
 @Injectable()
 export class NotificationsService {
@@ -53,6 +65,9 @@ export class NotificationsService {
 
     if (query.unreadOnly === true) {
       qb.andWhere('n.read = false');
+    }
+    if (query.type) {
+      qb.andWhere('n.type = :type', { type: query.type });
     }
 
     const [rows, total] = await qb
@@ -144,6 +159,37 @@ export class NotificationsService {
     }
   }
 
+  /** Consumer: connection.updated — người gửi lời mời được thông báo kết quả accept/reject/signed. */
+  async handleConnectionUpdated(conn: ConnectionDto): Promise<void> {
+    const statusMap: Record<string, string> = {
+      accepted: 'đã chấp nhận',
+      rejected: 'đã từ chối',
+      signed: 'đã ký hợp đồng với',
+    };
+    const statusText = statusMap[conn.status] ?? conn.status;
+    const title = 'Cập nhật kết nối';
+    const body = `Lời mời kết nối của bạn ${statusText}.`;
+
+    await this.createAndPushZns(conn.fromUserId, {
+      type: 'connection',
+      title,
+      body,
+      severity: conn.status === 'rejected' ? 'warning' : 'info',
+      linkTo: `/connections/${conn.id}`,
+    });
+  }
+
+  /** Consumer: process.event — nhắc việc care-plan hoặc cảnh báo tuân thủ tiêu chuẩn. */
+  async handleProcessEvent(payload: ProcessEventPayload): Promise<void> {
+    await this.createAndPushZns(payload.userId, {
+      type: 'process',
+      title: payload.title,
+      body: payload.body,
+      severity: payload.severity,
+      linkTo: payload.linkTo,
+    });
+  }
+
   /** Consumer: connection.requested — ConnectionDto JSON. */
   async handleConnectionRequested(conn: ConnectionDto): Promise<void> {
     const title = 'Lời mời kết nối';
@@ -163,7 +209,7 @@ export class NotificationsService {
   private async createAndPushZns(
     userId: string,
     data: {
-      type: NotificationEntity['type'];
+      type: 'alert' | 'contract' | 'connection' | 'system' | 'process';
       title: string;
       body: string;
       severity?: NotificationEntity['severity'];

@@ -35,5 +35,9 @@ export function notificationLinkToAppPath(
     return '/buyer';
   }
 
+  if (path.startsWith('/farms/') && path.includes('/care-logs')) {
+    return '/farmer/garden';
+  }
+
   return null;
 }

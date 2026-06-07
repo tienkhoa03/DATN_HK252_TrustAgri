@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect, useMemo, useRef, lazy, Suspense } from 'react';
 import { Page, Box, Text, useNavigate } from 'zmp-ui';
+import { NotificationBell } from '@/components/NotificationBell';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { Icon } from '../../../design-system/components/Icon';
 import type { ChartDataPoint } from '../../../design-system/components/Chart';
@@ -238,21 +239,24 @@ export const TraderDashboardScreen: React.FC<TraderDashboardScreenProps> = ({
       `}</style>
       <ConnectionStatusBanner />
       <div style={contentStyles}>
-        <div style={headerStyles}>
-          <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
-            Xin chào,
-          </Text>
-          <Text.Title size="normal" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
-            {traderName}
-          </Text.Title>
-          <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
-            {companyName}
-          </Text>
-          {data && (
-            <Text size="xSmall" style={{ color: colors.text.secondary, margin: `${spacing.xs} 0 0` }}>
-              Kỳ thống kê: {formatPeriod(data.periodFrom, data.periodTo)}
+        <div style={{ ...headerStyles, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div>
+            <Text size="small" style={{ color: colors.text.secondary, margin: 0 }}>
+              Xin chào,
             </Text>
-          )}
+            <Text.Title size="normal" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
+              {traderName}
+            </Text.Title>
+            <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>
+              {companyName}
+            </Text>
+            {data && (
+              <Text size="xSmall" style={{ color: colors.text.secondary, margin: `${spacing.xs} 0 0` }}>
+                Kỳ thống kê: {formatPeriod(data.periodFrom, data.periodTo)}
+              </Text>
+            )}
+          </div>
+          <NotificationBell />
         </div>
 
         {error && (

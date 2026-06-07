@@ -31,11 +31,23 @@ const SEVERITY_COLOR: Record<NonNullable<NotificationDto['severity']>, string> =
 };
 
 const TYPE_LABEL: Record<NotificationDto['type'], string> = {
-  alert: 'Cảnh báo',
+  alert: 'Cảm biến',
   contract: 'Hợp đồng',
   connection: 'Kết nối',
   system: 'Hệ thống',
+  process: 'Quy trình',
 };
+
+type FilterTab = 'all' | NotificationDto['type'];
+
+const FILTER_TABS: { key: FilterTab; label: string }[] = [
+  { key: 'all', label: 'Tất cả' },
+  { key: 'alert', label: 'Cảm biến' },
+  { key: 'contract', label: 'Hợp đồng' },
+  { key: 'connection', label: 'Kết nối' },
+  { key: 'process', label: 'Quy trình' },
+  { key: 'system', label: 'Hệ thống' },
+];
 
 function formatRelative(iso: string): string {
   const ts = new Date(iso).getTime();
@@ -60,14 +72,20 @@ export const NotificationsScreen: React.FC = () => {
   const [items, setItems] = useState<NotificationDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [readingAll, setReadingAll] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(async (filter: FilterTab = 'all') => {
     setLoading(true);
     try {
-      const res = await listNotifications({ page: 1, limit: 50 });
+      const params = filter === 'all'
+        ? { page: 1, limit: 50 }
+        : { page: 1, limit: 50, type: filter as NotificationDto['type'] };
+      const res = await listNotifications(params);
       setItems(res.items);
-      const unread = res.items.filter((n) => !n.read).length;
-      setUnread(unread);
+      if (filter === 'all') {
+        const unread = res.items.filter((n) => !n.read).length;
+        setUnread(unread);
+      }
     } catch (err) {
       openSnackbar({ type: 'error', text: toNotificationViMessage(err, 'list'), duration: 4000, icon: true });
     } finally {
@@ -76,8 +94,8 @@ export const NotificationsScreen: React.FC = () => {
   }, [openSnackbar, setUnread]);
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    void reload(activeFilter);
+  }, [reload, activeFilter]);
 
   const handleItemClick = useCallback(
     async (n: NotificationDto) => {
@@ -165,6 +183,40 @@ export const NotificationsScreen: React.FC = () => {
         >
           {readingAll ? 'Đang lưu…' : 'Đọc tất cả'}
         </button>
+      </div>
+
+      {/* Tab filter */}
+      <div
+        style={{
+          display: 'flex',
+          gap: spacing.xs,
+          padding: `${spacing.sm} ${spacing.md}`,
+          overflowX: 'auto',
+          backgroundColor: colors.background.primary,
+          borderBottom: `1px solid ${colors.background.secondary}`,
+        }}
+      >
+        {FILTER_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveFilter(tab.key)}
+            style={{
+              flexShrink: 0,
+              padding: `6px ${spacing.md}`,
+              borderRadius: 20,
+              border: 'none',
+              fontSize: fontSize.small,
+              fontWeight: activeFilter === tab.key ? fontWeight.semibold : fontWeight.regular,
+              backgroundColor: activeFilter === tab.key ? colors.primary.zaloBlue : colors.background.secondary,
+              color: activeFilter === tab.key ? colors.text.inverse : colors.text.secondary,
+              cursor: 'pointer',
+              minHeight: 44,
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       <div style={{ padding: spacing.md, paddingBottom: '80px' }}>

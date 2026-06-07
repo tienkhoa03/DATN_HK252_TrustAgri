@@ -98,6 +98,7 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
   const [loadingMore, setLoadingMore] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterOption>('Tất cả');
   const [searchVisible, setSearchVisible] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
 
   // Load news
   useEffect(() => {
@@ -508,28 +509,53 @@ export const BuyerMarketplaceScreen: React.FC<BuyerMarketplaceScreenProps> = ({
           </div>
         )}
 
-        {/* Filter Chip Bar */}
-        <div style={filterBarStyles}>
-          {FILTER_OPTIONS.map((opt) => (
-            <button
-              key={opt}
-              style={filterChipStyles(activeFilter === opt)}
-              onClick={() => setActiveFilter(opt)}
-              type="button"
-            >
-              {opt}
-            </button>
-          ))}
-        </div>
-
-        {/* Section title */}
-        <div style={{ padding: `0 ${spacing.md} 0` }}>
+        {/* Section title + filter icon */}
+        <div style={{ padding: `0 ${spacing.md}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs }}>
           <Text.Title size="small" style={{ margin: 0 }}>
             {loading
               ? 'Đang tải...'
               : `Nông sản (${filteredProducts.length}${productTotal > products.length ? `/${productTotal}` : ''})`}
           </Text.Title>
+          <button
+            type="button"
+            style={{
+              padding: spacing.sm,
+              border: `1px solid ${activeFilter !== 'Tất cả' ? colors.primary.agriGreen : colors.background.tertiary}`,
+              borderRadius: 8,
+              backgroundColor: activeFilter !== 'Tất cả' ? `${colors.primary.agriGreen}10` : 'transparent',
+              cursor: 'pointer',
+              minHeight: 44,
+              minWidth: 44,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: spacing.xs,
+            }}
+            onClick={() => setFilterOpen((v) => !v)}
+            aria-label="Bộ lọc"
+          >
+            <Icon name="filter" size="sm" color={activeFilter !== 'Tất cả' ? colors.primary.agriGreen : colors.text.secondary} />
+            {activeFilter !== 'Tất cả' && (
+              <Text size="xSmall" style={{ color: colors.primary.agriGreen, margin: 0, fontSize: fontSize.caption }}>{activeFilter}</Text>
+            )}
+          </button>
         </div>
+
+        {/* Filter Chip Bar — hiện khi nhấn icon lọc */}
+        {filterOpen && (
+          <div style={filterBarStyles}>
+            {FILTER_OPTIONS.map((opt) => (
+              <button
+                key={opt}
+                style={filterChipStyles(activeFilter === opt)}
+                onClick={() => setActiveFilter(opt)}
+                type="button"
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Product Grid */}
         {renderProductGrid()}

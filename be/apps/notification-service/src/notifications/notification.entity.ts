@@ -8,7 +8,7 @@ import {
 } from 'typeorm';
 
 @Entity('notifications')
-@Check(`"type" IN ('alert', 'contract', 'connection', 'system')`)
+@Check(`"type" IN ('alert', 'contract', 'connection', 'system', 'process')`)
 @Check(`"severity" IS NULL OR "severity" IN ('info', 'warning', 'danger')`)
 export class NotificationEntity {
   @PrimaryGeneratedColumn('uuid')
@@ -22,7 +22,7 @@ export class NotificationEntity {
   userId: string;
 
   @Column({ type: 'varchar', length: 32 })
-  type: 'alert' | 'contract' | 'connection' | 'system';
+  type: 'alert' | 'contract' | 'connection' | 'system' | 'process';
 
   @Column()
   title: string;

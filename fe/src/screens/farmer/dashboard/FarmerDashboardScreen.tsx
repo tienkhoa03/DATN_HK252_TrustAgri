@@ -18,6 +18,7 @@ import { ConnectionStatusBanner } from '@/components/ConnectionStatusBanner';
 import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import { ApiError } from '@/api/errors';
+import { NotificationBell } from '@/components/NotificationBell';
 import { useMonitoring } from '@/hooks/useMonitoring';
 import { useCarePlan } from '@/hooks/useCarePlan';
 import {
@@ -216,18 +217,7 @@ export const FarmerDashboardScreen: React.FC<FarmerDashboardScreenProps> = ({
               <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0 }}>{resolvedFarmName}</Text>
             </div>
           </div>
-          <button
-            style={{ position: 'relative', width: 44, height: 44, borderRadius: '50%', backgroundColor: 'transparent', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            onClick={() => navigate('/farmer/alerts')}
-            aria-label={`Cảnh báo${alertBadgeCount > 0 ? ` (${alertBadgeCount} chưa xử lý)` : ''}`}
-          >
-            <Icon name="notification" size="md" color={colors.text.primary} />
-            {alertBadgeCount > 0 && (
-              <div style={{ position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: '50%', backgroundColor: colors.functional.alertRed, color: colors.text.inverse, fontSize: fontSize.small, fontWeight: fontWeight.bold, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {alertBadgeCount > 9 ? '9+' : alertBadgeCount}
-              </div>
-            )}
-          </button>
+          <NotificationBell />
         </div>
 
         {/* Block 1: Priority Banner */}

@@ -8,7 +8,7 @@ import { ForecastPayloadDto } from './forecast.dto';
  */
 export interface NotificationDto {
   id: string;
-  type: 'alert' | 'contract' | 'connection' | 'system';
+  type: 'alert' | 'contract' | 'connection' | 'system' | 'process';
   title: string;
   body: string;
   severity?: 'info' | 'warning' | 'danger';
