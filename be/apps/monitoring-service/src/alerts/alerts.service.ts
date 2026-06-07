@@ -7,6 +7,7 @@ import { AlertQueryDto } from './dto/alert-query.dto';
 import { AlertPublisherService } from './services/alert-publisher.service';
 import { FarmClientService } from '../clients/farm-client.service';
 import { AuthClientService } from '../clients/auth-client.service';
+import { ContractClientService } from '../clients/contract-client.service';
 import { settledValue } from '../clients/settled.util';
 
 interface SensorThreshold {
@@ -19,11 +20,8 @@ interface ThresholdConfig {
   danger: SensorThreshold;
 }
 
-/**
- * Ngưỡng cảnh báo theo loại cảm biến.
- * Mỗi loại có hai mức: warning (cảnh báo sớm) và danger (nguy hiểm).
- */
-const THRESHOLDS: Record<string, ThresholdConfig> = {
+/** Ngưỡng mặc định — fallback khi farm không có hợp đồng/tiêu chuẩn định nghĩa ngưỡng. */
+const DEFAULT_THRESHOLDS: Record<string, ThresholdConfig> = {
   temperature: {
     warning: { min: 15, max: 35 },
     danger: { min: 10, max: 40 },
@@ -41,6 +39,13 @@ const THRESHOLDS: Record<string, ThresholdConfig> = {
     danger: { min: 20, max: 80 },
   },
 };
+
+const THRESHOLD_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+interface CachedThresholds {
+  config: Record<string, ThresholdConfig>;
+  expiresAt: number;
+}
 
 /**
  * Hành động đề xuất theo loại cảm biến và hướng vượt ngưỡng.
@@ -67,6 +72,7 @@ const SUGGESTED_ACTIONS: Record<string, { high: string; low: string }> = {
 @Injectable()
 export class AlertsService {
   private readonly logger = new Logger(AlertsService.name);
+  private readonly thresholdCache = new Map<string, CachedThresholds>();
 
   constructor(
     @InjectRepository(AlertEntity)
@@ -74,14 +80,17 @@ export class AlertsService {
     private readonly publisher: AlertPublisherService,
     private readonly farmClient: FarmClientService,
     private readonly authClient: AuthClientService,
+    private readonly contractClient: ContractClientService,
   ) {}
 
   /**
    * Kiểm tra giá trị cảm biến có vượt ngưỡng không và tạo alert nếu cần.
    * Tránh spam: bỏ qua nếu đã có alert unacknowledged cùng farm/sensorType/severity.
+   * Ngưỡng được resolve theo standard của hợp đồng farmer_trader active; fallback về DEFAULT_THRESHOLDS.
    */
   async checkAndCreateAlert(reading: SensorReadingDto): Promise<void> {
-    const config = THRESHOLDS[reading.sensorType];
+    const resolved = await this.resolveThresholds(reading.farmId);
+    const config = resolved[reading.sensorType];
     if (!config) return;
 
     const result = this.detectThresholdBreach(reading.value, config);
@@ -186,6 +195,28 @@ export class AlertsService {
   }
 
   // ─── Private helpers ───────────────────────────────────────────────────────
+
+  private async resolveThresholds(farmId: string): Promise<Record<string, ThresholdConfig>> {
+    const cached = this.thresholdCache.get(farmId);
+    if (cached && cached.expiresAt > Date.now()) {
+      return cached.config;
+    }
+
+    const farmThresholds = await this.contractClient.getFarmThresholds(farmId);
+    const config: Record<string, ThresholdConfig> = { ...DEFAULT_THRESHOLDS };
+
+    if (farmThresholds && farmThresholds.thresholds.length > 0) {
+      for (const t of farmThresholds.thresholds) {
+        config[t.sensorType] = {
+          warning: { min: t.warningMin ?? undefined, max: t.warningMax ?? undefined },
+          danger: { min: t.dangerMin ?? undefined, max: t.dangerMax ?? undefined },
+        };
+      }
+    }
+
+    this.thresholdCache.set(farmId, { config, expiresAt: Date.now() + THRESHOLD_CACHE_TTL_MS });
+    return config;
+  }
 
   private detectThresholdBreach(
     value: number,

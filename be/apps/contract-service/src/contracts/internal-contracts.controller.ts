@@ -1,6 +1,6 @@
 import { Controller, Get, NotFoundException, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { ComplianceCertificateDto, InternalContractRefDto, Public } from '@trustagri/shared';
+import { ComplianceCertificateDto, FarmThresholdsDto, InternalContractRefDto, Public } from '@trustagri/shared';
 import { ComplianceService } from './compliance.service';
 import { TraceabilityInternalGuard } from './internal.guard';
 
@@ -14,6 +14,14 @@ import { TraceabilityInternalGuard } from './internal.guard';
 @UseGuards(TraceabilityInternalGuard)
 export class InternalContractsController {
   constructor(private readonly complianceService: ComplianceService) {}
+
+  @Get('farms/:farmId/thresholds')
+  @ApiOperation({ summary: 'Resolve sensor thresholds for a farm via active farmer_trader contract (internal)' })
+  @ApiResponse({ status: 200, description: 'Thresholds resolved (empty array if no active contract/standard)' })
+  @ApiResponse({ status: 403 })
+  getFarmThresholds(@Param('farmId') farmId: string): Promise<FarmThresholdsDto> {
+    return this.complianceService.getFarmThresholds(farmId);
+  }
 
   @Get('farms/:farmId/active-compliance')
   @ApiOperation({ summary: 'Get active contract compliance snapshot for a farm (internal, no auth)' })

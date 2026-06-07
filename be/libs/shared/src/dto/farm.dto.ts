@@ -6,11 +6,39 @@ import {
   IsArray,
   IsInt,
   IsDateString,
+  IsIn,
   ValidateNested,
   IsDefined,
+  registerDecorator,
+  ValidationOptions,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export const SENSOR_TYPES = ['temperature', 'humidity', 'light', 'soil_moisture'] as const;
+export type SensorType = typeof SENSOR_TYPES[number];
+
+/** Validate danger_min ≤ warning_min ≤ warning_max ≤ danger_max (skip undefined bounds). */
+function IsThresholdOrderValid(options?: ValidationOptions) {
+  return function (target: object, propertyName: string) {
+    registerDecorator({
+      name: 'isThresholdOrderValid',
+      target: (target as { constructor: Function }).constructor,
+      propertyName,
+      options: { message: 'Thứ tự ngưỡng không hợp lệ: cần danger_min ≤ warning_min ≤ warning_max ≤ danger_max', ...options },
+      validator: {
+        validate(_: unknown, args: import('class-validator').ValidationArguments) {
+          const obj = args.object as CreateStandardThresholdDto;
+          const { dangerMin, warningMin, warningMax, dangerMax } = obj;
+          if (dangerMin !== undefined && warningMin !== undefined && dangerMin > warningMin) return false;
+          if (warningMin !== undefined && warningMax !== undefined && warningMin > warningMax) return false;
+          if (warningMax !== undefined && dangerMax !== undefined && warningMax > dangerMax) return false;
+          return true;
+        },
+      },
+    });
+  };
+}
 
 // ─── FARM ──────────────────────────────────────────────────────────────────────
 
@@ -221,6 +249,44 @@ export class CreateEvidenceDto {
   capturedAt: string;
 }
 
+// ─── STANDARD THRESHOLD ────────────────────────────────────────────────────────
+
+/** Ngưỡng cảnh báo theo loại cảm biến của một tiêu chuẩn. */
+export interface SensorThresholdDto {
+  sensorType: SensorType;
+  warningMin?: number | null;
+  warningMax?: number | null;
+  dangerMin?: number | null;
+  dangerMax?: number | null;
+}
+
+export class CreateStandardThresholdDto {
+  @ApiProperty({ description: 'Sensor type', enum: SENSOR_TYPES, example: 'temperature' })
+  @IsIn(SENSOR_TYPES)
+  sensorType: SensorType;
+
+  @ApiPropertyOptional({ description: 'Warning lower bound', example: 15 })
+  @IsOptional()
+  @IsNumber()
+  warningMin?: number;
+
+  @ApiPropertyOptional({ description: 'Warning upper bound', example: 35 })
+  @IsOptional()
+  @IsNumber()
+  warningMax?: number;
+
+  @ApiPropertyOptional({ description: 'Danger lower bound', example: 10 })
+  @IsOptional()
+  @IsNumber()
+  dangerMin?: number;
+
+  @ApiPropertyOptional({ description: 'Danger upper bound', example: 40 })
+  @IsOptional()
+  @IsNumber()
+  @IsThresholdOrderValid()
+  dangerMax?: number;
+}
+
 // ─── STANDARD ──────────────────────────────────────────────────────────────────
 
 /**
@@ -249,6 +315,7 @@ export interface StandardDto {
   ownerTraderName?: string | null;
   ownerTraderPhone?: string | null;
   steps: StandardStepDto[];
+  thresholds?: SensorThresholdDto[];
   createdAt: string;
   updatedAt: string;
 }
@@ -301,6 +368,13 @@ export class CreateStandardDto {
   @ValidateNested({ each: true })
   @Type(() => CreateStandardStepDto)
   steps?: CreateStandardStepDto[];
+
+  @ApiPropertyOptional({ description: 'Sensor alert thresholds (warning/danger min/max per sensor type)', type: () => [CreateStandardThresholdDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateStandardThresholdDto)
+  thresholds?: CreateStandardThresholdDto[];
 }
 
 export class UpdateStandardDto {
@@ -325,6 +399,13 @@ export class UpdateStandardDto {
   @ValidateNested({ each: true })
   @Type(() => CreateStandardStepDto)
   steps?: CreateStandardStepDto[];
+
+  @ApiPropertyOptional({ description: 'Sensor alert thresholds (warning/danger min/max per sensor type)', type: () => [CreateStandardThresholdDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateStandardThresholdDto)
+  thresholds?: CreateStandardThresholdDto[];
 }
 
 // ─── TRACEABILITY ──────────────────────────────────────────────────────────────

@@ -9,6 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { StandardStepEntity } from './standard-step.entity';
+import { StandardThresholdEntity } from './standard-threshold.entity';
 
 @Entity('standards')
 export class StandardEntity {
@@ -53,6 +54,12 @@ export class StandardEntity {
     eager: false,
   })
   steps: StandardStepEntity[];
+
+  @OneToMany(() => StandardThresholdEntity, (t) => t.standard, {
+    cascade: true,
+    eager: false,
+  })
+  thresholds: StandardThresholdEntity[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

@@ -4,6 +4,7 @@ import { AlertEntity } from './alert.entity';
 import { AlertPublisherService } from './services/alert-publisher.service';
 import { FarmClientService } from '../clients/farm-client.service';
 import { AuthClientService } from '../clients/auth-client.service';
+import { ContractClientService } from '../clients/contract-client.service';
 import type { SensorReadingDto } from '@trustagri/shared';
 
 function mockRepo() {
@@ -34,6 +35,12 @@ function mockAuthClient() {
   } as unknown as jest.Mocked<AuthClientService>;
 }
 
+function mockContractClient() {
+  return {
+    getFarmThresholds: jest.fn().mockResolvedValue({ farmId: 'farm-1', thresholds: [] }),
+  } as unknown as jest.Mocked<ContractClientService>;
+}
+
 function reading(overrides: Partial<SensorReadingDto>): SensorReadingDto {
   return {
     farmId: 'farm-1',
@@ -54,6 +61,7 @@ describe('AlertsService', () => {
         publisher as unknown as AlertPublisherService,
         mockFarmClient(),
         mockAuthClient(),
+        mockContractClient(),
       );
 
       await svc.checkAndCreateAlert({
@@ -74,6 +82,7 @@ describe('AlertsService', () => {
         publisher as unknown as AlertPublisherService,
         mockFarmClient(),
         mockAuthClient(),
+        mockContractClient(),
       );
 
       await svc.checkAndCreateAlert(reading({ sensorType: 'temperature', value: 22 }));
@@ -96,6 +105,7 @@ describe('AlertsService', () => {
         publisher as unknown as AlertPublisherService,
         mockFarmClient(),
         mockAuthClient(),
+        mockContractClient(),
       );
 
       await svc.checkAndCreateAlert(reading({ sensorType: 'temperature', value: 41 }));
@@ -124,6 +134,7 @@ describe('AlertsService', () => {
         publisher as unknown as AlertPublisherService,
         mockFarmClient(),
         mockAuthClient(),
+        mockContractClient(),
       );
 
       await svc.checkAndCreateAlert(reading({ sensorType: 'humidity', value: 95 }));
@@ -143,6 +154,7 @@ describe('AlertsService', () => {
         publisher as unknown as AlertPublisherService,
         mockFarmClient(),
         mockAuthClient(),
+        mockContractClient(),
       );
 
       await expect(svc.acknowledgeAlert('missing', 'user-1')).rejects.toThrow('Cảnh báo không tồn tại');
@@ -163,6 +175,7 @@ describe('AlertsService', () => {
         publisher as unknown as AlertPublisherService,
         mockFarmClient(),
         mockAuthClient(),
+        mockContractClient(),
       );
 
       const res = await svc.acknowledgeAlert('a1', 'user-1');

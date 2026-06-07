@@ -18,6 +18,16 @@ import apiClient from '@/api/client';
 
 // ── DTO types (camelCase — khớp backend design.md §4.3) ───────────────────────
 
+export type SensorType = 'temperature' | 'humidity' | 'light' | 'soil_moisture';
+
+export interface SensorThresholdDto {
+  sensorType: SensorType;
+  warningMin?: number | null;
+  warningMax?: number | null;
+  dangerMin?: number | null;
+  dangerMax?: number | null;
+}
+
 export interface StandardStepDto {
   id: string;
   order: number;
@@ -34,6 +44,7 @@ export interface StandardDto {
   description: string;
   ownerTraderId?: string;   // null = tiêu chuẩn chung hệ thống
   steps: StandardStepDto[];
+  thresholds?: SensorThresholdDto[];
   createdAt: string;        // ISO-8601
 }
 
@@ -52,8 +63,15 @@ export interface ListStandardsParams {
   includedTraderId?: string;
 }
 
-export type CreateStandardDto = Pick<StandardDto, 'code' | 'name' | 'description' | 'steps'>;
-export type UpdateStandardDto = Partial<CreateStandardDto>;
+export interface CreateStandardDto {
+  code: string;
+  name: string;
+  description: string;
+  steps?: StandardStepDto[];
+  thresholds?: SensorThresholdDto[];
+}
+
+export type UpdateStandardDto = Partial<Omit<CreateStandardDto, 'code'>>;
 
 // ── Service functions ─────────────────────────────────────────────────────────
 

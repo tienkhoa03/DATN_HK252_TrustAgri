@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { StandardEntity } from './entities/standard.entity';
 import { StandardStepEntity } from './entities/standard-step.entity';
+import { StandardThresholdEntity } from './entities/standard-threshold.entity';
+import { SensorType } from '@trustagri/shared';
 
 interface SeedStep {
   order: number;
@@ -12,16 +14,34 @@ interface SeedStep {
   acceptanceCriteria?: string;
 }
 
+interface SeedThreshold {
+  sensorType: SensorType;
+  warningMin?: number;
+  warningMax?: number;
+  dangerMin?: number;
+  dangerMax?: number;
+}
+
 interface SeedStandard {
   code: string;
   name: string;
   description: string;
   steps: SeedStep[];
+  thresholds?: SeedThreshold[];
 }
+
+/** Ngưỡng mặc định — giữ đúng giá trị hardcode từ alerts.service.ts để không đổi hành vi cũ. */
+const DEFAULT_THRESHOLDS: SeedThreshold[] = [
+  { sensorType: 'temperature', warningMin: 15, warningMax: 35, dangerMin: 10, dangerMax: 40 },
+  { sensorType: 'humidity', warningMin: 30, warningMax: 80, dangerMin: 20, dangerMax: 90 },
+  { sensorType: 'light', warningMin: 1000, warningMax: 80000, dangerMin: 500, dangerMax: 100000 },
+  { sensorType: 'soil_moisture', warningMin: 30, warningMax: 70, dangerMin: 20, dangerMax: 80 },
+];
 
 const SYSTEM_STANDARDS: SeedStandard[] = [
   {
     code: 'VIETGAP_2024',
+    thresholds: DEFAULT_THRESHOLDS,
     name: 'VietGAP 2024',
     description:
       'Quy trình thực hành sản xuất nông nghiệp tốt tại Việt Nam (VietGAP) — phiên bản 2024. Đảm bảo an toàn thực phẩm, sức khỏe người lao động và bảo vệ môi trường.',
@@ -102,6 +122,7 @@ const SYSTEM_STANDARDS: SeedStandard[] = [
   },
   {
     code: 'GLOBALGAP_2024',
+    thresholds: DEFAULT_THRESHOLDS,
     name: 'GlobalG.A.P. 2024',
     description:
       'Tiêu chuẩn thực hành nông nghiệp tốt toàn cầu (GlobalG.A.P.) — phiên bản 2024. Tiêu chuẩn quốc tế giúp tiếp cận thị trường xuất khẩu.',
@@ -173,6 +194,7 @@ const SYSTEM_STANDARDS: SeedStandard[] = [
   },
   {
     code: 'ORGANIC_VN_2024',
+    thresholds: DEFAULT_THRESHOLDS,
     name: 'Hữu cơ Việt Nam 2024',
     description:
       'Tiêu chuẩn canh tác hữu cơ Việt Nam (TCVN 11041) — phiên bản 2024. Không sử dụng hóa chất tổng hợp, ưu tiên bảo tồn đa dạng sinh học.',
@@ -244,6 +266,8 @@ export class StandardsSeeder implements OnApplicationBootstrap {
     private readonly standardRepo: Repository<StandardEntity>,
     @InjectRepository(StandardStepEntity)
     private readonly stepRepo: Repository<StandardStepEntity>,
+    @InjectRepository(StandardThresholdEntity)
+    private readonly thresholdRepo: Repository<StandardThresholdEntity>,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -254,7 +278,8 @@ export class StandardsSeeder implements OnApplicationBootstrap {
       });
 
       if (exists) {
-        this.logger.debug(`Seed '${seed.code}' already exists — skipping.`);
+        await this.seedThresholdsIfMissing(exists.id, seed.thresholds ?? []);
+        this.logger.debug(`Seed '${seed.code}' already exists — skipping steps.`);
         continue;
       }
 
@@ -278,9 +303,30 @@ export class StandardsSeeder implements OnApplicationBootstrap {
       );
       await this.stepRepo.save(stepEntities);
 
+      await this.seedThresholdsIfMissing(saved.id, seed.thresholds ?? []);
+
       this.logger.log(
-        `Seeded system standard '${seed.code}' with ${seed.steps.length} steps.`,
+        `Seeded system standard '${seed.code}' with ${seed.steps.length} steps and ${seed.thresholds?.length ?? 0} thresholds.`,
       );
     }
+  }
+
+  private async seedThresholdsIfMissing(standardId: string, thresholds: SeedThreshold[]): Promise<void> {
+    if (thresholds.length === 0) return;
+    const existing = await this.thresholdRepo.count({ where: { standardId } });
+    if (existing > 0) return;
+
+    const entities = thresholds.map((t) =>
+      this.thresholdRepo.create({
+        standardId,
+        sensorType: t.sensorType,
+        warningMin: t.warningMin ?? null,
+        warningMax: t.warningMax ?? null,
+        dangerMin: t.dangerMin ?? null,
+        dangerMax: t.dangerMax ?? null,
+      }),
+    );
+    await this.thresholdRepo.save(entities);
+    this.logger.log(`Seeded ${entities.length} thresholds for standard ${standardId}`);
   }
 }

@@ -10,12 +10,14 @@ import { Repository, IsNull } from 'typeorm';
 import {
   StandardDto,
   StandardStepDto,
+  SensorThresholdDto,
   CreateStandardDto,
   UpdateStandardDto,
   ListResponse,
 } from '@trustagri/shared';
 import { StandardEntity } from './entities/standard.entity';
 import { StandardStepEntity } from './entities/standard-step.entity';
+import { StandardThresholdEntity } from './entities/standard-threshold.entity';
 import { ListStandardsQueryDto } from './dto/list-standards-query.dto';
 import { AuthClientService } from '../clients/auth-client.service';
 import { settledValue } from '../clients/settled.util';
@@ -29,6 +31,8 @@ export class StandardsService {
     private readonly standardRepo: Repository<StandardEntity>,
     @InjectRepository(StandardStepEntity)
     private readonly stepRepo: Repository<StandardStepEntity>,
+    @InjectRepository(StandardThresholdEntity)
+    private readonly thresholdRepo: Repository<StandardThresholdEntity>,
     private readonly authClient: AuthClientService,
   ) {}
 
@@ -40,6 +44,7 @@ export class StandardsService {
     const qb = this.standardRepo
       .createQueryBuilder('std')
       .leftJoinAndSelect('std.steps', 'step')
+      .leftJoinAndSelect('std.thresholds', 'threshold')
       .orderBy('std.createdAt', 'DESC')
       .addOrderBy('step.order', 'ASC')
       .skip(skip)
@@ -74,7 +79,7 @@ export class StandardsService {
   async findOne(id: string): Promise<StandardDto> {
     const standard = await this.standardRepo.findOne({
       where: { id },
-      relations: ['steps'],
+      relations: ['steps', 'thresholds'],
       order: { steps: { order: 'ASC' } },
     });
     if (!standard) {
@@ -122,6 +127,20 @@ export class StandardsService {
       await this.stepRepo.save(stepEntities);
     }
 
+    if (dto.thresholds && dto.thresholds.length > 0) {
+      const thresholdEntities = dto.thresholds.map((t) =>
+        this.thresholdRepo.create({
+          standardId: saved.id,
+          sensorType: t.sensorType,
+          warningMin: t.warningMin ?? null,
+          warningMax: t.warningMax ?? null,
+          dangerMin: t.dangerMin ?? null,
+          dangerMax: t.dangerMax ?? null,
+        }),
+      );
+      await this.thresholdRepo.save(thresholdEntities);
+    }
+
     return this.findOne(saved.id);
   }
 
@@ -132,7 +151,7 @@ export class StandardsService {
   ): Promise<StandardDto> {
     const standard = await this.standardRepo.findOne({
       where: { id },
-      relations: ['steps'],
+      relations: ['steps', 'thresholds'],
     });
     if (!standard) {
       throw new NotFoundException('Tiêu chuẩn không tồn tại');
@@ -174,6 +193,24 @@ export class StandardsService {
       }
     }
 
+    if (dto.thresholds !== undefined) {
+      await this.thresholdRepo.delete({ standardId: id });
+
+      if (dto.thresholds.length > 0) {
+        const thresholdEntities = dto.thresholds.map((t) =>
+          this.thresholdRepo.create({
+            standardId: id,
+            sensorType: t.sensorType,
+            warningMin: t.warningMin ?? null,
+            warningMax: t.warningMax ?? null,
+            dangerMin: t.dangerMin ?? null,
+            dangerMax: t.dangerMax ?? null,
+          }),
+        );
+        await this.thresholdRepo.save(thresholdEntities);
+      }
+    }
+
     return this.findOne(id);
   }
 
@@ -210,6 +247,14 @@ export class StandardsService {
         acceptanceCriteria: s.acceptanceCriteria ?? undefined,
       }));
 
+    const thresholds: SensorThresholdDto[] = (standard.thresholds ?? []).map((t) => ({
+      sensorType: t.sensorType,
+      warningMin: t.warningMin ?? null,
+      warningMax: t.warningMax ?? null,
+      dangerMin: t.dangerMin ?? null,
+      dangerMax: t.dangerMax ?? null,
+    }));
+
     return {
       id: standard.id,
       code: standard.code,
@@ -221,6 +266,7 @@ export class StandardsService {
       ownerTraderName: standard.ownerTraderName ?? null,
       ownerTraderPhone: standard.ownerTraderPhone ?? null,
       steps,
+      thresholds,
       createdAt: standard.createdAt.toISOString(),
       updatedAt: standard.updatedAt.toISOString(),
     };

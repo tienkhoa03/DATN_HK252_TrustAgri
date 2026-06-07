@@ -3,6 +3,7 @@ import { Repository } from 'typeorm';
 import { StandardsService } from './standards.service';
 import { StandardEntity } from './entities/standard.entity';
 import { StandardStepEntity } from './entities/standard-step.entity';
+import { StandardThresholdEntity } from './entities/standard-threshold.entity';
 import { AuthClientService } from '../clients/auth-client.service';
 
 function mockStandardRepo() {
@@ -21,6 +22,14 @@ function mockStepRepo() {
   } as unknown as jest.Mocked<Repository<StandardStepEntity>>;
 }
 
+function mockThresholdRepo() {
+  return {
+    delete: jest.fn(),
+    save: jest.fn(),
+    count: jest.fn().mockResolvedValue(0),
+  } as unknown as jest.Mocked<Repository<StandardThresholdEntity>>;
+}
+
 function mockAuthClient() {
   return {
     getUserSnapshot: jest.fn().mockResolvedValue(null),
@@ -33,7 +42,7 @@ describe('StandardsService', () => {
       const standardRepo = mockStandardRepo();
       standardRepo.findOne.mockResolvedValue(null);
       const stepRepo = mockStepRepo();
-      const svc = new StandardsService(standardRepo, stepRepo, mockAuthClient());
+      const svc = new StandardsService(standardRepo, stepRepo, mockThresholdRepo(), mockAuthClient());
 
       await expect(svc.findOne('missing-id')).rejects.toBeInstanceOf(NotFoundException);
     });
@@ -52,6 +61,7 @@ describe('StandardsService', () => {
         ownerTraderId: 'trader-1',
         createdAt: created,
         updatedAt: updated,
+        thresholds: [],
         steps: [
           {
             id: 's2',
@@ -75,7 +85,7 @@ describe('StandardsService', () => {
       } as StandardEntity;
       standardRepo.findOne.mockResolvedValue(entity);
       const stepRepo = mockStepRepo();
-      const svc = new StandardsService(standardRepo, stepRepo, mockAuthClient());
+      const svc = new StandardsService(standardRepo, stepRepo, mockThresholdRepo(), mockAuthClient());
 
       const dto = await svc.findOne('std-1');
 

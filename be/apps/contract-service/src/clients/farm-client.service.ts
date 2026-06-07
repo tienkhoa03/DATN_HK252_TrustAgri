@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { resolveServiceUrl, SERVICE_URL_KEYS } from '@trustagri/shared';
+import { resolveServiceUrl, SERVICE_URL_KEYS, SensorThresholdDto, StandardDto } from '@trustagri/shared';
 
 @Injectable()
 export class FarmClientService {
@@ -129,6 +129,25 @@ export class FarmClientService {
         `farm không đọc được tiêu chuẩn ${standardId}: ${(err as Error).message}`,
       );
       return null;
+    }
+  }
+
+  async getStandardThresholds(standardId: string): Promise<SensorThresholdDto[]> {
+    const base = this.farmBase();
+    const url = `${base}/api/v1/standards/${standardId}`;
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      if (!res.ok) {
+        this.logger.warn(`farm GET /standards/${standardId} → ${res.status}`);
+        return [];
+      }
+      const data = (await res.json()) as StandardDto;
+      return data.thresholds ?? [];
+    } catch (err) {
+      this.logger.warn(
+        `farm không đọc được ngưỡng tiêu chuẩn ${standardId}: ${(err as Error).message}`,
+      );
+      return [];
     }
   }
 }

@@ -10,6 +10,7 @@ import {
   IsDateString,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { SensorThresholdDto } from './farm.dto';
 
 // ─── PRODUCT ───────────────────────────────────────────────────────────────────
 
@@ -512,4 +513,13 @@ export interface InternalContractRefDto {
   productName: string | null;
   quantity: number;
   unit: string;
+}
+
+/** Ngưỡng cảm biến được resolve theo hợp đồng farmer_trader active của một farm. */
+export interface FarmThresholdsDto {
+  farmId: string;
+  contractId?: string;
+  standardId?: string;
+  standardName?: string | null;
+  thresholds: SensorThresholdDto[];
 }

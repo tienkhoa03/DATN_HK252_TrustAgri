@@ -15,6 +15,7 @@ import {
   CareLogDto,
   ComplianceCertificateDto,
   ComplianceDto,
+  FarmThresholdsDto,
   InternalContractRefDto,
   JwtPayload,
   ListResponse,
@@ -25,6 +26,7 @@ import {
 } from '@trustagri/shared';
 import { ContractEntity } from './entities/contract.entity';
 import { ContractsService } from './contracts.service';
+import { FarmClientService } from '../clients/farm-client.service';
 
 const COMPLIANCE_CACHE_PREFIX = 'compliance:v1:';
 const COMPLIANCE_CACHE_TTL_SEC = 300;
@@ -37,6 +39,7 @@ export class ComplianceService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly config: ConfigService,
     private readonly contractsService: ContractsService,
+    private readonly farmClient: FarmClientService,
     @InjectRepository(ContractEntity)
     private readonly contractRepo: Repository<ContractEntity>,
   ) {}
@@ -198,6 +201,26 @@ export class ComplianceService implements OnModuleInit, OnModuleDestroy {
       complianceScore: cached.complianceScore,
       lastComputedAt: cached.lastComputedAt,
       status: 'verified',
+    };
+  }
+
+  async getFarmThresholds(farmId: string): Promise<FarmThresholdsDto> {
+    const contract = await this.contractRepo.findOne({
+      where: { farmId, contractType: 'farmer_trader' as const, status: 'active' as const },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!contract || !contract.standardId) {
+      return { farmId, thresholds: [] };
+    }
+
+    const thresholds = await this.farmClient.getStandardThresholds(contract.standardId);
+    return {
+      farmId,
+      contractId: contract.id,
+      standardId: contract.standardId,
+      standardName: contract.standardName,
+      thresholds,
     };
   }
 

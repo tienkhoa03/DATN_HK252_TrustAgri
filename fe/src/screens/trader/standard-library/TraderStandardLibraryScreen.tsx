@@ -29,7 +29,7 @@ import { fontSize, fontWeight } from '../../../design-system/tokens/typography';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { useStandards } from '@/hooks/useStandards';
 import type { StandardDto, CreateStandardDto, UpdateStandardDto } from '@/hooks/useStandards';
-import type { StandardStepDto } from '@/services/standardService';
+import type { StandardStepDto, SensorThresholdDto, SensorType } from '@/services/standardService';
 
 // ── View states ───────────────────────────────────────────────────────────────
 
@@ -96,6 +96,75 @@ function formToStepDto(s: StepFormItem): StandardStepDto {
   };
 }
 
+// ── Threshold form helper types ───────────────────────────────────────────────
+
+const SENSOR_LABELS: Record<SensorType, string> = {
+  temperature: 'Nhiệt độ (°C)',
+  humidity: 'Độ ẩm (%)',
+  light: 'Ánh sáng (lux)',
+  soil_moisture: 'Độ ẩm đất (%)',
+};
+
+const SENSOR_TYPES: SensorType[] = ['temperature', 'humidity', 'light', 'soil_moisture'];
+
+interface ThresholdFormItem {
+  sensorType: SensorType;
+  warningMin: string;
+  warningMax: string;
+  dangerMin: string;
+  dangerMax: string;
+}
+
+function buildEmptyThresholds(): ThresholdFormItem[] {
+  return SENSOR_TYPES.map((t) => ({ sensorType: t, warningMin: '', warningMax: '', dangerMin: '', dangerMax: '' }));
+}
+
+function thresholdDtoToForm(thresholds: SensorThresholdDto[]): ThresholdFormItem[] {
+  const map = new Map(thresholds.map((t) => [t.sensorType, t]));
+  return SENSOR_TYPES.map((t) => {
+    const dto = map.get(t);
+    return {
+      sensorType: t,
+      warningMin: dto?.warningMin != null ? String(dto.warningMin) : '',
+      warningMax: dto?.warningMax != null ? String(dto.warningMax) : '',
+      dangerMin: dto?.dangerMin != null ? String(dto.dangerMin) : '',
+      dangerMax: dto?.dangerMax != null ? String(dto.dangerMax) : '',
+    };
+  });
+}
+
+function formToThresholdDtos(items: ThresholdFormItem[]): SensorThresholdDto[] {
+  return items
+    .filter((t) => t.warningMin || t.warningMax || t.dangerMin || t.dangerMax)
+    .map((t) => ({
+      sensorType: t.sensorType,
+      warningMin: t.warningMin ? Number(t.warningMin) : null,
+      warningMax: t.warningMax ? Number(t.warningMax) : null,
+      dangerMin: t.dangerMin ? Number(t.dangerMin) : null,
+      dangerMax: t.dangerMax ? Number(t.dangerMax) : null,
+    }));
+}
+
+function validateThresholdOrder(items: ThresholdFormItem[]): string | null {
+  for (const t of items) {
+    const dMin = t.dangerMin ? Number(t.dangerMin) : undefined;
+    const wMin = t.warningMin ? Number(t.warningMin) : undefined;
+    const wMax = t.warningMax ? Number(t.warningMax) : undefined;
+    const dMax = t.dangerMax ? Number(t.dangerMax) : undefined;
+
+    if (dMin !== undefined && wMin !== undefined && dMin > wMin) {
+      return `${SENSOR_LABELS[t.sensorType]}: Ngưỡng danger_min phải ≤ warning_min`;
+    }
+    if (wMin !== undefined && wMax !== undefined && wMin > wMax) {
+      return `${SENSOR_LABELS[t.sensorType]}: warning_min phải ≤ warning_max`;
+    }
+    if (wMax !== undefined && dMax !== undefined && wMax > dMax) {
+      return `${SENSOR_LABELS[t.sensorType]}: warning_max phải ≤ danger_max`;
+    }
+  }
+  return null;
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inTab }) => {
@@ -147,6 +216,7 @@ export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inT
   const [formName, setFormName] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formSteps, setFormSteps] = useState<StepFormItem[]>([]);
+  const [formThresholds, setFormThresholds] = useState<ThresholdFormItem[]>(buildEmptyThresholds());
   const [formError, setFormError] = useState<string | null>(null);
 
   // ── Initial load ────────────────────────────────────────────────────────────
@@ -186,6 +256,7 @@ export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inT
     setFormName('');
     setFormDesc('');
     setFormSteps([]);
+    setFormThresholds(buildEmptyThresholds());
     setFormError(null);
     setView('form');
   };
@@ -200,6 +271,7 @@ export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inT
     setFormName(s.name);
     setFormDesc(s.description);
     setFormSteps(s.steps.map(stepDtoToForm));
+    setFormThresholds(s.thresholds && s.thresholds.length > 0 ? thresholdDtoToForm(s.thresholds) : buildEmptyThresholds());
     setFormError(null);
     setView('form');
   };
@@ -229,13 +301,21 @@ export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inT
       setFormError('Mã và tên quy trình là bắt buộc.');
       return;
     }
+
+    const thresholdError = validateThresholdOrder(formThresholds);
+    if (thresholdError) {
+      setFormError(thresholdError);
+      return;
+    }
     setFormError(null);
 
+    const thresholds = formToThresholdDtos(formThresholds);
     const body: CreateStandardDto | UpdateStandardDto = {
       code: formCode.trim(),
       name: formName.trim(),
       description: formDesc.trim(),
       steps: formSteps.map(formToStepDto),
+      thresholds,
     };
 
     if (editingId) {
@@ -598,6 +678,35 @@ export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inT
                   )}
                 </div>
               ))}
+
+            {detail.thresholds && detail.thresholds.length > 0 && (
+              <>
+                <Text.Title size="small" style={{ marginBottom: spacing.md, marginTop: spacing.md }}>
+                  Ngưỡng môi trường
+                </Text.Title>
+                {detail.thresholds.map((t) => (
+                  <div key={t.sensorType} style={{ ...s.card, cursor: 'default', marginBottom: spacing.sm }}>
+                    <Text size="small" style={{ fontWeight: fontWeight.semibold, display: 'block', marginBottom: spacing.xs }}>
+                      {SENSOR_LABELS[t.sensorType as SensorType] ?? t.sensorType}
+                    </Text>
+                    <div style={{ display: 'flex', gap: spacing.md, flexWrap: 'wrap' }}>
+                      {t.dangerMin != null && (
+                        <Text size="xSmall" style={{ color: colors.functional.alertRed }}>Danger min: {t.dangerMin}</Text>
+                      )}
+                      {t.warningMin != null && (
+                        <Text size="xSmall" style={{ color: colors.functional.warningYellow }}>Warning min: {t.warningMin}</Text>
+                      )}
+                      {t.warningMax != null && (
+                        <Text size="xSmall" style={{ color: colors.functional.warningYellow }}>Warning max: {t.warningMax}</Text>
+                      )}
+                      {t.dangerMax != null && (
+                        <Text size="xSmall" style={{ color: colors.functional.alertRed }}>Danger max: {t.dangerMax}</Text>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </>
         ) : null}
       </div>
@@ -790,6 +899,50 @@ export const TraderStandardLibraryScreen: React.FC<{ inTab?: boolean }> = ({ inT
             Thêm bước
           </button>
         )}
+
+        {/* Threshold section */}
+        <div style={{ marginTop: spacing.md, marginBottom: spacing.sm }}>
+          <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.xs }}>
+            Ngưỡng môi trường
+          </Text.Title>
+          <Text size="xSmall" style={{ color: colors.text.secondary, display: 'block', marginBottom: spacing.md }}>
+            Để trống nếu không cần cảnh báo theo loại đó. Thứ tự: danger_min ≤ warning_min ≤ warning_max ≤ danger_max.
+          </Text>
+        </div>
+
+        {formThresholds.map((t, idx) => {
+          type NumField = 'dangerMin' | 'warningMin' | 'warningMax' | 'dangerMax';
+          const updateT = (field: NumField, val: string) =>
+            setFormThresholds((prev) => prev.map((item, i) => (i === idx ? { ...item, [field]: val } : item)));
+          const numFields: [NumField, string][] = [
+            ['dangerMin', 'Danger min'],
+            ['warningMin', 'Warning min'],
+            ['warningMax', 'Warning max'],
+            ['dangerMax', 'Danger max'],
+          ];
+          return (
+            <div key={t.sensorType} style={{ ...s.stepBox, marginBottom: spacing.sm }}>
+              <Text size="small" style={{ fontWeight: fontWeight.semibold, marginBottom: spacing.sm, display: 'block' }}>
+                {SENSOR_LABELS[t.sensorType]}
+              </Text>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: spacing.sm }}>
+                {numFields.map(([field, label]) => (
+                  <div key={field}>
+                    <label style={{ ...s.label, fontSize: '11px' }}>{label}</label>
+                    <input
+                      style={s.input}
+                      type="number"
+                      placeholder="—"
+                      value={t[field]}
+                      onChange={(e) => updateT(field, e.target.value)}
+                      disabled={isMutating}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </>
   );
