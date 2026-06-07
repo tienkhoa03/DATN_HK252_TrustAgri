@@ -26,7 +26,7 @@ import { AuthModule } from './auth/auth.module';
         password: config.get<string>('POSTGRES_PASSWORD'),
         database: config.get<string>('POSTGRES_DB', 'trustagri'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: config.get<string>('NODE_ENV') !== 'production',
+        synchronize: process.env.TYPEORM_SYNCHRONIZE === 'true',
         logging: config.get<string>('NODE_ENV') === 'development',
       }),
       inject: [ConfigService],

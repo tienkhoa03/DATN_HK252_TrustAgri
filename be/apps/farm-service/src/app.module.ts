@@ -32,7 +32,7 @@ import { ClientsModule } from './clients/clients.module';
         password: config.get<string>('POSTGRES_PASSWORD'),
         database: config.get<string>('POSTGRES_DB', 'trustagri'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: config.get<string>('NODE_ENV') !== 'production',
+        synchronize: process.env.TYPEORM_SYNCHRONIZE === 'true',
       }),
       inject: [ConfigService],
     }),
