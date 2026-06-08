@@ -33,7 +33,7 @@ async function bootstrap() {
   }
 
   const port = process.env.PORT ?? process.env.FARM_SERVICE_PORT ?? 3003;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   console.log(
     JSON.stringify({
       level: 'info',
