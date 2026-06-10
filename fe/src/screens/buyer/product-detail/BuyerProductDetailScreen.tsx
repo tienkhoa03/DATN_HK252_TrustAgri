@@ -20,6 +20,7 @@ import {
 } from '../../../services/marketplaceService';
 import { BuyerHeader } from '../components/BuyerHeader';
 import { ProductDetailTabs } from './ProductDetailTabs';
+import { BuyerPlaceOrderSheet } from './BuyerPlaceOrderSheet';
 
 export interface BuyerProductDetailScreenProps {
   productId?: string;
@@ -56,6 +57,7 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
   const [product, setProduct] = useState<ProductDto | null>(null);
   const [loading, setLoading] = useState(!!productId);
   const [error, setError] = useState<string | null>(productId ? null : 'Sản phẩm không tồn tại.');
+  const [orderSheetOpen, setOrderSheetOpen] = useState(false);
 
   useEffect(() => {
     if (!productId) return;
@@ -165,7 +167,8 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
   // ── Render helpers ───────────────────────────────────────────────────────────
 
   const renderStickyFooter = (p: ProductDto) => {
-    const inStock = (p.stockQuantity ?? 0) > 0 || p.status === 'active';
+    // Còn bán khi đang active VÀ (không quản kho HOẶC còn tồn) — khớp với trần số lượng trong sheet đặt mua.
+    const inStock = p.status === 'active' && (p.stockQuantity == null || p.stockQuantity > 0);
 
     return (
       <div style={stickyFooterStyles}>
@@ -188,20 +191,20 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
         <div style={{ display: 'flex', gap: spacing.sm }}>
           <button
             type="button"
-            style={{ ...primaryBtnStyles, flex: 1 }}
+            style={{ ...primaryBtnStyles, flex: 1, backgroundColor: inStock ? colors.primary.agriGreen : colors.text.disabled }}
             disabled={!inStock}
             onClick={() => {
               if (onOrder) {
                 onOrder(p.id);
                 return;
               }
-              // Tạo yêu cầu mua từ sản phẩm này
-              navigate(`/buyer/sourcing?action=create&productId=${encodeURIComponent(p.id)}`);
+              // Đặt mua trực tiếp sản phẩm này (POST /orders)
+              setOrderSheetOpen(true);
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = colors.primary.agriGreenDark; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = colors.primary.agriGreen; }}
+            onMouseEnter={(e) => { if (inStock) e.currentTarget.style.backgroundColor = colors.primary.agriGreenDark; }}
+            onMouseLeave={(e) => { if (inStock) e.currentTarget.style.backgroundColor = colors.primary.agriGreen; }}
           >
-            Gửi yêu cầu mua
+            {inStock ? 'Đặt mua' : 'Hết hàng'}
           </button>
           <button
             type="button"
@@ -357,6 +360,14 @@ export const BuyerProductDetailScreen: React.FC<BuyerProductDetailScreenProps> =
       />
 
       {renderContent()}
+
+      {product && (
+        <BuyerPlaceOrderSheet
+          open={orderSheetOpen}
+          product={product}
+          onClose={() => setOrderSheetOpen(false)}
+        />
+      )}
     </Page>
   );
 };
