@@ -1,11 +1,21 @@
 -- =============================================================================
--- seed-demo-scenario.sql — Demo Scenario Seed
+-- seed-demo-scenario.sql — Demo Scenario Seed (single real user)
 -- =============================================================================
 -- Mục đích: Tạo dữ liệu demo end-to-end cho phiên bảo vệ đồ án.
 --
+-- Phiên bản này gắn TOÀN BỘ dữ liệu vào MỘT tài khoản Zalo thật:
+--   USER_MAIN_UUID = f12970bd-935b-4c55-8987-433ada76dfc7
+--   roles = buyer,farmer,trader  → 1 user đảm nhiệm hết 3 vai trò.
+--
+-- Ngoại lệ duy nhất: bảng `connections` có CHECK("from_user_id" <> "to_user_id")
+-- nên không thể tự kết nối với chính mình. Vì vậy script chèn 1 user "đối tác"
+-- KHÔNG đăng nhập (stub) chỉ để làm bên còn lại của connection:
+--   USER_STUB_UUID = a0000002-0000-4000-8000-000000000001 (HTX Nông sản Tân Lộc)
+--
 -- Thứ tự chạy:
 --   1. Chạy auth-service migration / TypeORM sync (tạo bảng users, v.v.)
---   2. Chạy be/scripts/seed-dev-users.sql (tạo 4 user nền)
+--   2. Đăng nhập 1 lần bằng Zalo thật để tài khoản f12970bd-... tồn tại trong `users`.
+--      (Script này KHÔNG tạo/sửa user chính — chỉ seed dữ liệu nghiệp vụ.)
 --   3. Khởi động farm-service (StandardsSeeder tự seed VietGAP/GlobalGAP/Organic)
 --   4. Chạy file này:
 --        docker exec -i trustagri-postgres psql -U trustagri -d trustagri < be/scripts/seed-demo-scenario.sql
@@ -27,43 +37,35 @@ BEGIN;
 -- ---------------------------------------------------------------------------
 -- 0. Constants (dùng trong toàn script qua subquery / hardcode UUID)
 -- ---------------------------------------------------------------------------
--- farmer  : a0000001-0000-4000-8000-000000000001
--- trader  : a0000001-0000-4000-8000-000000000002
--- buyer   : a0000001-0000-4000-8000-000000000003
--- guest   : a0000001-0000-4000-8000-000000000004
--- mock_farmer2 không tồn tại trong users — bỏ qua pending connection (xem mục 4)
+-- USER chính (mọi vai trò) : f12970bd-935b-4c55-8987-433ada76dfc7
+-- USER stub (đối tác, no-login, chỉ cho connection):
+--                            a0000002-0000-4000-8000-000000000001
 --
 -- Farm main UUID = a1111111-0000-4000-8000-000000000001 (cần cho seed-influxdb.sh)
 -- ---------------------------------------------------------------------------
 
 -- ---------------------------------------------------------------------------
--- 1. Cập nhật tên + avatar người dùng đẹp hơn cho demo
+-- 1. User "đối tác" (stub) — KHÔNG đăng nhập, chỉ làm bên còn lại của connection.
+--    Bắt buộc vì connections có CHECK("from_user_id" <> "to_user_id").
 -- ---------------------------------------------------------------------------
-UPDATE users SET
-  display_name = N'Nông hộ Sáu Xoài – Cái Bè',
-  avatar_url   = 'https://picsum.photos/seed/farmer_demo/64/64',
-  farmer_profile = '{"region":"Tiền Giang","experienceYears":15}'::jsonb
-WHERE user_id = 'a0000001-0000-4000-8000-000000000001'::uuid;
-
-UPDATE users SET
-  display_name   = N'Vựa trái cây Minh Phát',
-  avatar_url     = 'https://picsum.photos/seed/trader_demo/64/64',
-  trader_profile = '{"companyName":"Cty TNHH XNK Minh Phát","region":"Cần Thơ","capacity":"800 tấn/tháng","trustScore":4.8}'::jsonb
-WHERE user_id = 'a0000001-0000-4000-8000-000000000002'::uuid;
-
-UPDATE users SET
-  display_name  = N'Chuỗi Xanh Plus',
-  avatar_url    = 'https://picsum.photos/seed/buyer_demo/64/64',
-  buyer_profile = '{"organizationName":"Chuỗi siêu thị Xanh Plus – 50 chi nhánh"}'::jsonb
-WHERE user_id = 'a0000001-0000-4000-8000-000000000003'::uuid;
-
-UPDATE users SET
-  display_name = N'Khách tham quan',
-  avatar_url   = 'https://picsum.photos/seed/guest_demo/64/64'
-WHERE user_id = 'a0000001-0000-4000-8000-000000000004'::uuid;
+INSERT INTO users (
+  user_id, zalo_id, roles, display_name, phone, avatar_url,
+  trader_profile, farmer_profile, created_at, last_login
+) VALUES (
+  'a0000002-0000-4000-8000-000000000001'::uuid,
+  'zalo_demo_partner_tanloc_001',
+  'farmer,trader',
+  N'HTX Nông sản Tân Lộc',
+  '0907654321',
+  'https://picsum.photos/seed/partner_tanloc/64/64',
+  '{"companyName":"HTX Thu mua Nông sản Tân Lộc","region":"Tiền Giang","capacity":"300 tấn/tháng","trustScore":4.5}'::jsonb,
+  '{"region":"Tiền Giang","experienceYears":10}'::jsonb,
+  NOW() - INTERVAL '6 months',
+  NOW()
+) ON CONFLICT (user_id) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
--- 2. Farms (2 vườn cho farmer)
+-- 2. Farms (2 vườn cho user chính ở vai trò farmer)
 -- ---------------------------------------------------------------------------
 
 -- farm_main: Vườn xoài cát Hòa Lộc — vườn demo chính
@@ -76,7 +78,7 @@ INSERT INTO farms (
   created_at, updated_at
 ) VALUES (
   'a1111111-0000-4000-8000-000000000001'::uuid,
-  'a0000001-0000-4000-8000-000000000001',
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Nông hộ Sáu Xoài – Cái Bè',
   '0901234567',
   N'Vườn xoài cát Hòa Lộc',
@@ -90,6 +92,7 @@ INSERT INTO farms (
   NOW() - INTERVAL '5 months',
   NOW()
 ) ON CONFLICT (id) DO UPDATE SET
+  owner_id           = EXCLUDED.owner_id,
   owner_display_name = EXCLUDED.owner_display_name,
   name               = EXCLUDED.name,
   traceability_code  = EXCLUDED.traceability_code,
@@ -104,7 +107,7 @@ INSERT INTO farms (
   created_at, updated_at
 ) VALUES (
   'a1111111-0000-4000-8000-000000000002'::uuid,
-  'a0000001-0000-4000-8000-000000000001',
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Nông hộ Sáu Xoài – Cái Bè',
   '0901234567',
   N'Vườn sầu riêng Monthong',
@@ -118,11 +121,13 @@ INSERT INTO farms (
   NOW() - INTERVAL '9 months',
   NOW()
 ) ON CONFLICT (id) DO UPDATE SET
+  owner_id   = EXCLUDED.owner_id,
   name       = EXCLUDED.name,
   updated_at = NOW();
 
 -- ---------------------------------------------------------------------------
--- 3. Connection farmer ↔ trader, trạng thái 'accepted' (đã ký kết)
+-- 3. Connection 'accepted': user(farmer) ↔ stub(trader) — đối tác đã ký kết.
+--    Hiển thị ở danh sách kết nối khi xem vai trò FARMER.
 -- ---------------------------------------------------------------------------
 INSERT INTO connections (
   id, from_user_id, to_user_id,
@@ -136,12 +141,12 @@ INSERT INTO connections (
   created_at, responded_at
 ) VALUES (
   'b1111111-0000-4000-8000-000000000001'::uuid,
-  'a0000001-0000-4000-8000-000000000001',  -- farmer
-  'a0000001-0000-4000-8000-000000000002',  -- trader
+  'f12970bd-935b-4c55-8987-433ada76dfc7',   -- user (vai trò farmer)
+  'a0000002-0000-4000-8000-000000000001',   -- stub (vai trò trader)
   'farmer', 'trader',
   'a1111111-0000-4000-8000-000000000001',
   N'Nông hộ Sáu Xoài – Cái Bè', '0901234567',
-  N'Vựa trái cây Minh Phát', '0912345678',
+  N'HTX Nông sản Tân Lộc', '0907654321',
   N'Vườn xoài cát Hòa Lộc',
   N'Mong muốn hợp tác xuất khẩu xoài cát Hòa Lộc tiêu chuẩn VietGAP 2024',
   'accepted',
@@ -150,9 +155,8 @@ INSERT INTO connections (
 ) ON CONFLICT (id) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
--- 4. Connection pending (mock farmer2 → trader) để demo Accept trực tiếp
---    farmer2 không có user thật → dùng buyer user_id tạm thời làm "người gửi"
---    để tránh FK violation. Thực tế demo: trader nhìn thấy incoming request.
+-- 4. Connection 'pending': stub(farmer) → user(trader) — yêu cầu đến để demo Accept.
+--    Hiển thị ở danh sách kết nối khi xem vai trò TRADER (incoming pending).
 -- ---------------------------------------------------------------------------
 INSERT INTO connections (
   id, from_user_id, to_user_id,
@@ -166,8 +170,8 @@ INSERT INTO connections (
   created_at, responded_at
 ) VALUES (
   'b1111111-0000-4000-8000-000000000002'::uuid,
-  'a0000001-0000-4000-8000-000000000004',  -- dùng guest user làm "farmer mới"
-  'a0000001-0000-4000-8000-000000000002',  -- trader
+  'a0000002-0000-4000-8000-000000000001',   -- stub (vai trò farmer)
+  'f12970bd-935b-4c55-8987-433ada76dfc7',   -- user (vai trò trader)
   'farmer', 'trader',
   NULL,
   N'Nông hộ Bảy Lúa – Châu Thành', '0907654321',
@@ -181,6 +185,7 @@ INSERT INTO connections (
 
 -- ---------------------------------------------------------------------------
 -- 5. Hợp đồng farmer–trader (farmer_trader), trạng thái 'active', VietGAP 2024
+--    Cả 2 bên đều là user chính (farmer = trader = f12970bd) — không có self-check.
 -- ---------------------------------------------------------------------------
 INSERT INTO contracts (
   id,
@@ -201,8 +206,8 @@ INSERT INTO contracts (
   created_at, updated_at
 ) VALUES (
   'c1111111-0000-4000-8000-000000000001'::uuid,
-  'a0000001-0000-4000-8000-000000000001',  -- farmer
-  'a0000001-0000-4000-8000-000000000002',  -- trader
+  'f12970bd-935b-4c55-8987-433ada76dfc7',  -- farmer
+  'f12970bd-935b-4c55-8987-433ada76dfc7',  -- trader
   NULL,
   'farmer_trader',
   NULL,
@@ -253,12 +258,12 @@ INSERT INTO care_logs (
 ) VALUES (
   'd1111111-0000-4000-8000-000000000001'::uuid,
   'a1111111-0000-4000-8000-000000000001',
-  (SELECT id FROM standard_steps ss JOIN standards s ON ss.standard_id = s.id WHERE s.code = 'VIETGAP_2024' AND ss."order" = 1 LIMIT 1),
+  (SELECT ss.id FROM standard_steps ss JOIN standards s ON ss.standard_id = s.id WHERE s.code = 'VIETGAP_2024' AND ss."order" = 1 LIMIT 1),
   'process_step_complete',
   N'Đã phân tích đất, pH=6.2, bổ sung vôi 200kg/ha. Kết quả đạt yêu cầu.',
   NOW() - INTERVAL '6 days',
   false, 'synced', 'demo-cl-001',
-  'a0000001-0000-4000-8000-000000000001',
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Nông hộ Sáu Xoài – Cái Bè', '0901234567',
   'c1111111-0000-4000-8000-000000000001'::uuid,
   NOW() - INTERVAL '6 days', NOW() - INTERVAL '6 days'
@@ -273,12 +278,12 @@ INSERT INTO care_logs (
 ) VALUES (
   'd1111111-0000-4000-8000-000000000002'::uuid,
   'a1111111-0000-4000-8000-000000000001',
-  (SELECT id FROM standard_steps ss JOIN standards s ON ss.standard_id = s.id WHERE s.code = 'VIETGAP_2024' AND ss."order" = 2 LIMIT 1),
+  (SELECT ss.id FROM standard_steps ss JOIN standards s ON ss.standard_id = s.id WHERE s.code = 'VIETGAP_2024' AND ss."order" = 2 LIMIT 1),
   'process_step_complete',
   N'Bón 500kg phân hữu cơ ủ hoai + 100kg NPK 16-16-8 theo khuyến cáo.',
   NOW() - INTERVAL '5 days',
   false, 'synced', 'demo-cl-002',
-  'a0000001-0000-4000-8000-000000000001',
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Nông hộ Sáu Xoài – Cái Bè', '0901234567',
   'c1111111-0000-4000-8000-000000000001'::uuid,
   NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'
@@ -293,12 +298,12 @@ INSERT INTO care_logs (
 ) VALUES (
   'd1111111-0000-4000-8000-000000000003'::uuid,
   'a1111111-0000-4000-8000-000000000001',
-  (SELECT id FROM standard_steps ss JOIN standards s ON ss.standard_id = s.id WHERE s.code = 'VIETGAP_2024' AND ss."order" = 3 LIMIT 1),
+  (SELECT ss.id FROM standard_steps ss JOIN standards s ON ss.standard_id = s.id WHERE s.code = 'VIETGAP_2024' AND ss."order" = 3 LIMIT 1),
   'process_step_complete',
   N'Trồng 850 cây xoài cát giống kiểm định, mật độ 4x4m. Tỉ lệ bén rễ sau 7 ngày đạt 92%.',
   NOW() - INTERVAL '5 days' + INTERVAL '2 hours',
   false, 'synced', 'demo-cl-003',
-  'a0000001-0000-4000-8000-000000000001',
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Nông hộ Sáu Xoài – Cái Bè', '0901234567',
   'c1111111-0000-4000-8000-000000000001'::uuid,
   NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'
@@ -313,12 +318,12 @@ INSERT INTO care_logs (
 ) VALUES (
   'd1111111-0000-4000-8000-000000000004'::uuid,
   'a1111111-0000-4000-8000-000000000001',
-  (SELECT id FROM standard_steps ss JOIN standards s ON ss.standard_id = s.id WHERE s.code = 'VIETGAP_2024' AND ss."order" = 4 LIMIT 1),
+  (SELECT ss.id FROM standard_steps ss JOIN standards s ON ss.standard_id = s.id WHERE s.code = 'VIETGAP_2024' AND ss."order" = 4 LIMIT 1),
   'process_step_complete',
   N'Hệ thống tưới nhỏ giọt hoạt động tốt. Độ ẩm đất duy trì 68-72%. Kiểm tra sensor mỗi sáng.',
   NOW() - INTERVAL '4 days',
   false, 'synced', 'demo-cl-004',
-  'a0000001-0000-4000-8000-000000000001',
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Nông hộ Sáu Xoài – Cái Bè', '0901234567',
   'c1111111-0000-4000-8000-000000000001'::uuid,
   NOW() - INTERVAL '4 days', NOW() - INTERVAL '4 days'
@@ -333,12 +338,12 @@ INSERT INTO care_logs (
 ) VALUES (
   'd1111111-0000-4000-8000-000000000005'::uuid,
   'a1111111-0000-4000-8000-000000000001',
-  (SELECT id FROM standard_steps ss JOIN standards s ON ss.standard_id = s.id WHERE s.code = 'VIETGAP_2024' AND ss."order" = 5 LIMIT 1),
+  (SELECT ss.id FROM standard_steps ss JOIN standards s ON ss.standard_id = s.id WHERE s.code = 'VIETGAP_2024' AND ss."order" = 5 LIMIT 1),
   'process_step_complete',
   N'Bón phân thúc giai đoạn ra hoa: Kali 200kg/ha + Bo vi lượng 30g/cây. Ghi chép đầy đủ.',
   NOW() - INTERVAL '3 days',
   false, 'synced', 'demo-cl-005',
-  'a0000001-0000-4000-8000-000000000001',
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Nông hộ Sáu Xoài – Cái Bè', '0901234567',
   'c1111111-0000-4000-8000-000000000001'::uuid,
   NOW() - INTERVAL '3 days', NOW() - INTERVAL '3 days'
@@ -353,12 +358,12 @@ INSERT INTO care_logs (
 ) VALUES (
   'd1111111-0000-4000-8000-000000000006'::uuid,
   'a1111111-0000-4000-8000-000000000001',
-  (SELECT id FROM standard_steps ss JOIN standards s ON ss.standard_id = s.id WHERE s.code = 'VIETGAP_2024' AND ss."order" = 6 LIMIT 1),
+  (SELECT ss.id FROM standard_steps ss JOIN standards s ON ss.standard_id = s.id WHERE s.code = 'VIETGAP_2024' AND ss."order" = 6 LIMIT 1),
   'process_step_complete',
   N'Phun thuốc Abamectin 3.6EC (trong danh mục) phòng nhện đỏ. Ghi nhận xuất hiện sớm hơn dự kiến — đã ghi deviation.',
   NOW() - INTERVAL '2 days',
   true, 'synced', 'demo-cl-006',
-  'a0000001-0000-4000-8000-000000000001',
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Nông hộ Sáu Xoài – Cái Bè', '0901234567',
   'c1111111-0000-4000-8000-000000000001'::uuid,
   NOW() - INTERVAL '2 days', NOW() - INTERVAL '2 days'
@@ -406,7 +411,7 @@ INSERT INTO alerts (
   'soil_moisture', 'warning', 30.0, 27.5,
   N'Kiểm tra hệ thống tưới nhỏ giọt, tăng lịch tưới thêm 15 phút/ngày.',
   true,
-  'a0000001-0000-4000-8000-000000000001',
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Nông hộ Sáu Xoài – Cái Bè', '0901234567',
   NOW() - INTERVAL '3 days' + INTERVAL '2 hours',
   NOW() - INTERVAL '3 days'
@@ -430,7 +435,7 @@ INSERT INTO alerts (
 ) ON CONFLICT (id) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
--- 8. Products của trader (3 sản phẩm)
+-- 8. Products của user (vai trò trader) — 3 sản phẩm
 -- ---------------------------------------------------------------------------
 INSERT INTO products (
   id, trader_id, farm_id,
@@ -440,8 +445,8 @@ INSERT INTO products (
   images, standard_code, stock_quantity, description,
   status, created_at
 ) VALUES (
-  'p1111111-0000-4000-8000-000000000001'::uuid,
-  'a0000001-0000-4000-8000-000000000002',
+  'aa111111-0000-4000-8000-000000000001'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   'a1111111-0000-4000-8000-000000000001',
   N'Vựa trái cây Minh Phát', '0912345678',
   N'Vườn xoài cát Hòa Lộc',
@@ -464,8 +469,8 @@ INSERT INTO products (
   images, standard_code, stock_quantity, description,
   status, created_at
 ) VALUES (
-  'p1111111-0000-4000-8000-000000000002'::uuid,
-  'a0000001-0000-4000-8000-000000000002',
+  'aa111111-0000-4000-8000-000000000002'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   NULL,
   N'Vựa trái cây Minh Phát', '0912345678',
   NULL,
@@ -486,8 +491,8 @@ INSERT INTO products (
   images, standard_code, stock_quantity, description,
   status, created_at
 ) VALUES (
-  'p1111111-0000-4000-8000-000000000003'::uuid,
-  'a0000001-0000-4000-8000-000000000002',
+  'aa111111-0000-4000-8000-000000000003'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   NULL,
   N'Vựa trái cây Minh Phát', '0912345678',
   NULL,
@@ -501,7 +506,7 @@ INSERT INTO products (
 ) ON CONFLICT (id) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
--- 9. Buying Request từ buyer (mua xoài)
+-- 9. Buying Request từ user (vai trò buyer) — mua xoài
 -- ---------------------------------------------------------------------------
 INSERT INTO buying_requests (
   id, buyer_id, buyer_display_name, buyer_phone,
@@ -510,8 +515,8 @@ INSERT INTO buying_requests (
   delivery_date, description, status,
   created_at, updated_at
 ) VALUES (
-  'br111111-0000-4000-8000-000000000001'::uuid,
-  'a0000001-0000-4000-8000-000000000003',
+  'ab111111-0000-4000-8000-000000000001'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Chuỗi siêu thị Xanh Plus', '0934567890',
   'mango', 500.000, 'kg',
   'VIETGAP_2024', 50000.00, 5000000.00,
@@ -521,7 +526,7 @@ INSERT INTO buying_requests (
   NOW() - INTERVAL '5 days', NOW() - INTERVAL '5 days'
 ) ON CONFLICT (id) DO NOTHING;
 
--- Proposal từ trader phản hồi buying request (status pending — để demo Accept live)
+-- Proposal từ user (vai trò trader) phản hồi buying request (status pending — để demo Accept live)
 INSERT INTO proposals (
   id, buying_request_id, trader_id, farm_id,
   trader_display_name, trader_phone, farm_name,
@@ -529,9 +534,9 @@ INSERT INTO proposals (
   price, quantity, standard_code, note,
   status, created_at
 ) VALUES (
-  'pr111111-0000-4000-8000-000000000001'::uuid,
-  'br111111-0000-4000-8000-000000000001'::uuid,
-  'a0000001-0000-4000-8000-000000000002',
+  'ac111111-0000-4000-8000-000000000001'::uuid,
+  'ab111111-0000-4000-8000-000000000001'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   'a1111111-0000-4000-8000-000000000001',
   N'Vựa trái cây Minh Phát', '0912345678',
   N'Vườn xoài cát Hòa Lộc',
@@ -546,6 +551,7 @@ INSERT INTO proposals (
 
 -- ---------------------------------------------------------------------------
 -- 10. Order accepted → Buyer–Trader contract (trader_buyer) để Buyer Live Monitor
+--     buyer = trader = user chính (không có self-check trên orders/contracts).
 -- ---------------------------------------------------------------------------
 
 -- Order đã được accepted (contracted)
@@ -557,12 +563,12 @@ INSERT INTO orders (
   total_price, deposit, status,
   created_at, updated_at
 ) VALUES (
-  'or111111-0000-4000-8000-000000000001'::uuid,
-  'a0000001-0000-4000-8000-000000000003',
-  'a0000001-0000-4000-8000-000000000002',
+  'ad111111-0000-4000-8000-000000000001'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Chuỗi siêu thị Xanh Plus', '0934567890',
   N'Vựa trái cây Minh Phát', '0912345678',
-  'p1111111-0000-4000-8000-000000000001'::uuid,
+  'aa111111-0000-4000-8000-000000000001'::uuid,
   1000.000, 'kg',
   55000000.00, 11000000.00,
   'contracted',
@@ -590,10 +596,10 @@ INSERT INTO contracts (
 ) VALUES (
   'c1111111-0000-4000-8000-000000000002'::uuid,
   NULL,
-  'a0000001-0000-4000-8000-000000000002',
-  'a0000001-0000-4000-8000-000000000003',
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   'trader_buyer',
-  'p1111111-0000-4000-8000-000000000001'::uuid,
+  'aa111111-0000-4000-8000-000000000001'::uuid,
   (SELECT id FROM standards WHERE code = 'VIETGAP_2024' LIMIT 1),
   'VietGAP 2024',
   'a1111111-0000-4000-8000-000000000001',
@@ -608,12 +614,11 @@ INSERT INTO contracts (
   NULL,
   'active',
   N'Hợp đồng mua xoài cát Hòa Lộc VietGAP 2024 cung cấp cho chuỗi Xanh Plus. Giao hàng tại kho TP.HCM.',
-  'or111111-0000-4000-8000-000000000001'::uuid,
+  'ad111111-0000-4000-8000-000000000001'::uuid,
   NULL,
   'c1111111-0000-4000-8000-000000000001'::uuid,
   NULL,
   NULL,
-  NOW() - INTERVAL '25 days',
   NOW() - INTERVAL '25 days',
   NOW() - INTERVAL '25 days',
   NOW() - INTERVAL '25 days',
@@ -624,6 +629,7 @@ INSERT INTO contracts (
 
 -- ---------------------------------------------------------------------------
 -- 11. News + Price Forecasts (2 tin tức, 7 ngày giá xoài + sầu riêng)
+--     Đăng bởi user ở vai trò trader.
 -- ---------------------------------------------------------------------------
 
 -- News article 1
@@ -632,8 +638,8 @@ INSERT INTO news_articles (
   title, summary, content, category, image_url,
   published_at, created_at, updated_at
 ) VALUES (
-  'na111111-0000-4000-8000-000000000001'::uuid,
-  'a0000001-0000-4000-8000-000000000002',
+  'ae111111-0000-4000-8000-000000000001'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Vựa trái cây Minh Phát', '0912345678',
   N'Xoài cát Hòa Lộc VietGAP chinh phục thị trường Nhật Bản',
   N'Lần đầu tiên xoài cát Hòa Lộc đạt chuẩn VietGAP 2024 được xuất khẩu chính ngạch sang Nhật Bản sau nhiều năm đàm phán.',
@@ -651,8 +657,8 @@ INSERT INTO news_articles (
   title, summary, content, category, image_url,
   published_at, created_at, updated_at
 ) VALUES (
-  'na111111-0000-4000-8000-000000000002'::uuid,
-  'a0000001-0000-4000-8000-000000000002',
+  'ae111111-0000-4000-8000-000000000002'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Vựa trái cây Minh Phát', '0912345678',
   N'Giá sầu riêng Monthong tăng mạnh trước vụ thu hoạch chính',
   N'Sầu riêng Monthong Ri6 tăng 15% trong tháng 6/2026 do nhu cầu từ thị trường Trung Quốc tăng cao.',
@@ -674,7 +680,7 @@ INSERT INTO forecasts (
   created_at, updated_at
 ) VALUES (
   'fc111111-0000-4000-8000-000000000001'::uuid,
-  'a0000001-0000-4000-8000-000000000002',
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Vựa trái cây Minh Phát', '0912345678',
   'Tiền Giang', 'mango', 'price',
   '{
@@ -711,7 +717,7 @@ INSERT INTO forecasts (
   created_at, updated_at
 ) VALUES (
   'fc111111-0000-4000-8000-000000000002'::uuid,
-  'a0000001-0000-4000-8000-000000000002',
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Vựa trái cây Minh Phát', '0912345678',
   'Tiền Giang', 'durian', 'price',
   '{
@@ -740,7 +746,7 @@ INSERT INTO forecasts (
   updated_at    = NOW();
 
 -- ---------------------------------------------------------------------------
--- 12. Trader Review (4.8 sao, từ buyer)
+-- 12. Trader Review (5 sao) — user(buyer) đánh giá user(trader) trên đơn đã hoàn tất.
 -- ---------------------------------------------------------------------------
 INSERT INTO trader_reviews (
   id, trader_id, buyer_id,
@@ -749,12 +755,12 @@ INSERT INTO trader_reviews (
   order_id, rating, comment,
   created_at, updated_at
 ) VALUES (
-  'rv111111-0000-4000-8000-000000000001'::uuid,
-  'a0000001-0000-4000-8000-000000000002',
-  'a0000001-0000-4000-8000-000000000003',
+  'af111111-0000-4000-8000-000000000001'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   N'Vựa trái cây Minh Phát', '0912345678',
   N'Chuỗi siêu thị Xanh Plus', '0934567890',
-  'or111111-0000-4000-8000-000000000001'::uuid,
+  'ad111111-0000-4000-8000-000000000001'::uuid,
   5,
   N'Hàng đúng chuẩn VietGAP, truy xuất nguồn gốc rõ ràng. Giao hàng đúng hạn. Rất hài lòng, sẽ hợp tác dài hạn.',
   NOW() - INTERVAL '20 days',
@@ -766,97 +772,81 @@ INSERT INTO trader_reviews (
   updated_at = NOW();
 
 -- ---------------------------------------------------------------------------
--- 13. Notifications (3-4 thông báo mỗi role)
+-- 13. Notifications — gộp toàn bộ vào 1 user (mọi vai trò).
 -- ---------------------------------------------------------------------------
-
--- Thông báo cho farmer
 INSERT INTO notifications (id, user_id, type, title, body, severity, link_to, read, read_at, created_at)
 VALUES
+-- (vai trò farmer)
 (
-  'nt111111-0000-4000-8000-000000000001'::uuid,
-  'a0000001-0000-4000-8000-000000000001',
+  'ba111111-0000-4000-8000-000000000001'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   'alert', N'Cảnh báo nhiệt độ cao',
   N'Nhiệt độ tại vườn xoài Hòa Lộc vượt ngưỡng 35°C (36.8°C). Hãy bật hệ thống làm mát.',
   'warning', '/alerts', false, NULL, NOW() - INTERVAL '6 hours'
 ),
 (
-  'nt111111-0000-4000-8000-000000000002'::uuid,
-  'a0000001-0000-4000-8000-000000000001',
+  'ba111111-0000-4000-8000-000000000002'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   'contract', N'Hợp đồng đã được ký',
   N'Hợp đồng farmer–trader với Minh Phát đã có hiệu lực từ hôm nay. Vui lòng bắt đầu ghi nhật ký chăm sóc.',
   'info', '/contracts', true, NOW() - INTERVAL '4 months', NOW() - INTERVAL '4 months'
 ),
 (
-  'nt111111-0000-4000-8000-000000000003'::uuid,
-  'a0000001-0000-4000-8000-000000000001',
+  'ba111111-0000-4000-8000-000000000003'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   'process', N'Nhắc nhở: Bước thu hoạch sắp đến hạn',
   N'Bước 7 - Thu hoạch trong kế hoạch VietGAP sẽ đến hạn trong 14 ngày. Chuẩn bị dụng cụ và nhân lực.',
   'info', '/care-plan', false, NULL, NOW() - INTERVAL '1 day'
 ),
 (
-  'nt111111-0000-4000-8000-000000000004'::uuid,
-  'a0000001-0000-4000-8000-000000000001',
-  'connection', N'Kết nối với Minh Phát được chấp nhận',
-  N'Thương lái Minh Phát đã chấp nhận yêu cầu kết nối của bạn. Bạn có thể bắt đầu thương lượng hợp đồng.',
+  'ba111111-0000-4000-8000-000000000004'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
+  'connection', N'Kết nối với HTX Tân Lộc được chấp nhận',
+  N'HTX Nông sản Tân Lộc đã chấp nhận yêu cầu kết nối của bạn. Bạn có thể bắt đầu thương lượng hợp đồng.',
   'info', '/connections', true, NOW() - INTERVAL '4 months', NOW() - INTERVAL '4 months'
-)
-ON CONFLICT (id) DO NOTHING;
-
--- Thông báo cho trader
-INSERT INTO notifications (id, user_id, type, title, body, severity, link_to, read, read_at, created_at)
-VALUES
+),
+-- (vai trò trader)
 (
-  'nt111111-0000-4000-8000-000000000005'::uuid,
-  'a0000001-0000-4000-8000-000000000002',
+  'ba111111-0000-4000-8000-000000000005'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   'connection', N'Yêu cầu kết nối mới',
   N'Nông hộ "Bảy Lúa – Châu Thành" muốn kết nối hợp tác. Xem và phản hồi ngay.',
   'info', '/connections', false, NULL, NOW() - INTERVAL '2 days'
 ),
 (
-  'nt111111-0000-4000-8000-000000000006'::uuid,
-  'a0000001-0000-4000-8000-000000000002',
+  'ba111111-0000-4000-8000-000000000006'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   'contract', N'Buying request mới từ Xanh Plus',
   N'Chuỗi Xanh Plus đăng yêu cầu mua 500kg xoài cát VietGAP. Hãy gửi proposal ngay.',
   'info', '/buying-requests', false, NULL, NOW() - INTERVAL '5 days'
 ),
 (
-  'nt111111-0000-4000-8000-000000000007'::uuid,
-  'a0000001-0000-4000-8000-000000000002',
-  'alert', N'Cảnh báo cảm biến vườn Hòa Lộc',
-  N'Cảnh báo nhiệt độ cao (36.8°C) tại vườn xoài Hòa Lộc. Đã thông báo nông dân.',
-  'warning', '/farms/a1111111-0000-4000-8000-000000000001/monitoring', false, NULL, NOW() - INTERVAL '6 hours'
-),
-(
-  'nt111111-0000-4000-8000-000000000008'::uuid,
-  'a0000001-0000-4000-8000-000000000002',
+  'ba111111-0000-4000-8000-000000000008'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   'contract', N'Đánh giá 5 sao từ Xanh Plus',
   N'Chuỗi siêu thị Xanh Plus vừa đánh giá 5 sao cho đơn hàng xoài. Điểm uy tín của bạn đã được cập nhật.',
   'info', '/reviews', true, NOW() - INTERVAL '20 days', NOW() - INTERVAL '20 days'
-)
-ON CONFLICT (id) DO NOTHING;
-
--- Thông báo cho buyer
-INSERT INTO notifications (id, user_id, type, title, body, severity, link_to, read, read_at, created_at)
-VALUES
+),
+-- (vai trò buyer)
 (
-  'nt111111-0000-4000-8000-000000000009'::uuid,
-  'a0000001-0000-4000-8000-000000000003',
+  'ba111111-0000-4000-8000-000000000009'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   'contract', N'Proposal từ Minh Phát',
   N'Thương lái Minh Phát đã gửi proposal cho yêu cầu mua xoài VietGAP của bạn. Xem ngay.',
   'info', '/proposals', false, NULL, NOW() - INTERVAL '3 days'
 ),
 (
-  'nt111111-0000-4000-8000-000000000010'::uuid,
-  'a0000001-0000-4000-8000-000000000003',
+  'ba111111-0000-4000-8000-000000000010'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   'contract', N'Hợp đồng đang có hiệu lực',
   N'Hợp đồng mua xoài cát với Minh Phát đang có hiệu lực. Theo dõi tiến độ canh tác trực tiếp.',
   'info', '/contracts', true, NOW() - INTERVAL '25 days', NOW() - INTERVAL '25 days'
 ),
 (
-  'nt111111-0000-4000-8000-000000000011'::uuid,
-  'a0000001-0000-4000-8000-000000000003',
+  'ba111111-0000-4000-8000-000000000011'::uuid,
+  'f12970bd-935b-4c55-8987-433ada76dfc7',
   'system', N'Chào mừng đến TrustAgri',
-  N'Bạn đã đăng ký thành công tài khoản người mua trên TrustAgri. Khám phá sản phẩm nông sản sạch ngay!',
+  N'Bạn đã đăng ký thành công tài khoản trên TrustAgri. Khám phá sản phẩm nông sản sạch ngay!',
   'info', '/marketplace', true, NOW() - INTERVAL '80 days', NOW() - INTERVAL '80 days'
 )
 ON CONFLICT (id) DO NOTHING;
@@ -869,6 +859,11 @@ COMMIT;
 -- =============================================================================
 -- OPERATOR NOTES
 -- =============================================================================
+-- 0) TẤT CẢ dữ liệu nghiệp vụ gắn vào 1 user thật:
+--      f12970bd-935b-4c55-8987-433ada76dfc7 (roles: buyer,farmer,trader).
+--    Chỉ user "đối tác" stub a0000002-...-001 (HTX Nông sản Tân Lộc) là không
+--    đăng nhập, tồn tại duy nhất để làm bên còn lại của connection.
+--
 -- 1) Sau khi chạy script này, seed InfluxDB sensor data:
 --      ./be/scripts/seed-influxdb.sh a1111111-0000-4000-8000-000000000001
 --    Đảm bảo ~10-15% points có is_imputed=true (test NFR-A01).
@@ -879,9 +874,10 @@ COMMIT;
 -- 3) Alert chưa ack (id=f1111111-...-000000000002, nhiệt độ 36.8°C) → dùng để demo
 --    acknowledge flow live.
 --
--- 4) Connection pending (id=b1111111-...-000000000002) → trader demo Accept flow live.
+-- 4) Connection pending (id=b1111111-...-000000000002, stub→user) → ở vai trò TRADER,
+--    user thấy yêu cầu đến từ "Bảy Lúa" để demo Accept flow live.
 --
--- 5) Proposal pending (id=pr111111-...-000000000001) → buyer demo Accept flow live.
+-- 5) Proposal pending (id=ac111111-...-000000000001) → ở vai trò BUYER, user demo Accept live.
 --
 -- 6) Trader review score = 5 sao → trust score hiển thị trên TraderLibraryScreen.
 -- =============================================================================
