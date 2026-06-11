@@ -1,5 +1,6 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHmac } from 'crypto';
 import { resolveZaloGraphMeUrl, resolveZaloGraphPhoneUrl } from '@trustagri/shared';
 
 export interface ZaloUserInfo {
@@ -21,6 +22,7 @@ export class ZaloService {
   private readonly logger = new Logger(ZaloService.name);
   private readonly zaloGraphMeUrl: string;
   private readonly zaloGraphPhoneUrl: string;
+  private readonly secretKey: string;
 
   constructor(private readonly config: ConfigService) {
     this.zaloGraphMeUrl = resolveZaloGraphMeUrl(
@@ -29,14 +31,32 @@ export class ZaloService {
     this.zaloGraphPhoneUrl = resolveZaloGraphPhoneUrl(
       this.config.get<string>('ZALO_GRAPH_PHONE_URL'),
     );
+    // Tên biến env chuẩn (deploy docs + .env): ZALO_SECRET_KEY. Giữ fallback tên cũ.
+    this.secretKey = (
+      this.config.get<string>('ZALO_SECRET_KEY') ??
+      this.config.get<string>('ZALO_APP_SECRET_KEY') ??
+      ''
+    ).trim();
+    if (!this.secretKey) {
+      this.logger.warn('ZALO_SECRET_KEY chưa cấu hình — gọi Zalo Graph API có thể bị từ chối (thiếu appsecret_proof)');
+    }
+  }
+
+  // Zalo yêu cầu appsecret_proof cho các lời gọi server→server từ Mini App token:
+  // HMAC-SHA256(access_token) với key là Secret Key của app, mã hex.
+  private buildAppSecretProof(accessToken: string): string {
+    return createHmac('sha256', this.secretKey).update(accessToken).digest('hex');
   }
 
   async getUserInfo(zaloAccessToken: string): Promise<ZaloUserInfo> {
     let response: Response;
     try {
-      // access_token goes in the query string — this is Zalo's documented method
-      // and avoids leaking the token in proxy/load-balancer access logs
-      const url = `${this.zaloGraphMeUrl}&access_token=${encodeURIComponent(zaloAccessToken)}`;
+      // access_token + appsecret_proof ở query string — phương thức Zalo tài liệu hóa;
+      // tránh lộ token trong access log của proxy/load-balancer.
+      let url = `${this.zaloGraphMeUrl}&access_token=${encodeURIComponent(zaloAccessToken)}`;
+      if (this.secretKey) {
+        url += `&appsecret_proof=${this.buildAppSecretProof(zaloAccessToken)}`;
+      }
       response = await fetch(url);
     } catch (err) {
       this.logger.error('Lỗi kết nối tới Zalo API', err);
@@ -49,9 +69,14 @@ export class ZaloService {
       );
     }
 
-    const data = (await response.json()) as ZaloUserInfo & { error?: number };
+    const data = (await response.json()) as ZaloUserInfo & {
+      error?: number;
+      message?: string;
+    };
 
     if (data.error || !data.id) {
+      // Log mã lỗi Zalo để chẩn đoán (không log token). error=-201/-204... thường là token/appsecret_proof sai.
+      this.logger.warn(`Zalo /me từ chối token: error=${data.error}, message=${data.message ?? 'n/a'}`);
       throw new UnauthorizedException('zaloAccessToken không hợp lệ hoặc đã hết hạn');
     }
 
@@ -62,18 +87,17 @@ export class ZaloService {
    * Giải mã số điện thoại Zalo Mini App theo luồng production.
    * `getPhoneNumber()` ở client trả về một `token` (code); server đổi code này lấy số thật:
    *   GET https://graph.zalo.me/v2.0/me/info
-   *   Headers: access_token, code, secret_key (ZALO_APP_SECRET_KEY)
+   *   Headers: access_token, code, secret_key (ZALO_SECRET_KEY)
    * Fail-soft: trả null nếu chưa cấu hình secret_key hoặc bất kỳ lỗi nào — KHÔNG block login.
    */
   async getPhoneNumber(accessToken: string, code: string): Promise<string | null> {
-    const secretKey = (this.config.get<string>('ZALO_APP_SECRET_KEY') ?? '').trim();
-    if (!secretKey) {
-      this.logger.debug('ZALO_APP_SECRET_KEY chưa cấu hình — bỏ qua giải mã số điện thoại');
+    if (!this.secretKey) {
+      this.logger.debug('ZALO_SECRET_KEY chưa cấu hình — bỏ qua giải mã số điện thoại');
       return null;
     }
     try {
       const response = await fetch(this.zaloGraphPhoneUrl, {
-        headers: { access_token: accessToken, code, secret_key: secretKey },
+        headers: { access_token: accessToken, code, secret_key: this.secretKey },
       });
       if (!response.ok) {
         this.logger.warn(`Zalo /me/info trả về lỗi ${response.status}`);

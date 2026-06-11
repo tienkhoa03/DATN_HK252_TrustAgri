@@ -38,10 +38,20 @@ export class RequirePasswordLoginError extends Error {
  * Zalo /me/info (cần ZALO_APP_SECRET_KEY). Ta trả về `phoneToken`.
  * Dev/staging: một số phiên bản ZMP trả thẳng `number`/`phoneNumber` — trả về `phoneNumber`.
  */
+const PHONE_TIMEOUT_MS = 8000;
+
 async function tryGetPhoneNumber(): Promise<{ phoneNumber?: string; phoneToken?: string }> {
   try {
     const { getPhoneNumber } = await import('zmp-sdk/apis');
-    const result = (await getPhoneNumber({ success: () => {}, fail: () => {} })) as {
+    // Gọi dạng promise (KHÔNG truyền success/fail) — truyền callback khiến một số phiên
+    // bản ZMP route kết quả/lỗi vào callback và để promise treo vĩnh viễn → app loading mãi.
+    // Bọc thêm timeout: phone là best-effort, KHÔNG được block luồng login.
+    const result = (await Promise.race([
+      getPhoneNumber(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('getPhoneNumber timeout')), PHONE_TIMEOUT_MS),
+      ),
+    ])) as {
       number?: string;
       phoneNumber?: string;
       token?: string;
@@ -54,7 +64,7 @@ async function tryGetPhoneNumber(): Promise<{ phoneNumber?: string; phoneToken?:
       return { phoneToken: result.token };
     }
   } catch {
-    // Không hỗ trợ hoặc user từ chối — bỏ qua
+    // Không hỗ trợ / user từ chối / timeout — bỏ qua, login vẫn tiếp tục không có phone
   }
   return {};
 }
