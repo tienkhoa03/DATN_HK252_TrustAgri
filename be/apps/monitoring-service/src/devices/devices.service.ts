@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import {
@@ -80,6 +85,29 @@ export class DevicesService {
     await this.repo.softDelete(id);
     this.logger.log({ action: 'iot_device.deleted', deviceId: id });
     return { success: true };
+  }
+
+  /**
+   * Kiểm tra userId là chủ vườn farmId qua farm-service.
+   * Ném ForbiddenException nếu không phải chủ vườn. FR-M01, NFR-S02.
+   */
+  async assertFarmOwner(farmId: string, userId: string): Promise<void> {
+    const ownerId = await this.farmClient.getFarmOwner(farmId);
+    if (ownerId !== userId) {
+      throw new ForbiddenException('Chỉ chủ vườn mới có quyền thực hiện thao tác này');
+    }
+  }
+
+  /**
+   * Kiểm tra userId là chủ vườn của thiết bị id.
+   * Ném NotFoundException nếu thiết bị không tồn tại, ForbiddenException nếu không phải chủ.
+   */
+  async assertDeviceOwner(id: string, userId: string): Promise<void> {
+    const device = await this.repo.findOne({ where: { id } });
+    if (!device) {
+      throw new NotFoundException(`IoT device không tồn tại: ${id}`);
+    }
+    await this.assertFarmOwner(device.farmId, userId);
   }
 
   private toDto(entity: IotDeviceEntity): IotDeviceDto {

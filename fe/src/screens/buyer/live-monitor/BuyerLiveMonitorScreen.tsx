@@ -113,8 +113,12 @@ export const BuyerLiveMonitorScreen: React.FC = () => {
         {!loading && !error && contracts.length === 0 && (
           <EmptyState
             icon="🌱"
-            title="Chưa có đơn đặt cọc nào"
-            description="Đặt cọc để theo dõi vườn trồng của nông dân theo thời gian thực"
+            title="Chưa có hợp đồng đang hoạt động"
+            description="Đặt cọc mua sản phẩm từ nông dân để theo dõi vườn trồng theo thời gian thực"
+            cta={{
+              label: 'Khám phá chợ nông sản',
+              onClick: () => navigate('/buyer'),
+            }}
           />
         )}
 

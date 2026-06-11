@@ -445,6 +445,36 @@ export class ConnectionsService implements OnModuleInit {
   }
 
   /**
+   * POST /api/v1/connections/:id/sign
+   * Alias endpoint (Bảng 5.5): xác nhận kết nối đã đạt thỏa thuận ("ký kết").
+   * Entity không có trạng thái riêng `signed`; endpoint trả về kết nối `accepted` để biểu thị
+   * sự đồng thuận. Ném ConflictException nếu kết nối không ở trạng thái `accepted`.
+   * Cả hai phía của kết nối đều được phép gọi.
+   */
+  async confirmSign(
+    connectionId: string,
+    userId: string,
+  ): Promise<ConnectionDto> {
+    const connection = await this.requireConnection(connectionId);
+    if (connection.fromUserId !== userId && connection.toUserId !== userId) {
+      throw new ForbiddenException(
+        'Chỉ người trong kết nối mới có thể xác nhận ký kết',
+      );
+    }
+    if (connection.status !== 'accepted') {
+      throw new ConflictException(
+        `Kết nối phải ở trạng thái "accepted" để xác nhận ký kết (hiện tại: "${connection.status}")`,
+      );
+    }
+    // No status change — accepted is the terminal state representing mutual agreement.
+    // Actual signing is tracked by ContractEntity.
+    this.logger.log(
+      `Connection sign confirmed (alias): id=${connectionId} by=${userId}`,
+    );
+    return this.toDto(connection);
+  }
+
+  /**
    * Tự động đặt kết nối farmer↔trader thành 'signed' khi hợp đồng farmer_trader trở thành active.
    * Không throw nếu không tìm thấy kết nối — chỉ log cảnh báo.
    */

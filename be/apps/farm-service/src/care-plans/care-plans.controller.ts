@@ -20,15 +20,17 @@ export class CarePlansController {
 
   /** GET /api/v1/farms/:farmId/care-plan/today */
   @Get(':farmId/care-plan/today')
-  @ApiOperation({ summary: "Get today's care plan tasks for a farm" })
+  @ApiOperation({ summary: "Get today's care plan tasks for a farm (owner or trader with active contract)" })
   @ApiResponse({ status: 200, description: "Today's care plan with pending tasks" })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - owner or trader with active contract required' })
   @ApiResponse({ status: 404, description: 'Farm not found' })
   getTodayPlan(
     @Param('farmId', ParseUUIDPipe) farmId: string,
     @CurrentUser() user: JwtPayload,
   ): Promise<CarePlanResponseDto> {
-    return this.carePlansService.getTodayPlan(farmId, user.sub);
+    // Pass role so service can distinguish trader contract access (FR-T11)
+    return this.carePlansService.getTodayPlan(farmId, user.sub, user.role);
   }
 
   /** POST /api/v1/farms/:farmId/care-plan/tasks/:standardStepId/complete */

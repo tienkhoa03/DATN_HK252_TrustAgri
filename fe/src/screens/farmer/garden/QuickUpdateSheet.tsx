@@ -1,5 +1,5 @@
 /**
- * QuickUpdateSheet — bottom sheet for logging a care step (FR-F09)
+ * QuickUpdateSheet — bottom sheet for logging a care step (FR-F09, NFR-R02)
  */
 
 import React, { useState, useRef } from 'react';
@@ -13,6 +13,13 @@ import {
   MAX_EVIDENCE_PHOTOS,
   pickEvidenceImages,
 } from '@/services/evidenceUploadService';
+import {
+  enqueue as queueOfflineCareLog,
+  countQueue,
+  generateClientRecordId,
+} from '@/services/careLogOfflineQueue';
+import { notifyCareLogQueued } from '@/services/careLogAutoSync';
+import { ApiError } from '@/api/errors';
 
 export interface QuickUpdateSheetProps {
   open: boolean;
@@ -70,6 +77,7 @@ export const QuickUpdateSheet: React.FC<QuickUpdateSheetProps> = ({
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    const clientRecordId = generateClientRecordId();
     try {
       const { evidenceUploaded, evidenceFailed } = await createCareLogWithEvidence(
         farmId,
@@ -78,7 +86,7 @@ export const QuickUpdateSheet: React.FC<QuickUpdateSheetProps> = ({
           notes: note.trim() || undefined,
           performedAt: new Date().toISOString(),
           standardStepId: standardStepId || undefined,
-          clientRecordId: `qu-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          clientRecordId,
         },
         photos,
       );
@@ -94,8 +102,40 @@ export const QuickUpdateSheet: React.FC<QuickUpdateSheetProps> = ({
       onSuccess?.();
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Không thể ghi nhật ký. Vui lòng thử lại.';
-      openSnackbar({ type: 'error', text: msg, duration: 3500, icon: true });
+      // NFR-R02: nếu lỗi mạng → enqueue offline, thông báo người dùng
+      const isNetworkError =
+        !navigator.onLine ||
+        (err instanceof ApiError && (err.code === 'NETWORK_ERROR' || err.httpStatus === 0));
+      if (isNetworkError) {
+        try {
+          await queueOfflineCareLog({
+            clientRecordId,
+            farmId,
+            action: 'inspection',
+            notes: note.trim() || undefined,
+            performedAt: new Date().toISOString(),
+            standardStepId: standardStepId || undefined,
+            evidenceUrls: [],
+            queuedAt: new Date().toISOString(),
+          });
+          const count = await countQueue();
+          notifyCareLogQueued(count);
+          openSnackbar({
+            type: 'warning',
+            text: `Đã lưu ngoại tuyến — sẽ tự đồng bộ khi có mạng (${count} chờ)`,
+            duration: 4000,
+            icon: true,
+          });
+          resetForm();
+          onSuccess?.();
+          onClose();
+        } catch {
+          openSnackbar({ type: 'error', text: 'Không thể lưu nhật ký. Vui lòng thử lại.', duration: 3500, icon: true });
+        }
+      } else {
+        const msg = err instanceof Error ? err.message : 'Không thể ghi nhật ký. Vui lòng thử lại.';
+        openSnackbar({ type: 'error', text: msg, duration: 3500, icon: true });
+      }
     } finally {
       setSubmitting(false);
     }

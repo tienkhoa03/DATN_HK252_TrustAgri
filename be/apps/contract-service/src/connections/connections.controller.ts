@@ -169,4 +169,68 @@ export class ConnectionsController {
     return this.connectionsService.rejectConnection(id, user.sub);
   }
 
+  /**
+   * POST /api/v1/connections/:id/negotiate
+   *
+   * Alias: chuyển kết nối từ trạng thái `pending` sang `accepted` để bắt đầu
+   * đàm phán hợp đồng. Khớp với Bảng 5.5 báo cáo.
+   *
+   * Lưu ý kỹ thuật: entity Connection không có trạng thái riêng `negotiating` —
+   * trạng thái `accepted` biểu thị hai bên đã đồng ý kết nối và có thể bắt đầu
+   * đàm phán. Endpoint này là thin alias của /accept.
+   * Chỉ người nhận mới được gọi. Ném ConflictException nếu không ở trạng thái `pending`.
+   */
+  @Post(':id/negotiate')
+  @HttpCode(HttpStatus.OK)
+  @Roles('farmer', 'trader')
+  @ApiOperation({
+    summary: 'Alias: accept connection to start negotiation (pending → accepted)',
+    description:
+      'Thin alias of POST /connections/:id/accept. The Connection entity has no separate ' +
+      '"negotiating" status; "accepted" represents the negotiation phase. Only the recipient may call.',
+  })
+  @ApiResponse({ status: 200, description: 'Connection accepted (negotiation started)' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - only the recipient can start negotiation' })
+  @ApiResponse({ status: 409, description: 'Conflict - connection is not in pending state' })
+  negotiate(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<ConnectionDto> {
+    // Delegates to acceptConnection which enforces pending guard + recipient check
+    return this.connectionsService.acceptConnection(id, user.sub);
+  }
+
+  /**
+   * POST /api/v1/connections/:id/sign
+   *
+   * Alias: xác nhận kết nối `accepted` đã đi đến thỏa thuận ("ký kết").
+   * Khớp với Bảng 5.5 báo cáo.
+   *
+   * Lưu ý kỹ thuật: entity Connection không có trạng thái riêng `signed` —
+   * hợp đồng thực sự (ContractEntity) giữ trạng thái ký. Endpoint này trả về
+   * kết nối hiện tại nếu đang ở `accepted`, hoặc ném ConflictException nếu không phải.
+   * Cả hai phía của kết nối đều được phép gọi.
+   */
+  @Post(':id/sign')
+  @HttpCode(HttpStatus.OK)
+  @Roles('farmer', 'trader')
+  @ApiOperation({
+    summary: 'Alias: confirm signed agreement on an accepted connection',
+    description:
+      'Thin alias endpoint documented in Table 5.5. The Connection entity has no "signed" status; ' +
+      'formal signing is tracked by ContractEntity. This endpoint returns the accepted connection ' +
+      'to confirm both parties have agreed. Throws 409 if connection is not in "accepted" state.',
+  })
+  @ApiResponse({ status: 200, description: 'Connection confirmed (accepted state)' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - must be a participant of the connection' })
+  @ApiResponse({ status: 409, description: 'Conflict - connection is not in accepted state' })
+  sign(
+    @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser() user: JwtPayload,
+  ): Promise<ConnectionDto> {
+    return this.connectionsService.confirmSign(id, user.sub);
+  }
+
 }

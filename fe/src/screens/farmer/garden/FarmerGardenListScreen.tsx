@@ -21,6 +21,7 @@ import { spacing } from '@/design-system/tokens/spacing';
 import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import { ApiError } from '@/api/errors';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
+import { onCareLogSynced } from '@/services/careLogAutoSync';
 
 export interface FarmListItem {
   farm: FarmDto;
@@ -201,6 +202,19 @@ export const FarmerGardenListScreen: React.FC = () => {
     loadedRef.current = true;
     void loadFarms();
   }, [session?.userId, loadFarms]);
+
+  // NFR-R02: subscribe to sync completion — show "Đã đồng bộ N nhật ký" toast
+  useEffect(() => {
+    const unsub = onCareLogSynced((count) => {
+      openSnackbar({
+        type: 'success',
+        text: `Đã đồng bộ ${count} nhật ký`,
+        duration: 3000,
+        icon: true,
+      });
+    });
+    return unsub;
+  }, [openSnackbar]);
 
   const handleSelectFarm = (farmId: string) => {
     navigate(`/farmer/garden/${farmId}`);

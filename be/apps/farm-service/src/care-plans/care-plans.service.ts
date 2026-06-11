@@ -10,7 +10,10 @@ import {
   CarePlanResponseDto,
   CompleteTaskResponseDto,
   DailyTaskDto,
+  resolveServiceUrl,
+  SERVICE_URL_KEYS,
 } from '@trustagri/shared';
+import { ConfigService } from '@nestjs/config';
 import { FarmEntity } from '../farms/entities/farm.entity';
 import { StandardEntity } from '../standards/entities/standard.entity';
 import { StandardStepEntity } from '../standards/entities/standard-step.entity';
@@ -29,18 +32,60 @@ export class CarePlansService {
     private readonly stepRepo: Repository<StandardStepEntity>,
     @InjectRepository(CareLogEntity)
     private readonly careLogRepo: Repository<CareLogEntity>,
+    private readonly config: ConfigService,
   ) {}
+
+  /**
+   * Kiểm tra thương lái có hợp đồng farmer_trader active với vườn này không.
+   * FR-T11: thương lái giám sát và đối chiếu quy trình canh tác.
+   */
+  private async traderHasActiveContract(
+    farmId: string,
+    traderId: string,
+  ): Promise<boolean> {
+    const base = resolveServiceUrl(
+      this.config.get<string>(SERVICE_URL_KEYS.CONTRACT),
+      SERVICE_URL_KEYS.CONTRACT,
+    );
+    try {
+      const url = `${base}/api/v1/contracts?farmId=${farmId}&traderId=${traderId}&status=active&limit=1`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      if (!res.ok) {
+        this.logger.warn(
+          `contract-service ${res.status} khi kiểm tra hợp đồng trader=${traderId} farm=${farmId}`,
+        );
+        return false;
+      }
+      const body = (await res.json()) as { total?: number; items?: unknown[] };
+      return (body.total ?? body.items?.length ?? 0) > 0;
+    } catch (err) {
+      this.logger.warn(
+        `contract-service không phản hồi khi kiểm tra trader care-plan access: ${(err as Error).message}`,
+      );
+      return false;
+    }
+  }
 
   async getTodayPlan(
     farmId: string,
     userId: string,
+    userRole?: string,
   ): Promise<CarePlanResponseDto> {
     const farm = await this.farmRepo.findOne({ where: { id: farmId } });
     if (!farm) throw new NotFoundException('Vườn không tồn tại');
 
     if (farm.ownerId !== userId) {
-      // TODO: trader có hợp đồng active cũng được phép truy cập — Phase sau
-      throw new ForbiddenException('Bạn không có quyền xem kế hoạch của vườn này');
+      // FR-T11: trader với hợp đồng active có thể đọc care plan để giám sát quy trình
+      if (userRole === 'trader') {
+        const hasContract = await this.traderHasActiveContract(farmId, userId);
+        if (!hasContract) {
+          throw new ForbiddenException(
+            'Thương lái không có hợp đồng active với vườn này',
+          );
+        }
+      } else {
+        throw new ForbiddenException('Bạn không có quyền xem kế hoạch của vườn này');
+      }
     }
 
     if (!farm.standardId || !farm.plantingDate) {

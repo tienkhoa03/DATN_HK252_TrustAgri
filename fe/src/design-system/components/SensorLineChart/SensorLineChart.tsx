@@ -3,14 +3,14 @@
  *
  * Phân biệt rõ ràng:
  *   • Thực đo  (isImputed = false) — đường liền, chấm đặc
- *   • Ước tính (isImputed = true)  — đường nét đứt, chấm rỗng + màu vàng
+ *   • Bổ khuyết bởi AI P-MIMP (isImputed = true) — đường nét đứt, chấm rỗng + màu vàng
  *
  * Dùng SVG thuần, không phụ thuộc thư viện chart bên ngoài.
  *
- * Requirements: Phase 6.1 — FR-F07, FR-T11, FR-U05
+ * Requirements: Phase 6.1 — FR-F07, FR-T11, FR-U05, NFR-A01
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { colors } from '../../tokens/colors';
 import { spacing } from '../../tokens/spacing';
 import { fontSize, fontWeight } from '../../tokens/typography';
@@ -62,10 +62,13 @@ export const SensorLineChart: React.FC<SensorLineChartProps> = ({
   width = 320,
   height = 160,
   lineColor = colors.primary.agriGreen,
-  imputedColor = '#FFCC00',
+  imputedColor = colors.functional.warningYellow,
   className = '',
 }) => {
   const pad = { top: 16, right: 16, bottom: 36, left: 44 };
+
+  // Tooltip state — hiển thị khi hover/tap trên điểm imputed
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; value: number; isImputed: boolean } | null>(null);
   const cw = width - pad.left - pad.right;
   const ch = height - pad.top - pad.bottom;
 
@@ -168,7 +171,8 @@ export const SensorLineChart: React.FC<SensorLineChartProps> = ({
         backgroundColor: colors.background.primary,
         borderRadius: 8,
         padding: spacing.sm,
-        overflow: 'hidden',
+        overflow: 'visible',
+        position: 'relative',
       }}
     >
       {/* Title */}
@@ -247,10 +251,16 @@ export const SensorLineChart: React.FC<SensorLineChartProps> = ({
                 key={i}
                 cx={p.x}
                 cy={p.y}
-                r={3}
+                r={4}
                 fill={colors.background.primary}
                 stroke={imputedColor}
                 strokeWidth={1.5}
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={() => setTooltip({ x: p.x + pad.left, y: p.y + pad.top, value: p.value, isImputed: true })}
+                onMouseLeave={() => setTooltip(null)}
+                onTouchStart={() => setTooltip({ x: p.x + pad.left, y: p.y + pad.top, value: p.value, isImputed: true })}
+                onTouchEnd={() => setTimeout(() => setTooltip(null), 2000)}
+                aria-label="Giá trị ước lượng do mất tín hiệu cảm biến"
               />
             ) : (
               <circle
@@ -261,6 +271,8 @@ export const SensorLineChart: React.FC<SensorLineChartProps> = ({
                 fill={lineColor}
                 stroke={colors.background.primary}
                 strokeWidth={1}
+                onMouseEnter={() => setTooltip({ x: p.x + pad.left, y: p.y + pad.top, value: p.value, isImputed: false })}
+                onMouseLeave={() => setTooltip(null)}
               />
             )
           ))}
@@ -296,15 +308,47 @@ export const SensorLineChart: React.FC<SensorLineChartProps> = ({
         </g>
       </svg>
 
-      {/* Legend */}
+      {/* Tooltip overlay — chỉ hiển thị khi hover/tap */}
+      {tooltip && (
+        <div
+          style={{
+            position: 'absolute',
+            left: Math.min(tooltip.x, width - 180),
+            top: Math.max(0, tooltip.y - 52),
+            backgroundColor: 'rgba(0,0,0,0.82)',
+            color: colors.text.inverse,
+            padding: `${spacing.xs} ${spacing.sm}`,
+            borderRadius: 6,
+            fontSize: fontSize.small,
+            pointerEvents: 'none',
+            zIndex: 10,
+            maxWidth: 180,
+            lineHeight: 1.4,
+          }}
+        >
+          <div style={{ fontWeight: fontWeight.semibold }}>
+            {tooltip.value.toFixed(1)}{unit ?? ''}
+          </div>
+          {tooltip.isImputed && (
+            <div style={{ marginTop: 2, fontSize: '11px', opacity: 0.9 }}>
+              Giá trị ước lượng do mất tín hiệu cảm biến
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Legend — NFR-A01: luôn hiển thị để giải thích dữ liệu imputed */}
       <div
         style={{
           display: 'flex',
           gap: spacing.md,
-          marginTop: spacing.xs,
+          marginTop: spacing.sm,
           flexWrap: 'wrap',
+          paddingTop: spacing.xs,
+          borderTop: `1px solid ${colors.background.secondary}`,
         }}
       >
+        {/* Thực đo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs }}>
           <div
             style={{
@@ -314,24 +358,26 @@ export const SensorLineChart: React.FC<SensorLineChartProps> = ({
               borderRadius: 2,
             }}
           />
-          <span style={{ fontSize: fontSize.small, color: colors.text.secondary }}>
+          <span style={{ fontSize: '11px', color: colors.text.secondary }}>
             Thực đo
           </span>
         </div>
+        {/* Bổ khuyết bởi AI (P-MIMP) */}
         <div style={{ display: 'flex', alignItems: 'center', gap: spacing.xs }}>
-          <svg width={20} height={8}>
+          <svg width={24} height={10} style={{ flexShrink: 0 }}>
             <line
               x1={0}
-              y1={4}
-              x2={20}
-              y2={4}
+              y1={5}
+              x2={24}
+              y2={5}
               stroke={imputedColor}
               strokeWidth={2}
               strokeDasharray="4 2"
             />
+            <circle cx={12} cy={5} r={3} fill={colors.background.primary} stroke={imputedColor} strokeWidth={1.5} />
           </svg>
-          <span style={{ fontSize: fontSize.small, color: colors.text.secondary }}>
-            Ước tính
+          <span style={{ fontSize: '11px', color: colors.text.secondary }}>
+            Bổ khuyết bởi AI (P-MIMP)
           </span>
         </div>
       </div>

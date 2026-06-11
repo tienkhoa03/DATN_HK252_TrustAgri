@@ -24,14 +24,47 @@ import { CROP_LABELS } from '@/services/marketplaceService';
 
 type Tab = 'news' | 'forecasts';
 
+// Ánh xạ category → nhãn emoji + text (FR-F12, FR-T12)
 const CATEGORY_LABELS: Record<string, string> = {
-  price_forecast: 'Dự báo giá',
-  weather_alert: 'Cảnh báo thời tiết',
-  farming_technique: 'Kỹ thuật canh tác',
+  price_forecast: '📈 Dự báo giá',
+  market_news: '📈 Dự báo giá',
+  'market-news': '📈 Dự báo giá',
+  weather_alert: '🌦 Thời tiết',
+  weather: '🌦 Thời tiết',
+  farming_technique: '🧪 Kỹ thuật',
+  technique: '🧪 Kỹ thuật',
+  'farming-technique': '🧪 Kỹ thuật',
+  supply_demand: '📊 Cung cầu',
+  general: '📰 Chung',
+};
+
+// Màu chip theo nhóm category — dùng token màu, không hardcode
+const CATEGORY_COLORS: Record<string, { bg: string; text: string }> = {
+  '📈': { bg: `${colors.primary.agriGreen}14`, text: colors.primary.agriGreen },
+  '🌦': { bg: `${colors.primary.zaloBlue}14`, text: colors.primary.zaloBlue },
+  // 🧪 dùng nền vàng nhạt, chữ primary để đủ tương phản
+  '🧪': { bg: `${colors.functional.warningYellow}28`, text: colors.text.primary },
+  '📊': { bg: `${colors.primary.zaloBlue}14`, text: colors.primary.zaloBlue },
+  '📰': { bg: colors.background.tertiary, text: colors.text.secondary },
 };
 
 function categoryLabel(cat: string): string {
-  return CATEGORY_LABELS[cat] ?? cat;
+  return CATEGORY_LABELS[cat] ?? `📰 ${cat}`;
+}
+
+function categoryChipStyle(cat: string): React.CSSProperties {
+  const label = categoryLabel(cat);
+  const emoji = label.slice(0, 2).trim();
+  const scheme = CATEGORY_COLORS[emoji] ?? { bg: `${colors.background.tertiary}`, text: colors.text.secondary };
+  return {
+    display: 'inline-block',
+    padding: `${spacing.xs} ${spacing.sm}`,
+    backgroundColor: scheme.bg,
+    color: scheme.text,
+    borderRadius: 6,
+    fontSize: fontSize.small,
+    fontWeight: fontWeight.medium,
+  };
 }
 
 function formatDate(iso: string): string {
@@ -206,17 +239,7 @@ export const NewsFeedScreen: React.FC<NewsFeedScreenProps> = ({
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing.sm }}>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      padding: `${spacing.xs} ${spacing.sm}`,
-                      backgroundColor: `${colors.primary.zaloBlue}14`,
-                      color: colors.primary.zaloBlue,
-                      borderRadius: 6,
-                      fontSize: fontSize.small,
-                      fontWeight: fontWeight.medium,
-                    }}
-                  >
+                  <span style={categoryChipStyle(a.category)}>
                     {categoryLabel(a.category)}
                   </span>
                   <span style={{ fontSize: fontSize.small, color: colors.text.secondary }}>
@@ -359,13 +382,7 @@ export const NewsFeedScreen: React.FC<NewsFeedScreenProps> = ({
             </div>
             <span
               style={{
-                display: 'inline-block',
-                padding: `${spacing.xs} ${spacing.sm}`,
-                backgroundColor: `${colors.primary.zaloBlue}14`,
-                color: colors.primary.zaloBlue,
-                borderRadius: 6,
-                fontSize: fontSize.small,
-                fontWeight: fontWeight.medium,
+                ...categoryChipStyle(selectedNews.category),
                 marginBottom: spacing.sm,
               }}
             >
