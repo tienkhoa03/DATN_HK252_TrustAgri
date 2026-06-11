@@ -1,6 +1,5 @@
 import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHmac } from 'crypto';
 import { resolveZaloGraphMeUrl, resolveZaloGraphPhoneUrl } from '@trustagri/shared';
 
 export interface ZaloUserInfo {
@@ -32,31 +31,24 @@ export class ZaloService {
       this.config.get<string>('ZALO_GRAPH_PHONE_URL'),
     );
     // Tên biến env chuẩn (deploy docs + .env): ZALO_SECRET_KEY. Giữ fallback tên cũ.
+    // Chỉ dùng cho endpoint giải mã số điện thoại /me/info — KHÔNG dùng cho /me.
     this.secretKey = (
       this.config.get<string>('ZALO_SECRET_KEY') ??
       this.config.get<string>('ZALO_APP_SECRET_KEY') ??
       ''
     ).trim();
     if (!this.secretKey) {
-      this.logger.warn('ZALO_SECRET_KEY chưa cấu hình — gọi Zalo Graph API có thể bị từ chối (thiếu appsecret_proof)');
+      this.logger.warn('ZALO_SECRET_KEY chưa cấu hình — không giải mã được số điện thoại Zalo');
     }
-  }
-
-  // Zalo yêu cầu appsecret_proof cho các lời gọi server→server từ Mini App token:
-  // HMAC-SHA256(access_token) với key là Secret Key của app, mã hex.
-  private buildAppSecretProof(accessToken: string): string {
-    return createHmac('sha256', this.secretKey).update(accessToken).digest('hex');
   }
 
   async getUserInfo(zaloAccessToken: string): Promise<ZaloUserInfo> {
     let response: Response;
     try {
-      // access_token + appsecret_proof ở query string — phương thức Zalo tài liệu hóa;
-      // tránh lộ token trong access log của proxy/load-balancer.
-      let url = `${this.zaloGraphMeUrl}&access_token=${encodeURIComponent(zaloAccessToken)}`;
-      if (this.secretKey) {
-        url += `&appsecret_proof=${this.buildAppSecretProof(zaloAccessToken)}`;
-      }
+      // Zalo /v2.0/me chỉ cần access_token ở query string (KHÔNG dùng appsecret_proof —
+      // đó là cơ chế của Facebook, Zalo không hỗ trợ). Để token trong query tránh lộ
+      // trong access log của proxy/load-balancer.
+      const url = `${this.zaloGraphMeUrl}&access_token=${encodeURIComponent(zaloAccessToken)}`;
       response = await fetch(url);
     } catch (err) {
       this.logger.error('Lỗi kết nối tới Zalo API', err);
@@ -75,7 +67,7 @@ export class ZaloService {
     };
 
     if (data.error || !data.id) {
-      // Log mã lỗi Zalo để chẩn đoán (không log token). error=-201/-204... thường là token/appsecret_proof sai.
+      // Log mã lỗi Zalo để chẩn đoán (không log token). error=-201/-204... thường là token sai/hết hạn.
       this.logger.warn(`Zalo /me từ chối token: error=${data.error}, message=${data.message ?? 'n/a'}`);
       throw new UnauthorizedException('zaloAccessToken không hợp lệ hoặc đã hết hạn');
     }
