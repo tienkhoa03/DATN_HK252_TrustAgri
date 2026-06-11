@@ -47,7 +47,8 @@ interface NewsItem {
 interface FeaturedProductUi {
   id: string;
   name: string;
-  image: string;
+  imageUrl?: string; // URL ảnh thật nếu có; thiếu thì fallback emoji theo cropType
+  cropType: string;
   price: string;
 }
 
@@ -121,7 +122,8 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
           const uiItems: FeaturedProductUi[] = res.items.map((p) => ({
             id: p.id,
             name: p.name,
-            image: p.images[0] ?? cropEmoji(p.cropType),
+            imageUrl: p.images && p.images.length > 0 ? p.images[0] : undefined,
+            cropType: p.cropType,
             price: `${p.price.toLocaleString('vi-VN')} VNĐ/${p.unit}`,
           }));
           setFeaturedProducts(uiItems);
@@ -669,7 +671,18 @@ export const GuestHomeMarketNewsScreen: React.FC<GuestHomeMarketNewsScreenProps>
                     e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
                   }}
                 >
-                  <div style={productImageStyles}>{product.image}</div>
+                  {product.imageUrl && product.imageUrl.startsWith('http') ? (
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      style={{ width: '100%', height: '100px', objectFit: 'cover', display: 'block' }}
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div style={productImageStyles}>{cropEmoji(product.cropType)}</div>
+                  )}
 
                   <div style={productInfoStyles}>
                     <Text.Title size="small" style={{ margin: 0, fontWeight: fontWeight.semibold }}>
