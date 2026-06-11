@@ -33,7 +33,7 @@ async function bootstrap() {
   }
 
   const port = process.env.PORT ?? process.env.NOTIFICATION_SERVICE_PORT ?? 3002;
-  await app.listen(port, '0.0.0.0');
+  await app.listen(port, '::');
   console.log(
     JSON.stringify({
       level: 'info',
