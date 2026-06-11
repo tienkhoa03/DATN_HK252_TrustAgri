@@ -15,6 +15,7 @@ import { fontSize, fontWeight } from '@/design-system/tokens/typography';
 import { ApiError } from '@/api/errors';
 import {
   getTraceabilityByQrCode,
+  scanQrForTraceCode,
   toTraceabilityViMessage,
   type TraceabilityDto,
 } from '@/services/traceabilityService';
@@ -96,6 +97,7 @@ export const TraceabilityScreen: React.FC = () => {
   const [loadError, setLoadError] = useState(false);
   const [selectedSensorIndex, setSelectedSensorIndex] = useState(0);
   const [retryTick, setRetryTick] = useState(0);
+  const [scanning, setScanning] = useState(false);
 
   // Pre-fill input from URL param — user must press "Tìm kiếm" to trigger search
   useEffect(() => {
@@ -171,6 +173,42 @@ export const TraceabilityScreen: React.FC = () => {
     setSearchedCode(trimmed);
   };
 
+  // Mở camera quét QR thật (zmp-sdk). Quét xong → điền mã + tra cứu ngay.
+  const handleScan = async () => {
+    if (scanning || loading) return;
+    setScanning(true);
+    try {
+      const result = await scanQrForTraceCode();
+      switch (result.status) {
+        case 'ok':
+          setInputValue(result.code);
+          setSearchedCode(result.code);
+          break;
+        case 'empty':
+          openSnackbar({
+            type: 'warning',
+            text: 'Không đọc được mã từ ảnh QR. Vui lòng thử lại hoặc nhập mã thủ công.',
+            duration: 4000,
+            icon: true,
+          });
+          break;
+        case 'unavailable':
+          openSnackbar({
+            type: 'info',
+            text: 'Máy quét QR chỉ hoạt động trong ứng dụng Zalo. Vui lòng nhập mã thủ công.',
+            duration: 4000,
+            icon: true,
+          });
+          break;
+        case 'cancelled':
+        default:
+          break;
+      }
+    } finally {
+      setScanning(false);
+    }
+  };
+
   const handleBack = () => {
     navigate(-1);
   };
@@ -235,6 +273,25 @@ export const TraceabilityScreen: React.FC = () => {
     cursor: disabled ? 'not-allowed' : 'pointer',
     opacity: disabled ? 0.6 : 1,
     whiteSpace: 'nowrap',
+  });
+
+  const scanBtnStyles = (disabled: boolean): React.CSSProperties => ({
+    width: '100%',
+    minHeight: '44px',
+    marginTop: spacing.sm,
+    padding: `0 ${spacing.md}`,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.background.primary,
+    color: colors.primary.zaloBlue,
+    border: `1.5px solid ${colors.primary.zaloBlue}`,
+    borderRadius: '8px',
+    fontSize: fontSize.body,
+    fontWeight: fontWeight.semibold,
+    cursor: disabled ? 'not-allowed' : 'pointer',
+    opacity: disabled ? 0.6 : 1,
   });
 
   const sectionTitleStyles: React.CSSProperties = {
@@ -437,6 +494,19 @@ export const TraceabilityScreen: React.FC = () => {
               {loading ? '...' : 'Tìm kiếm'}
             </button>
           </div>
+
+          {/* Quét QR bằng camera thật (zmp-sdk) */}
+          <button
+            type="button"
+            onClick={() => void handleScan()}
+            disabled={scanning || loading}
+            style={scanBtnStyles(scanning || loading)}
+            aria-label="Quét mã QR bằng camera"
+          >
+            <Icon name="qr-code" size="md" color={colors.primary.zaloBlue} />
+            <span>{scanning ? 'Đang mở máy quét…' : 'Quét mã QR bằng camera'}</span>
+          </button>
+
           <Text size="xSmall" style={{ color: colors.text.secondary, marginTop: spacing.xs }}>
             Quét mã QR trên bao bì sản phẩm hoặc nhập mã trực tiếp
           </Text>

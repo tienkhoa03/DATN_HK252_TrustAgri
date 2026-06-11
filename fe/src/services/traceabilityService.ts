@@ -379,3 +379,61 @@ export async function getTraceabilityByQrCode(code: string): Promise<Traceabilit
   );
   return mapTraceabilityDto(data);
 }
+
+// ── QR scan (camera thật qua zmp-sdk scanQRCode) ──────────────────────────────
+
+/** Kết quả quét QR truy xuất — discriminated union để UI xử lý từng nhánh. */
+export type QrScanResult =
+  | { status: 'ok'; code: string }
+  | { status: 'empty' }        // quét được nhưng không tách ra mã hợp lệ
+  | { status: 'cancelled' }    // user thoát máy quét (zmp mã -201)
+  | { status: 'unavailable' }; // ngoài app Zalo / từ chối quyền camera / SDK lỗi
+
+/**
+ * Tách mã truy xuất từ nội dung QR đã quét.
+ * QR do app sinh ra encode dạng URL `${TRACE_BASE_URL}/<code>` (xem ContractQrCodeModal),
+ * nhưng vẫn chấp nhận mã thô (TR-… / LOT-…) phòng khi QR được in tay.
+ */
+export function extractTraceCodeFromQrContent(raw: string): string {
+  const content = (raw ?? '').trim();
+  if (!content) return '';
+  if (/^https?:\/\//i.test(content) || content.includes('://')) {
+    try {
+      const url = new URL(content);
+      const segments = url.pathname.split('/').filter(Boolean);
+      const traceIdx = segments.lastIndexOf('trace');
+      const seg =
+        traceIdx >= 0 && traceIdx < segments.length - 1
+          ? segments[traceIdx + 1]
+          : segments[segments.length - 1];
+      return decodeURIComponent(seg ?? '').trim();
+    } catch {
+      // không parse được URL → coi như mã thô bên dưới
+    }
+  }
+  return content;
+}
+
+/**
+ * Mở camera quét QR thật qua zmp-sdk (chỉ chạy trong app Zalo mobile).
+ * Dynamic import để không kéo SDK vào initial bundle (NFR-C01).
+ * Fail-soft: 'unavailable' khi chạy ngoài Zalo/từ chối quyền/SDK lỗi,
+ * 'cancelled' khi user thoát máy quét — để UI khỏi hiện lỗi thừa.
+ */
+export async function scanQrForTraceCode(): Promise<QrScanResult> {
+  let apis: typeof import('zmp-sdk/apis');
+  try {
+    apis = await import('zmp-sdk/apis');
+  } catch {
+    return { status: 'unavailable' };
+  }
+  try {
+    const res = await apis.scanQRCode({});
+    const code = extractTraceCodeFromQrContent(res?.content ?? '');
+    return code ? { status: 'ok', code } : { status: 'empty' };
+  } catch (err) {
+    const code = (err as { code?: number } | null)?.code;
+    if (code === -201) return { status: 'cancelled' };
+    return { status: 'unavailable' };
+  }
+}
