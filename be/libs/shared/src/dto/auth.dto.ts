@@ -104,6 +104,25 @@ export class AuthLoginDto {
   @IsOptional()
   @IsString()
   phoneToken?: string;
+
+  /**
+   * Fallback khi Zalo chặn /me theo IP (server ngoài VN, error -501): FE lấy id/tên/avatar
+   * qua zmp-sdk getUserInfo (chạy trên máy user trong VN) và gửi kèm. Chỉ dùng khi /me bị geo-block.
+   */
+  @ApiPropertyOptional({ description: 'Zalo user id from zmp-sdk getUserInfo (fallback when /me is geo-blocked)', example: '1234567890' })
+  @IsOptional()
+  @IsString()
+  zaloId?: string;
+
+  @ApiPropertyOptional({ description: 'Zalo display name from zmp-sdk getUserInfo (fallback)', example: 'Nguyen Van An' })
+  @IsOptional()
+  @IsString()
+  zaloName?: string;
+
+  @ApiPropertyOptional({ description: 'Zalo avatar URL from zmp-sdk getUserInfo (fallback)', example: 'https://...' })
+  @IsOptional()
+  @IsString()
+  zaloAvatar?: string;
 }
 
 /**

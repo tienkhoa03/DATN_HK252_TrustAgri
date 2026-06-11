@@ -12,6 +12,20 @@ export interface ZaloUserInfo {
   };
 }
 
+/** Mã lỗi Zalo khi /me bị chặn vì IP server nằm ngoài Việt Nam. */
+export const ZALO_ERROR_IP_RESTRICTED = -501;
+
+/**
+ * Ném khi Zalo /me bị geo-block (error -501): token có thể vẫn hợp lệ nhưng Zalo
+ * không trả thông tin do IP server ngoài VN. login() bắt lỗi này để fallback profile FE.
+ */
+export class ZaloGeoBlockedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ZaloGeoBlockedError';
+  }
+}
+
 /**
  * Gọi Zalo Graph API để xác thực zaloAccessToken và lấy thông tin người dùng.
  * Endpoint: GET https://graph.zalo.me/v2.0/me?fields=id,name,picture
@@ -69,6 +83,10 @@ export class ZaloService {
     if (data.error || !data.id) {
       // Log mã lỗi Zalo để chẩn đoán (không log token). error=-201/-204... thường là token sai/hết hạn.
       this.logger.warn(`Zalo /me từ chối token: error=${data.error}, message=${data.message ?? 'n/a'}`);
+      // -501: IP server ngoài VN → token có thể vẫn hợp lệ, để login() fallback profile FE.
+      if (data.error === ZALO_ERROR_IP_RESTRICTED) {
+        throw new ZaloGeoBlockedError(data.message ?? 'Zalo /me bị chặn theo IP');
+      }
       throw new UnauthorizedException('zaloAccessToken không hợp lệ hoặc đã hết hạn');
     }
 

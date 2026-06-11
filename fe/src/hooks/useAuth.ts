@@ -19,7 +19,7 @@ import { useAtom, useAtomValue } from 'jotai';
 
 import { authSessionAtom, currentRoleAtom, type AuthSession, type UserRole } from '@/state/authAtoms';
 import * as authService from '@/services/authService';
-import { resolveZaloAccessToken } from '@/services/zaloAccessToken';
+import { resolveZaloAccessToken, resolveZaloUserInfo } from '@/services/zaloAccessToken';
 import type { UserProfileDto } from '@/services/authService';
 import { ApiError } from '@/api/errors';
 import { ENV } from '@/config/env';
@@ -94,9 +94,12 @@ export function useAuth(): UseAuthReturn {
         );
       }
 
+      // Profile Zalo (fallback khi backend gọi /me bị chặn theo IP — error -501)
+      const zaloProfile = await resolveZaloUserInfo();
+
       // Bước 2: Trao đổi Zalo token → TrustAgri session
       // POST /api/v1/auth/login { zaloAccessToken } → { accessToken, refreshToken, userId, role, expiresAt }
-      const newSession: AuthSession = await authService.login(zaloToken);
+      const newSession: AuthSession = await authService.login(zaloToken, undefined, undefined, zaloProfile);
       setSession(newSession);
       // Sau setSession, interceptor tự gắn Bearer token cho mọi request tiếp theo
 

@@ -110,10 +110,15 @@ export async function login(
   zaloAccessToken: string,
   phoneNumber?: string,
   phoneToken?: string,
+  zaloProfile?: { zaloId?: string; zaloName?: string; zaloAvatar?: string },
 ): Promise<AuthSession> {
   const body: Record<string, string> = { zaloAccessToken };
   if (phoneNumber) body.phoneNumber = phoneNumber;
   if (phoneToken) body.phoneToken = phoneToken;
+  // Fallback profile khi backend gọi Zalo /me bị chặn theo IP (server ngoài VN, error -501).
+  if (zaloProfile?.zaloId) body.zaloId = zaloProfile.zaloId;
+  if (zaloProfile?.zaloName) body.zaloName = zaloProfile.zaloName;
+  if (zaloProfile?.zaloAvatar) body.zaloAvatar = zaloProfile.zaloAvatar;
 
   const { data } = await apiClient.post<{
     accessToken: string;

@@ -12,7 +12,7 @@
 
 import { ENV } from '@/config/env';
 import * as authService from '@/services/authService';
-import { resolveZaloAccessToken } from '@/services/zaloAccessToken';
+import { resolveZaloAccessToken, resolveZaloUserInfo } from '@/services/zaloAccessToken';
 import type { AuthSession } from '@/state/authAtoms';
 
 /** Throw bởi `bootstrapAuthSession()` khi mode='password' để RootEntry redirect /login. */
@@ -78,7 +78,9 @@ export async function bootstrapAuthSession(): Promise<AuthSession> {
       }
       // Lấy phone best-effort (fail-soft — không block login nếu SDK không hỗ trợ)
       const { phoneNumber, phoneToken } = await tryGetPhoneNumber();
-      return authService.login(zaloToken, phoneNumber, phoneToken);
+      // Lấy profile Zalo (fallback khi /me bị chặn theo IP ở backend — error -501)
+      const zaloProfile = await resolveZaloUserInfo();
+      return authService.login(zaloToken, phoneNumber, phoneToken, zaloProfile);
     }
 
     case 'zalo-token': {

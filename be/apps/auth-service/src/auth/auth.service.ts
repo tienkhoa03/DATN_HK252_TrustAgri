@@ -18,6 +18,7 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import {
+  AuthLoginDto,
   AuthLoginResponseDto,
   AuthVerifyResponseDto,
   JwtPayload,
@@ -26,7 +27,7 @@ import {
   UserPublicSummaryDto,
 } from '@trustagri/shared';
 import { UserEntity } from './entities/user.entity';
-import { ZaloService } from './zalo.service';
+import { ZaloService, ZaloGeoBlockedError } from './zalo.service';
 import { RedisService } from './redis.service';
 
 @Injectable()
@@ -42,13 +43,35 @@ export class AuthService {
     private readonly redisService: RedisService,
   ) {}
 
-  async login(
-    zaloAccessToken: string,
-    phoneNumber?: string,
-    phoneToken?: string,
-  ): Promise<AuthLoginResponseDto> {
-    // 1. Xác thực token với Zalo API
-    const zaloUser = await this.zaloService.getUserInfo(zaloAccessToken);
+  async login(dto: AuthLoginDto): Promise<AuthLoginResponseDto> {
+    const { zaloAccessToken, phoneNumber, phoneToken } = dto;
+
+    // 1. Xác thực token với Zalo /me. Nếu Zalo chặn theo IP (error -501, server ngoài VN)
+    // thì fallback dùng profile FE gửi kèm (zmp-sdk getUserInfo chạy trên máy user trong VN).
+    let zaloUserId: string;
+    let zaloName: string | undefined;
+    let zaloAvatar: string | null;
+    try {
+      const zaloUser = await this.zaloService.getUserInfo(zaloAccessToken);
+      zaloUserId = zaloUser.id;
+      zaloName = zaloUser.name;
+      zaloAvatar = zaloUser.picture?.data?.url ?? null;
+    } catch (err) {
+      if (!(err instanceof ZaloGeoBlockedError)) {
+        throw err;
+      }
+      const fallbackId = dto.zaloId?.trim();
+      if (!fallbackId) {
+        // Geo-block nhưng FE không gửi zaloId → không định danh được người dùng.
+        throw new UnauthorizedException(
+          'Zalo chặn xác thực theo IP và thiếu zaloId từ ứng dụng',
+        );
+      }
+      this.logger.warn(`Zalo /me bị chặn theo IP — fallback profile FE cho zaloId=${fallbackId}`);
+      zaloUserId = fallbackId;
+      zaloName = dto.zaloName?.trim() || undefined;
+      zaloAvatar = dto.zaloAvatar?.trim() || null;
+    }
 
     // 1b. Số điện thoại: ưu tiên giá trị FE gửi sẵn (dev/staging); nếu không có thì
     // giải mã `phoneToken` (code từ getPhoneNumber) qua Zalo /me/info (production). Fail-soft.
@@ -59,17 +82,17 @@ export class AuthService {
 
     // Zalo chỉ trả `name`/`picture` khi user cấp quyền scope.userInfo — fallback an toàn
     // vì cột display_name là NOT NULL.
-    const displayName = zaloUser.name?.trim() || 'Người dùng Zalo';
-    const avatarUrl = zaloUser.picture?.data?.url ?? null;
+    const displayName = zaloName?.trim() || 'Người dùng Zalo';
+    const avatarUrl = zaloAvatar;
 
     // 2. Tìm hoặc tạo mới user
     let user = await this.userRepo.findOne({
-      where: { zaloId: zaloUser.id },
+      where: { zaloId: zaloUserId },
     });
 
     if (!user) {
       user = this.userRepo.create({
-        zaloId: zaloUser.id,
+        zaloId: zaloUserId,
         displayName,
         avatarUrl,
         roles: ['buyer'],
@@ -81,8 +104,8 @@ export class AuthService {
       });
     } else {
       // Chỉ ghi đè khi Zalo thực sự trả dữ liệu — tránh xóa thông tin sẵn có bằng giá trị rỗng.
-      if (zaloUser.name?.trim()) {
-        user.displayName = zaloUser.name.trim();
+      if (zaloName?.trim()) {
+        user.displayName = zaloName.trim();
       }
       if (avatarUrl) {
         user.avatarUrl = avatarUrl;

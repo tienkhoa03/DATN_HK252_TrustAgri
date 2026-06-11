@@ -20,7 +20,7 @@ import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { ENV } from '@/config/env';
 import { ApiError } from '@/api/errors';
 import * as authService from '@/services/authService';
-import { resolveZaloAccessToken } from '@/services/zaloAccessToken';
+import { resolveZaloAccessToken, resolveZaloUserInfo } from '@/services/zaloAccessToken';
 import type { UserProfileDto } from '@/services/authService';
 import { authSessionAtom } from '@/state/authAtoms';
 import { ROLE_HOME_PATH } from '@/router/roleHome';
@@ -107,7 +107,9 @@ export function AppInitScreen() {
       }
 
       // Step 2: Exchange Zalo token -> JWT session (POST /api/v1/auth/login)
-      const authSession = await authService.login(zaloToken);
+      // Kèm profile Zalo làm fallback khi backend gọi /me bị chặn theo IP (error -501)
+      const zaloProfile = await resolveZaloUserInfo();
+      const authSession = await authService.login(zaloToken, undefined, undefined, zaloProfile);
       setAuthSession(authSession);
 
       // Step 3: Smoke call POST /api/v1/auth/verify với JWT accessToken
