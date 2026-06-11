@@ -9,6 +9,7 @@ import Redis from 'ioredis';
 import {
   ContractChangeRequestDto,
   ContractDto,
+  redisOptionsFromEnv,
 } from '@trustagri/shared';
 
 export const CONTRACT_CHANGED_CHANNEL = 'contract.changed';
@@ -33,8 +34,7 @@ export class ContractEventPublisherService
 
   onModuleInit(): void {
     this.publisher = new Redis({
-      host: this.config.get<string>('REDIS_HOST', 'localhost'),
-      port: this.config.get<number>('REDIS_PORT', 6379),
+      ...redisOptionsFromEnv(),
       lazyConnect: true,
     });
     this.publisher.on('error', (err: Error) =>

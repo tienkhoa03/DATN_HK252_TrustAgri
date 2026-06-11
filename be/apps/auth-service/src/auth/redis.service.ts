@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { redisOptionsFromEnv } from '@trustagri/shared';
 
 /**
  * Quản lý phiên người dùng trong Redis.
@@ -15,8 +16,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     this.client = new Redis({
-      host: this.config.get<string>('REDIS_HOST', 'localhost'),
-      port: this.config.get<number>('REDIS_PORT', 6379),
+      ...redisOptionsFromEnv(),
       lazyConnect: true,
     });
 

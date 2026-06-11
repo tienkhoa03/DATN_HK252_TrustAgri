@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { redisOptionsFromEnv } from '@trustagri/shared';
 
 export const PROCESS_EVENT_CHANNEL = 'process.event';
 
@@ -34,8 +35,7 @@ export class ProcessEventPublisherService
 
   onModuleInit(): void {
     this.publisher = new Redis({
-      host: this.config.get<string>('REDIS_HOST', 'localhost'),
-      port: this.config.get<number>('REDIS_PORT', 6379),
+      ...redisOptionsFromEnv(),
       lazyConnect: true,
     });
     this.publisher.on('error', (err: Error) =>

@@ -34,5 +34,6 @@ export * from './logger/logger.module';
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 export * from './config/config.module';
 export * from './config/database.config';
+export * from './config/redis-options.config';
 export * from './config/http.config';
 export * from './config/service-urls.config';

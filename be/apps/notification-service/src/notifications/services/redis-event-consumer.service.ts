@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
-import { AlertDto, ConnectionDto } from '@trustagri/shared';
+import { AlertDto, ConnectionDto, redisOptionsFromEnv } from '@trustagri/shared';
 import {
   ContractChangedEventPayload,
   NotificationsService,
@@ -36,8 +36,7 @@ export class RedisEventConsumerService
 
   onModuleInit(): void {
     this.subscriber = new Redis({
-      host: this.config.get<string>('REDIS_HOST', 'localhost'),
-      port: this.config.get<number>('REDIS_PORT', 6379),
+      ...redisOptionsFromEnv(),
       lazyConnect: true,
     });
 

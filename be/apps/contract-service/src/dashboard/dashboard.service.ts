@@ -20,6 +20,7 @@ import {
   ListResponse,
   resolveServiceUrl,
   SERVICE_URL_KEYS,
+  redisOptionsFromEnv,
 } from '@trustagri/shared';
 import { OrderEntity } from '../orders/entities/order.entity';
 import { BuyingRequestEntity } from '../buying-requests/entities/buying-request.entity';
@@ -60,8 +61,7 @@ export class DashboardService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     this.redis = new Redis({
-      host: this.config.get<string>('REDIS_HOST', 'localhost'),
-      port: this.config.get<number>('REDIS_PORT', 6379),
+      ...redisOptionsFromEnv(),
       lazyConnect: true,
       maxRetriesPerRequest: 2,
     });
