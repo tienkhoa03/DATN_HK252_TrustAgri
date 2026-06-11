@@ -9,15 +9,9 @@ export default () => {
     plugins: [zaloMiniApp(), react()],
     build: {
       assetsInlineLimit: 0,
-      // Performance optimizations
-      rollupOptions: {
-        output: {
-          // Optimize chunk file names
-          chunkFileNames: 'assets/[name]-[hash].js',
-          entryFileNames: 'assets/[name]-[hash].js',
-          assetFileNames: 'assets/[name]-[hash].[ext]',
-        },
-      },
+      // KHÔNG override entry/chunkFileNames: zmp-vite-plugin đặt hậu tố `.module.js`
+      // để Zalo nạp script dưới dạng ES module. Đổi tên thành `.js` khiến Zalo nạp
+      // như classic script → lỗi "cannot use import.meta outside a module".
       // Optimize chunk size
       chunkSizeWarningLimit: 1000, // 1MB warning
       // Minification
@@ -43,6 +37,9 @@ export default () => {
     // Optimize dependencies
     optimizeDeps: {
       include: ['react', 'react-dom', 'zmp-sdk', 'zmp-ui', 'jotai'],
+      esbuildOptions: {
+        target: 'es2015',
+      },
     },
   });
 };
