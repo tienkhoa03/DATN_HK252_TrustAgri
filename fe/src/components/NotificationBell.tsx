@@ -24,12 +24,15 @@ export interface NotificationBellProps {
   onClickBefore?: () => void;
   /** Màu icon. Mặc định text.primary. */
   iconColor?: string;
+  /** Khoảng cách lùi khỏi mép phải (px). Tránh trùng nút tắt demo của Zalo ở góc trên-phải. */
+  edgeOffset?: number;
 }
 
 export const NotificationBell: React.FC<NotificationBellProps> = ({
   targetPath = '/notifications',
   onClickBefore,
   iconColor = colors.text.primary,
+  edgeOffset = 40,
 }) => {
   const navigate = useNavigate();
   const setUnread = useSetAtom(notificationUnreadCountAtom);
@@ -91,6 +94,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
         border: 'none',
         background: 'transparent',
         padding: spacing.sm,
+        marginRight: edgeOffset,
         cursor: 'pointer',
         lineHeight: 0,
       }}
