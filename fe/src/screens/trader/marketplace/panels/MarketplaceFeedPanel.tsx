@@ -46,6 +46,7 @@ import {
 } from '@/services/farmService';
 import { getUserById } from '@/services/authService';
 import { buyingRequestBuyerDisplay, farmDisplayLabel } from '@/utils/displayLabels';
+import { isImageUrl } from '@/utils/imageOptimization';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { useKeyboardInset, scrollIntoViewOnFocus } from '@/hooks/useKeyboardInset';
 
@@ -746,14 +747,18 @@ export const MarketplaceFeedPanel: React.FC = () => {
         ) : (
           products.map((product) => {
             const isDeleting = deletingId === product.id;
-            const emoji = product.images[0] ?? cropEmoji(product.cropType);
+            const thumb = product.images[0];
             const std = standardLabel(product.standardCode);
 
             return (
               <div key={product.id} style={{ ...cardStyles, opacity: product.status === 'inactive' ? 0.65 : 1 }}>
                 <div style={{ display: 'flex', gap: spacing.md }}>
-                  <div style={{ width: 80, height: 80, backgroundColor: colors.background.secondary, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, flexShrink: 0 }}>
-                    {emoji}
+                  <div style={{ width: 80, height: 80, backgroundColor: colors.background.secondary, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 36, flexShrink: 0, overflow: 'hidden' }}>
+                    {isImageUrl(thumb) ? (
+                      <img src={thumb} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      thumb ?? cropEmoji(product.cropType)
+                    )}
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>

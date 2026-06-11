@@ -28,6 +28,7 @@ import { getMe, updateMe } from '@/services/authService';
 import type { UserProfileDto } from '@/services/authService';
 import { ApiError } from '@/api/errors';
 import { cropLabel } from '@/services/marketplaceService';
+import { isImageUrl } from '@/utils/imageOptimization';
 
 export interface TraderProfileNewsScreenProps {
   /** Giữ tương thích ví dụ / tích hợp sau (hồ sơ mock hiện dùng companyName). */
@@ -875,7 +876,15 @@ export const TraderProfileNewsScreen: React.FC<TraderProfileNewsScreenProps> = (
                     </button>
                   </div>
 
-                  <div style={{ fontSize: '28px', marginBottom: spacing.xs }}>{article.imageUrl ?? '📰'}</div>
+                  {isImageUrl(article.imageUrl) ? (
+                    <img
+                      src={article.imageUrl}
+                      alt={article.title}
+                      style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 8, marginBottom: spacing.xs }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: '28px', marginBottom: spacing.xs }}>{article.imageUrl ?? '📰'}</div>
+                  )}
 
                   <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.xs }}>
                     {article.title}

@@ -26,6 +26,7 @@ import {
 } from '@/services/newsForecastService';
 import { useStableOpenSnackbar } from '@/hooks/useStableOpenSnackbar';
 import { cropLabel } from '@/services/marketplaceService';
+import { isImageUrl } from '@/utils/imageOptimization';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -336,7 +337,15 @@ export const MarketplaceNewsPanel: React.FC = () => {
             <span style={categoryBadgeStyle(article.category)}>{categoryLabel(article.category)}</span>
             <button type="button" style={outlineBtn} onClick={() => startEditArticle(article)}>Sửa</button>
           </div>
-          <div style={{ fontSize: 28, marginBottom: spacing.xs }}>{article.imageUrl ?? '📰'}</div>
+          {isImageUrl(article.imageUrl) ? (
+            <img
+              src={article.imageUrl}
+              alt={article.title}
+              style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 8, marginBottom: spacing.xs }}
+            />
+          ) : (
+            <div style={{ fontSize: 28, marginBottom: spacing.xs }}>{article.imageUrl ?? '📰'}</div>
+          )}
           <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.xs }}>{article.title}</Text.Title>
           <Text size="small" style={{ color: colors.text.secondary, margin: 0, marginBottom: spacing.sm, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
             {article.summary}

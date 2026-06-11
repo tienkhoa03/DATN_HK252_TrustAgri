@@ -21,6 +21,7 @@ import {
   type ForecastDto,
 } from '@/services/newsForecastService';
 import { CROP_LABELS } from '@/services/marketplaceService';
+import { isImageUrl } from '@/utils/imageOptimization';
 
 type Tab = 'news' | 'forecasts';
 
@@ -246,7 +247,15 @@ export const NewsFeedScreen: React.FC<NewsFeedScreenProps> = ({
                     {formatDate(a.publishedAt)}
                   </span>
                 </div>
-                <div style={{ fontSize: 28, marginBottom: spacing.xs }}>{a.imageUrl ?? '📰'}</div>
+                {isImageUrl(a.imageUrl) ? (
+                  <img
+                    src={a.imageUrl}
+                    alt={a.title}
+                    style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 8, marginBottom: spacing.xs }}
+                  />
+                ) : (
+                  <div style={{ fontSize: 28, marginBottom: spacing.xs }}>{a.imageUrl ?? '📰'}</div>
+                )}
                 <Text.Title size="small" style={{ margin: 0, marginBottom: spacing.xs }}>{a.title}</Text.Title>
                 <Text
                   size="small"
@@ -392,7 +401,7 @@ export const NewsFeedScreen: React.FC<NewsFeedScreenProps> = ({
             <Text size="xSmall" style={{ color: colors.text.secondary, margin: 0, marginBottom: spacing.md }}>
               📅 {formatDate(selectedNews.publishedAt)}
             </Text>
-            {selectedNews.imageUrl && selectedNews.imageUrl.startsWith('http') && (
+            {isImageUrl(selectedNews.imageUrl) && (
               <img
                 src={selectedNews.imageUrl}
                 alt={selectedNews.title}

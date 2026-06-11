@@ -65,6 +65,7 @@ import {
   partyFarmerDisplay,
   contractFarmDisplay,
 } from '@/utils/displayLabels';
+import { isImageUrl } from '@/utils/imageOptimization';
 import { ContractChangeRequestsPanel } from '@/screens/shared/contract-change-requests';
 
 export interface TraderTradingOrdersScreenProps {
@@ -778,7 +779,7 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
 
     const renderProductCard = (product: ProductDto) => {
       const isDeleting = deletingId === product.id;
-      const emoji = product.images[0] ?? cropEmoji(product.cropType);
+      const thumb = product.images[0];
       const std = standardLabel(product.standardCode);
 
       return (
@@ -795,9 +796,14 @@ export const TraderTradingOrdersScreen: React.FC<TraderTradingOrdersScreenProps>
                 justifyContent: 'center',
                 fontSize: '36px',
                 flexShrink: 0,
+                overflow: 'hidden',
               }}
             >
-              {emoji}
+              {isImageUrl(thumb) ? (
+                <img src={thumb} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                thumb ?? cropEmoji(product.cropType)
+              )}
             </div>
 
             <div style={{ flex: 1 }}>

@@ -30,18 +30,23 @@ case "$INFLUXDB_URL" in
   *) INFLUXDB_URL="https://$INFLUXDB_URL" ;;
 esac
 
-FARM_ID="1be8074d-7c15-4d5d-8368-32830d0663ca"
-
-# Sensor IDs
-TEMP_SENSOR="sensor-temp-001"
-HUMID_SENSOR="sensor-humid-001"
-LIGHT_SENSOR="sensor-light-001"
-MOIST_SENSOR="sensor-moist-001"
+# Farm IDs — PHẢI khớp các vườn demo trong be/scripts/seed-demo-scenario.sql.
+# (Backend query InfluxDB theo tag farmId = id vườn trong bảng farms.)
+FARM_IDS=(
+  "a1111111-0000-4000-8000-000000000001"  # Vườn xoài cát Hòa Lộc
+  "a1111111-0000-4000-8000-000000000002"  # Vườn sầu riêng Monthong
+)
 
 NOW=$(date +%s)
 LINES=""
 
-# Sinh dữ liệu 7 ngày qua, mỗi 30 phút một điểm = 48 điểm/ngày/sensor
+# Schema line-protocol PHẢI khớp InfluxSensorService (be/apps/monitoring-service):
+#   measurement = sensor_reading (số ít)
+#   tags        = farmId, sensorType, isImputed   (camelCase)
+#   field       = value (float)
+#   sensorType ∈ temperature | humidity | light | soil_moisture
+# Sinh dữ liệu 7 ngày qua, mỗi 30 phút một điểm = 48 điểm/ngày/sensor cho mỗi vườn
+for FARM_ID in "${FARM_IDS[@]}"; do
 for day in $(seq 6 -1 0); do
   for slot in $(seq 0 47); do
     TS=$(( NOW - day * 86400 - slot * 1800 ))
@@ -78,16 +83,20 @@ for day in $(seq 6 -1 0); do
     # Soil moisture (%)
     MOIST=$(awk -v r=$RANDOM 'BEGIN { printf "%.1f", 45 + (r%350)/10.0 }')
 
+    # ~12% điểm đánh dấu isImputed=true để test NFR-A01.
+    IMP=$(awk -v r=$RANDOM 'BEGIN { print (r%100 < 12) ? "true" : "false" }')
+
     LINES="$LINES
-sensor_readings,farm_id=${FARM_ID},sensor_id=${TEMP_SENSOR},sensor_type=temperature value=${TEMP},isImputed=false ${TS_NS}
-sensor_readings,farm_id=${FARM_ID},sensor_id=${HUMID_SENSOR},sensor_type=humidity value=${HUMID},isImputed=false ${TS_NS}
-sensor_readings,farm_id=${FARM_ID},sensor_id=${LIGHT_SENSOR},sensor_type=light value=${LIGHT},isImputed=false ${TS_NS}
-sensor_readings,farm_id=${FARM_ID},sensor_id=${MOIST_SENSOR},sensor_type=moisture value=${MOIST},isImputed=false ${TS_NS}"
+sensor_reading,farmId=${FARM_ID},sensorType=temperature,isImputed=${IMP} value=${TEMP} ${TS_NS}
+sensor_reading,farmId=${FARM_ID},sensorType=humidity,isImputed=${IMP} value=${HUMID} ${TS_NS}
+sensor_reading,farmId=${FARM_ID},sensorType=light,isImputed=${IMP} value=${LIGHT} ${TS_NS}
+sensor_reading,farmId=${FARM_ID},sensorType=soil_moisture,isImputed=${IMP} value=${MOIST} ${TS_NS}"
   done
+done
 done
 
 PAYLOAD=$(echo "$LINES" | grep -v '^$')
-COUNT=$(echo "$PAYLOAD" | grep -c sensor_readings)
+COUNT=$(echo "$PAYLOAD" | grep -c sensor_reading)
 
 echo "Ghi $COUNT điểm vào ${INFLUXDB_URL} (org=${ORG}, bucket=${BUCKET})..."
 

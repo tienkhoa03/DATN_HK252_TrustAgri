@@ -4,6 +4,16 @@
  */
 
 /**
+ * Phân biệt giá trị là URL ảnh (http/https/data/blob/đường dẫn) hay emoji/text.
+ * Các field như product.images[0] hoặc news.imageUrl có thể chứa cả hai dạng;
+ * dùng để quyết định render <img> thay vì in chuỗi đường dẫn ra màn hình.
+ */
+export function isImageUrl(value?: string | null): boolean {
+  if (!value) return false;
+  return /^(https?:\/\/|data:image\/|blob:|\/)/i.test(value.trim());
+}
+
+/**
  * Image loading options
  */
 interface ImageLoadOptions {
