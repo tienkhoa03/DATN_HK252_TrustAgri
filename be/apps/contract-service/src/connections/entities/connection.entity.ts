@@ -12,7 +12,7 @@ export type ConnectionStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled'
 export type ConnectionRole = 'farmer' | 'trader';
 
 @Entity('connections')
-@Check('"from_user_id" <> "to_user_id"')
+// Cho phép tự kết nối (from_user_id == to_user_id) khi tài khoản giữ cả vai trò nông dân & thương lái
 @Check(`"status" IN ('pending', 'accepted', 'rejected', 'cancelled')`)
 @Check(`"from_role" IN ('farmer', 'trader')`)
 @Check(`"to_role" IN ('farmer', 'trader')`)

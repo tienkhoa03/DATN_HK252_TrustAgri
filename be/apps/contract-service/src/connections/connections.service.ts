@@ -66,6 +66,34 @@ export class ConnectionsService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     await this.ensureTraderReviewsTable();
+    await this.dropSelfConnectionCheck();
+  }
+
+  // Gỡ CHECK "from_user_id <> to_user_id" trên DB đã sync để cho phép tự kết nối.
+  // TypeORM synchronize không phải lúc nào cũng tự drop check constraint cũ.
+  private async dropSelfConnectionCheck(): Promise<void> {
+    try {
+      const [tbl] = await this.dataSource.query<[{ exists: boolean }]>(
+        `SELECT to_regclass('public.connections') IS NOT NULL AS exists`,
+      );
+      if (!tbl?.exists) return;
+      await this.dataSource.query(`
+        DO $$
+        DECLARE c record;
+        BEGIN
+          FOR c IN
+            SELECT conname FROM pg_constraint
+            WHERE conrelid = 'public.connections'::regclass
+              AND contype = 'c'
+              AND pg_get_constraintdef(oid) ILIKE '%from_user_id%<>%to_user_id%'
+          LOOP
+            EXECUTE 'ALTER TABLE public.connections DROP CONSTRAINT ' || quote_ident(c.conname);
+          END LOOP;
+        END $$;
+      `);
+    } catch (err) {
+      this.logger.error(`dropSelfConnectionCheck thất bại: ${(err as Error).message}`);
+    }
   }
 
   // Đảm bảo bảng trader_reviews tồn tại trước khi searchTraders chạy raw SQL
@@ -323,9 +351,7 @@ export class ConnectionsService implements OnModuleInit {
     userId: string,
     userRole: 'farmer' | 'trader',
   ): Promise<ConnectionDto> {
-    if (userId === dto.toUserId) {
-      throw new BadRequestException('Không thể gửi yêu cầu kết nối cho chính mình');
-    }
+    const isSelfConnection = userId === dto.toUserId;
 
     // Kiểm tra người nhận tồn tại và có vai trò hợp lệ
     const toUserRows = await this.dataSource.query<{ user_id: string; roles: string }[]>(
@@ -336,12 +362,28 @@ export class ConnectionsService implements OnModuleInit {
       throw new NotFoundException('Người dùng đích không tồn tại');
     }
     const userRoles = (toUserRows[0].roles ?? '').split(',').map((r) => r.trim());
-    const toRole = (userRoles.includes('farmer') ? 'farmer' : userRoles.includes('trader') ? 'trader' : null) as 'farmer' | 'trader' | null;
 
-    if (toRole == null) {
-      throw new BadRequestException(
-        'Chỉ có thể kết nối với nông dân hoặc thương lái',
-      );
+    let toRole: 'farmer' | 'trader' | null;
+    if (isSelfConnection) {
+      // Tự kết nối: nối vai trò nông dân ↔ thương lái của cùng một tài khoản.
+      // Cần giữ cả hai vai trò; toRole là vai trò đối diện fromRole.
+      toRole = userRole === 'farmer' ? 'trader' : 'farmer';
+      if (!userRoles.includes(toRole)) {
+        throw new BadRequestException(
+          'Cần có cả vai trò nông dân và thương lái để tự kết nối với chính mình',
+        );
+      }
+    } else {
+      toRole = (userRoles.includes('farmer')
+        ? 'farmer'
+        : userRoles.includes('trader')
+          ? 'trader'
+          : null) as 'farmer' | 'trader' | null;
+      if (toRole == null) {
+        throw new BadRequestException(
+          'Chỉ có thể kết nối với nông dân hoặc thương lái',
+        );
+      }
     }
 
     // Trùng chỉ khi cùng from + to + farm (một thương lái có thể kết nối nhiều vườn của cùng nông dân)
@@ -388,16 +430,25 @@ export class ConnectionsService implements OnModuleInit {
       toUserPhone: denorm.toUserPhone,
       farmName: denorm.farmName,
       message: dto.message ?? null,
-      status: 'pending',
+      // Tự kết nối được chấp nhận ngay vì không có bên thứ hai để phản hồi
+      status: isSelfConnection ? 'accepted' : 'pending',
+      respondedAt: isSelfConnection ? new Date() : null,
     });
 
     const saved = await this.connectionRepo.save(entity);
     const connectionDto = this.toDto(saved);
 
-    await this.publisher.publishConnectionRequested(connectionDto);
-    this.logger.log(
-      `Connection requested: id=${saved.id} from=${userId} to=${dto.toUserId}`,
-    );
+    if (isSelfConnection) {
+      // Không phát connection.requested để tránh tự gửi thông báo cho chính mình
+      this.logger.log(
+        `Self-connection created & auto-accepted: id=${saved.id} user=${userId} ${userRole}↔${toRole}`,
+      );
+    } else {
+      await this.publisher.publishConnectionRequested(connectionDto);
+      this.logger.log(
+        `Connection requested: id=${saved.id} from=${userId} to=${dto.toUserId}`,
+      );
+    }
 
     return connectionDto;
   }
